@@ -4,399 +4,430 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>压缩机效率计算器 (CoolProp)</title>
+    <!-- 加载 Tailwind CSS 以实现现代化样式 -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f7f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-        h1, h2 {
-            color: #333;
-            text-align: center;
-        }
-        #app-container {
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            width: 100%;
-            max-width: 800px;
-            overflow: hidden;
-        }
-        #loading {
-            padding: 40px;
-            text-align: center;
-            font-size: 1.2em;
-            color: #555;
-        }
-        #calculator {
-            display: none; /* 初始隐藏，WASM加载后显示 */
-            padding: 30px;
-        }
-        .input-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
+        /* 增加输入框的默认垂直间距 */
         .input-group {
-            display: flex;
-            flex-direction: column;
+            margin-bottom: 0.75rem; /* 12px */
         }
-        .input-group label {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #444;
-        }
-        .input-group input,
-        .input-group select {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1em;
-        }
-        .radio-group {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            padding-top: 5px;
-        }
-        button {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #fff;
-            background-color: #007aff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 30px;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #005bb5;
-        }
-        button:disabled {
-            background-color: #a0a0a0;
-            cursor: not-allowed;
-        }
-        #results-container {
-            margin-top: 30px;
-            background-color: #fafafa;
-            border: 1px solid #eee;
-            border-radius: 5px;
-        }
-        #results-container h2 {
-            margin: 0;
-            padding: 15px 20px;
-            background-color: #f0f0f0;
-            border-bottom: 1px solid #ddd;
-        }
-        #results-summary {
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            font-size: 1.1em;
-        }
-        #results-summary .result-item {
-            padding: 10px;
-            background-color: #e9f5ff;
-            border: 1px solid #cce4f7;
-            border-radius: 5px;
-        }
-        #results-summary .result-item strong {
-            font-size: 1.3em;
-            color: #005bb5;
-        }
-        #results-details {
-            padding: 0 20px 20px 20px;
-            font-family: "Courier New", Courier, monospace;
-            white-space: pre-wrap;
-            background-color: #2d2d2d;
-            color: #f0f0f0;
-            border-radius: 0 0 5px 5px;
-            overflow-x: auto;
-            max-height: 400px;
-        }
-        .error {
-            color: #d90000;
-            font-weight: bold;
+        /* 修正 Tailwind form-radio 的默认样式 */
+        input[type="radio"] {
+            margin-top: -0.1rem;
         }
     </style>
 </head>
-<body>
+<body class="bg-gray-100 font-sans antialiased">
 
-    <div id="app-container">
-        <div id="loading">
-            <p>正在加载 CoolProp 物性库 (WASM)...</p>
-            <p>如果长时间未响应，请确保 `coolprop.js` 和 `coolprop.wasm` 文件在同一目录下。</p>
-        </div>
+    <div class="container mx-auto p-4 sm:p-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">压缩机性能计算器</h1>
 
-        <div id="calculator">
-            <h1>压缩机效率计算器</h1>
+        <div class="bg-white shadow-xl rounded-lg p-6 sm:p-8">
             
-            <div class="input-grid">
-                <div class="input-column">
-                    <div class="input-group">
-                        <label for="refrigerant">制冷剂:</label>
-                        <select id="refrigerant">
-                            <option value="R134a">R134a</option>
-                            <option value="R245fa">R245fa</option>
-                            <option value="R1233zd(E)">R1233zd(E)</option>
-                            <option value="R1234ze(E)">R1234ze(E)</option>
-                            <option value="R515B">R515B</option>
-                            <option value="R290">R290 (丙烷)</option>
-                            <option value="R717">R717 (氨)</option>
-                            <option value="R744">R744 (CO2)</option>
-                        </select>
+            <!-- 输入表单 -->
+            <form id="calc-form">
+                <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">1. 输入参数</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                    <!-- 左侧：工质和压缩机 -->
+                    <div>
+                        <fieldset class="border p-4 rounded-lg mb-4">
+                            <legend class="font-medium px-2">工质与压缩机</legend>
+                            
+                            <!-- 更改 1: 制冷剂下拉菜单 -->
+                            <div class="input-group">
+                                <label for="fluid" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
+                                <select id="fluid" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white" required>
+                                    <option value="R134a" selected>R134a</option>
+                                    <option value="R245fa">R245fa</option>
+                                    <option value="R1233zd(E)">R1233zd(E)</option>
+                                    <option value="R1234ze(E)">R1234ze(E)</option>
+                                    <option value="R515B">R515B</option>
+                                    <option value="R123">R123</option>
+                                    <option value="R22">R22</option>
+                                    <option value="R410A">R410A</option>
+                                    <option value="R32">R32</option>
+                                    <option value="R290">R290</option>
+                                    <option value="R717">R717 (Ammonia)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 更改 3: 理论输气量模式 (已修改) -->
+
+                            <div class="input-group">
+                                <label for="rpm" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
+                                <input type="number" id="rpm" value="3000" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+
+                            <div class="input-group">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">理论输气量模式</label>
+                                <div class="flex space-x-4">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="flow_mode" id="flow_mode_rpm" value="rpm" class="form-radio" checked>
+                                        <span class="ml-2">按转速与排量</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="flow_mode" id="flow_mode_vol" value="vol" class="form-radio">
+                                        <span class="ml-2">按体积流量</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- 模式1: 转速与排量 -->
+                            <div id="rpm-inputs">
+                                <div class="input-group">
+                                    <label for="displacement" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³)</label>
+                                    <input type="number" id="displacement" value="500" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                </div>
+                            </div>
+
+                            <!-- 模式2: 体积流量 -->
+                            <div id="vol-inputs" style="display: none;">
+                                <div class="input-group">
+                                    <label for="flow_m3h" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
+                                    <input type="number" id="flow_m3h" value="100" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border p-4 rounded-lg mb-4">
+                             <legend class="font-medium px-2">功率与容量</legend>
+                            <div class="input-group">
+                                <label for="capacity" class="block text-sm font-medium text-gray-700 mb-1">制冷量 (kW)</label>
+                                <input type="number" id="capacity" value="50" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            
+                            <!-- 更改 4: 功率模式 -->
+                            <div class="input-group">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">功率模式</label>
+                                <div class="flex space-x-4">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="power_mode" id="power_mode_shaft" value="shaft" class="form-radio" checked>
+                                        <span class="ml-2">轴功率</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="power_mode" id="power_mode_input" value="input" class="form-radio">
+                                        <span class="ml-2">输入功率 (电机)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="power" id="power-label" class="block text-sm font-medium text-gray-700 mb-1">轴功率 (kW)</label>
+                                <input type="number" id="power" value="12" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                        </fieldset>
                     </div>
-                    <div class="input-group">
-                        <label for="t_evap">蒸发温度 (T_evap):</label>
-                        <input type="number" id="t_evap" value="10" placeholder="例如: 10">
-                    </div>
-                    <div class="input-group">
-                        <label for="t_cond">冷凝温度 (T_cond):</label>
-                        <input type="number" id="t_cond" value="80" placeholder="例如: 80">
-                    </div>
-                    <div class="input-group">
-                        <label for="t_subcool">过冷度 (ΔT_sub):</label>
-                        <input type="number" id="t_subcool" value="2" placeholder="例如: 2">
-                    </div>
-                    <div class="input-group">
-                        <label for="t_superheat">有效过热度 (ΔT_sh):</label>
-                        <input type="number" id="t_superheat" value="5" placeholder="例如: 5">
+
+                    <!-- 右侧：热力学工况 -->
+                    <div>
+                        <fieldset class="border p-4 rounded-lg mb-4">
+                            <legend class="font-medium px-2">热力学工况</legend>
+                            <div class="input-group">
+                                <label for="temp_evap" class="block text-sm font-medium text-gray-700 mb-1">蒸发温度 (°C)</label>
+                                <input type="number" id="temp_evap" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="temp_cond" class="block text-sm font-medium text-gray-700 mb-1">冷凝温度 (°C)</label>
+                                <input type="number" id="temp_cond" value="50" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="superheat" class="block text-sm font-medium text-gray-700 mb-1">有效过热度 (K)</label>
+                                <input type="number" id="superheat" value="10" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="subcooling" class="block text-sm font-medium text-gray-700 mb-1">过冷度 (K)</label>
+                                <input type="number" id="subcooling" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                        </fieldset>
                     </div>
                 </div>
 
-                <div class="input-column">
-                    <div class="input-group">
-                        <label>容量类型:</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="capacity_type" value="cooling" checked> 制冷量 (Q_evap)</label>
-                            <label><input type="radio" name="capacity_type" value="heating"> 制热量 (Q_cond)</label>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="capacity">容量 (Q):</label>
-                        <input type="number" id="capacity" value="1000" placeholder="单位: kW">
-                    </div>
-                    <div class="input-group">
-                        <label for="power_shaft">压缩机轴功率 (P_shaft):</label>
-                        <input type="number" id="power_shaft" value="250" placeholder="单位: kW">
-                    </div>
-                    <div class="input-group">
-                        <label for="displacement">理论排量 (V_theo):</label>
-                        <input type="number" id="displacement" value="1200" placeholder="单位: m³/h">
-                    </div>
+                <!-- 提交按钮 -->
+                <div class="mt-4 text-center">
+                    <button type="submit" id="calc-button" class="w-full md:w-1/2 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
+                        正在加载物性库...
+                    </button>
                 </div>
+            </form>
+
+            <!-- 结果显示 -->
+            <div class="mt-8">
+                <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">2. 计算结果</h2>
+                <!-- 更改 2: 结果区背景色 -->
+                <pre id="results" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[200px] font-mono text-sm">
+--- 请输入参数并点击计算 ---
+--- 确保 coolprop.js 和 coolprop.wasm 与此 html 文件在同一文件夹中 ---
+--- 并且, 您必须通过本地服务器 (如 VSCode "Go Live") 运行此文件, 否则 .wasm 可能加载失败 ---
+                </pre>
             </div>
 
-            <button id="calc-button">开始计算</button>
+        </div> <!-- end card -->
+    </div> <!-- end container -->
 
-            <div id="results-container" style="display: none;">
-                <h2>计算结果</h2>
-                <div id="results-summary"></div>
-                <pre id="results-details"></pre>
-            </div>
-        </div>
-    </div>
 
+    <!-- JavaScript 逻辑 -->
     <script type="module">
-        // 1. 从本地 coolprop.js 文件导入模块
+        // 1. 导入 CoolProp 模块
+        // 假设 coolprop.js 和 coolprop.wasm 在同一目录下
         import Module from './coolprop.js';
 
-        // 2. 定义将持有物性库实例的变量
-        let CP; 
-        
-        // 3. 获取所有需要的页面元素
-        const loadingEl = document.getElementById('loading');
-        const calculatorEl = document.getElementById('calculator');
+        let CP; // 全局变量，用于持有 CoolProp 实例
         const calcButton = document.getElementById('calc-button');
-        const resultsContainer = document.getElementById('results-container');
-        const summaryEl = document.getElementById('results-summary');
-        const detailsEl = document.getElementById('results-details');
+        const resultsDiv = document.getElementById('results');
+        const calcForm = document.getElementById('calc-form');
 
-        // 4. 异步初始化 CoolProp 模块 (使用您成功的逻辑)
+        // 新增: UI 切换元素
+        const flowModeRadios = document.querySelectorAll('input[name="flow_mode"]');
+        const rpmInputs = document.getElementById('rpm-inputs');
+        const volInputs = document.getElementById('vol-inputs');
+        const flowM3hInput = document.getElementById('flow_m3h');
+        const displacementInput = document.getElementById('displacement');
+        const rpmInput = document.getElementById('rpm'); // RPM 输入框现在是独立的
+
+        const powerModeRadios = document.querySelectorAll('input[name="power_mode"]');
+        const powerLabel = document.getElementById('power-label');
+
+
+        // 2. 异步初始化物性库
         async function initializeCoolProp() {
             try {
-                // 这会正确加载 coolprop.js 和 coolprop.wasm
+                resultsDiv.textContent = "--- 正在加载物性库 (coolprop.js & coolprop.wasm)... ---";
                 CP = await Module();
                 
-                // 物性库加载成功
-                loadingEl.style.display = 'none'; // 隐藏加载提示
-                calculatorEl.style.display = 'block'; // 显示计算器
-                calcButton.disabled = false; // 启用按钮
-                calcButton.textContent = "开始计算";
-                console.log("CoolProp loaded successfully via ESM import.");
+                resultsDiv.textContent = "--- 物性库加载成功，请输入参数并点击计算 ---";
+                calcButton.disabled = false;
+                calcButton.textContent = "计算效率";
 
             } catch (err) {
-                // 加载失败
-                loadingEl.innerHTML = 
-                    `<p class="error">CoolProp 加载失败!</p>
-                     <p>请确保 'coolprop.js' 和 'coolprop.wasm' 文件在同一文件夹中。</p>
-                     <p>错误: ${err.message}</p>`;
+                resultsDiv.textContent = `物性库加载失败: ${err.message}\n\n请检查文件路径是否正确，并确保使用本地服务器 (http://) 运行。`;
                 console.error(err);
             }
         }
 
-        // 5. 将计算功能绑定到按钮点击事件
-        calcButton.onclick = function() {
-            // 确保 CP 实例已准备就绪
+        // --- 新增: UI 切换逻辑 (更改 3 & 4) ---
+        flowModeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.value === 'rpm') {
+                    rpmInputs.style.display = 'block';
+                    volInputs.style.display = 'none';
+                    // 动态设置表单验证
+                    displacementInput.required = true;
+                    flowM3hInput.required = false;
+                } else {
+                    rpmInputs.style.display = 'none';
+                    volInputs.style.display = 'block';
+                    displacementInput.required = false;
+                    flowM3hInput.required = true;
+                }
+                // RPM 转速输入框 (rpmInput) 始终是必需的，不受切换影响
+            });
+        });
+
+        powerModeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.value === 'shaft') {
+                    powerLabel.textContent = '轴功率 (kW)';
+                } else {
+                    powerLabel.textContent = '输入功率 (kW) (电机)';
+                }
+            });
+        });
+        // --- UI 切换逻辑结束 ---
+
+
+        // 3. 绑定表单提交事件
+        calcForm.addEventListener('submit', (event) => {
+            event.preventDefault(); // 阻止表单默认提交
             if (!CP) {
-                alert("CoolProp 物性库尚未加载完成，请稍候。");
+                resultsDiv.textContent = "物性库未加载，请刷新页面。";
                 return;
             }
-            
-            // 开始计算 (这是我们之前的计算函数)
             calculate();
-        };
+        });
 
-        // 6. 页面加载时，禁用按钮，直到模块准备就绪
-        calcButton.disabled = true;
-        calcButton.textContent = "正在加载物性库...";
-        
-        // 7. 立即开始初始化
-        initializeCoolProp();
-
-
-        // --- 主计算函数 ---
-        // (这个函数现在在模块作用域内，可以访问 'CP' 变量)
+        // 4. 主计算函数 (已更新以处理新逻辑)
         function calculate() {
-            // 清空上次结果
-            summaryEl.innerHTML = '';
-            detailsEl.textContent = '';
-            resultsContainer.style.display = 'none';
-
             try {
-                // 1. 获取所有输入值
-                const ref = document.getElementById('refrigerant').value;
-                const T_evap_C = parseFloat(document.getElementById('t_evap').value);
-                const T_cond_C = parseFloat(document.getElementById('t_cond').value);
-                const T_sub_K = parseFloat(document.getElementById('t_subcool').value);
-                const T_sh_K = parseFloat(document.getElementById('t_superheat').value);
-                
-                const capacity_type = document.querySelector('input[name="capacity_type"]:checked').value;
-                const Q_kW = parseFloat(document.getElementById('capacity').value);
-                const P_shaft_kW = parseFloat(document.getElementById('power_shaft').value);
-                const V_theo_m3h = parseFloat(document.getElementById('displacement').value);
+                // --- A. 获取所有输入值 ---
+                const fluid = document.getElementById('fluid').value;
+                // 新增: 获取模式
+                const flow_mode = document.querySelector('input[name="flow_mode"]:checked').value;
+                const power_mode = document.querySelector('input[name="power_mode"]:checked').value;
 
-                if ([T_evap_C, T_cond_C, T_sub_K, T_sh_K, Q_kW, P_shaft_kW, V_theo_m3h].some(isNaN)) {
-                    throw new Error("所有输入项都必须是数字。");
+                // 获取 RPM (现在是共享的)
+                const rpm_val = parseFloat(document.getElementById('rpm').value);
+                if (isNaN(rpm_val)) throw new Error("请输入有效的压缩机转速 (RPM)。");
+
+                const Qe_kW = parseFloat(document.getElementById('capacity').value);
+                const Win_kW = parseFloat(document.getElementById('power').value);
+                const Te_C = parseFloat(document.getElementById('temp_evap').value);
+                const Tc_C = parseFloat(document.getElementById('temp_cond').value);
+                const dT_sh_K = parseFloat(document.getElementById('superheat').value);
+                const dT_sc_K = parseFloat(document.getElementById('subcooling').value);
+
+                // 检查无效输入
+                if (isNaN(Qe_kW) || isNaN(Win_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
+                    throw new Error("输入包含无效数字，请检查热力学工况、功率或容量字段。");
                 }
 
-                // 2. 单位转换为 SI
-                const T_evap_K = T_evap_C + 273.15;
-                const T_cond_K = T_cond_C + 273.15;
-                const Q_W = Q_kW * 1000;
-                const P_shaft_W = P_shaft_kW * 1000;
-                const V_theo_m3s = V_theo_m3h / 3600;
-
-                let details = "--- 计算过程 ---\n";
-                details += `制冷剂: ${ref}\n`;
-                details += `理论排量 (V_theo): ${V_theo_m3h.toFixed(2)} m³/h (${V_theo_m3s.toFixed(5)} m³/s)\n\n`;
-
-                // 3. 计算关键热力学状态点
-                const P_evap_Pa = CP.PropsSI("P", "T", T_evap_K, "Q", 0, ref);
-                const P_cond_Pa = CP.PropsSI("P", "T", T_cond_K, "Q", 0, ref);
-                details += "--- 压力 ---\n";
-                details += `蒸发压力 (P_evap): ${(P_evap_Pa / 1e5).toFixed(3)} bar\n`;
-                details += `冷凝压力 (P_cond): ${(P_cond_Pa / 1e5).toFixed(3)} bar\n\n`;
-
-                // 状态点 1
-                const T1_K = T_evap_K + T_sh_K;
-                const h1_J_kg = CP.PropsSI("H", "T", T1_K, "P", P_evap_Pa, ref);
-                const s1_J_kgK = CP.PropsSI("S", "T", T1_K, "P", P_evap_Pa, ref);
-                const v1_m3_kg = CP.PropsSI("V", "T", T1_K, "P", P_evap_Pa, ref);
-                details += "--- 状态点 1 (压缩机入口) ---\n";
-                details += `T1: ${T1_K.toFixed(2)} K (${(T1_K - 273.15).toFixed(2)} °C)\n`;
-                details += `h1: ${(h1_J_kg / 1000).toFixed(2)} kJ/kg\n`;
-                details += `s1: ${(s1_J_kgK / 1000).toFixed(4)} kJ/kg·K\n`;
-                details += `v1: ${v1_m3_kg.toFixed(5)} m³/kg\n\n`;
-
-                // 状态点 2s
-                const h2s_J_kg = CP.PropsSI("H", "S", s1_J_kgK, "P", P_cond_Pa, ref);
-                const T2s_K = CP.PropsSI("T", "S", s1_J_kgK, "P", P_cond_Pa, ref);
-                details += "--- G 状态点 2s (等熵出口) ---\n";
-                details += `h2s: ${(h2s_J_kg / 1000).toFixed(2)} kJ/kg\n`;
-                details += `T2s: ${T2s_K.toFixed(2)} K (${(T2s_K - 273.15).toFixed(2)} °C)\n\n`;
-
-                // 状态点 3
-                const T3_K = T_cond_K - T_sub_K;
-                const h3_J_kg = CP.PropsSI("H", "T", T3_K, "P", P_cond_Pa, ref);
-                details += "--- 状态点 3 (节流阀入口) ---\n";
-                details += `T3: ${T3_K.toFixed(2)} K (${(T3_K - 273.15).toFixed(2)} °C)\n`;
-                details += `h3: ${(h3_J_kg / 1000).toFixed(2)} kJ/kg\n\n`;
-
-                // 状态点 4
-                const h4_J_kg = h3_J_kg;
-
-                // 4. 计算性能
-                const q_evap_J_kg = h1_J_kg - h4_J_kg;
-                const w_isen_J_kg = h2s_J_kg - h1_J_kg;
+                // --- B. 单位转换 (CoolProp 使用 SI 单位) ---
+                const Te_K = Te_C + 273.15;
+                const Tc_K = Tc_C + 273.15;
+                const Qe_W = Qe_kW * 1000;
+                const Win_W = Win_kW * 1000;
                 
-                details += "--- 性能计算 ---\n";
-                details += `单位制冷量 (q_evap): ${(q_evap_J_kg / 1000).toFixed(2)} kJ/kg\n`;
-                details += `单位等熵功 (w_isen): ${(w_isen_J_kg / 1000).toFixed(2)} kJ/kg\n`;
+                // 理论体积流量 (m³/s) - 根据模式计算 (更改 3)
+                let V_th_m3_s;
+                let V_rev_cm3_val = NaN, V_th_m3_h_val = NaN;
 
-                // 实际质量流量
-                let m_actual_kg_s;
-                if (capacity_type === 'cooling') {
-                    m_actual_kg_s = Q_W / q_evap_J_kg;
-                    details += `基于制冷量 ${Q_kW} kW 计算...\n`;
+                if (flow_mode === 'rpm') {
+                    V_rev_cm3_val = parseFloat(document.getElementById('displacement').value);
+                    if (isNaN(V_rev_cm3_val)) throw new Error("请检查每转排量输入。");
+                    if (rpm_val <= 0) throw new Error("转速必须大于 0 才能计算体积流量。");
+                    
+                    V_th_m3_s = (V_rev_cm3_val / 1e6) * (rpm_val / 60);
+                    // 额外计算 m³/h 用于显示
+                    V_th_m3_h_val = V_th_m3_s * 3600;
+
+                } else { // flow_mode === 'vol'
+                    V_th_m3_h_val = parseFloat(document.getElementById('flow_m3h').value);
+                    if (isNaN(V_th_m3_h_val)) throw new Error("请检查体积流量输入。");
+                    if (rpm_val <= 0) throw new Error("转速必须大于 0 才能计算每转排量。");
+
+                    V_th_m3_s = V_th_m3_h_val / 3600; // m³/h -> m³/s
+                    // 额外反算 cm³/rev 用于显示
+                    V_rev_cm3_val = (V_th_m3_s * 60 / rpm_val) * 1e6;
+                }
+
+
+                // --- C. 计算热力学状态点 (SI 单位) ---
+
+                // 状态点 1 (压缩机入口)
+                const T1_K = Te_K + dT_sh_K;
+                const Pe_Pa = CP.PropsSI('P', 'T', Te_K, 'Q', 1, fluid); // 蒸发压力 (Pa)
+                const h1_J_kg = CP.PropsSI('H', 'T', T1_K, 'P', Pe_Pa, fluid); // 焓 (J/kg)
+                const s1_J_kgK = CP.PropsSI('S', 'T', T1_K, 'P', Pe_Pa, fluid); // 熵 (J/kg·K)
+                const rho1_kg_m3 = CP.PropsSI('D', 'T', T1_K, 'P', Pe_Pa, fluid); // 密度 (kg/m³)
+                const v1_m3_kg = 1 / rho1_kg_m3; // 比容 (m³/kg)
+
+                // 状态点 3 (膨胀阀入口)
+                const T3_K = Tc_K - dT_sc_K;
+                const Pc_Pa = CP.PropsSI('P', 'T', Tc_K, 'Q', 0, fluid); // 冷凝压力 (Pa)
+                const h3_J_kg = CP.PropsSI('H', 'T', T3_K, 'P', Pc_Pa, fluid); // 焓 (J/kg)
+
+                // 状态点 4 (蒸发器入口)
+                const h4_J_kg = h3_J_kg; // 等焓膨胀
+
+                // 状态点 2s (等熵压缩出口)
+                const h2s_J_kg = CP.PropsSI('H', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); // 等熵焓 (J/kg)
+
+                // --- D. 计算性能参数 ---
+
+                // 1. 质量流量 (kg/s)
+                const h_evap_J_kg = h1_J_kg - h4_J_kg; // 蒸发器焓差
+                if (h_evap_J_kg <= 0) {
+                    throw new Error("计算出错：制冷焓差小于等于零。");
+                }
+                const m_dot_kg_s = Qe_W / h_evap_J_kg;
+
+                // 2. 等熵功率 (W)
+                const h_isen_J_kg = h2s_J_kg - h1_J_kg; // 等熵压缩焓升
+                const Ws_W = m_dot_kg_s * h_isen_J_kg;
+
+                // 3. 实际入口体积流量 (m³/s)
+                const V_actual_m3_s = m_dot_kg_s * v1_m3_kg;
+
+                // --- E. 计算效率 ---
+
+                // 1. 等熵效率
+                if (Win_W <= 0) {
+                    throw new Error("输入功率必须大于零。");
+                }
+                const eta_s = (Ws_W / Win_W); // 核心计算 (Ws / W_provided)
+
+                // 2. 容积效率
+                if (V_th_m3_s <= 0) {
+                    throw new Error("理论排量必须大于零。");
+                }
+                const eta_v = (V_actual_m3_s / V_th_m3_s);
+
+                // --- F. 格式化输出 (已更新 更改 3 & 4) ---
+                
+                // 确定效率标签
+                const efficiencyLabel = (power_mode === 'shaft') ? 
+                    `等熵效率 (η_s = Ws / W_shaft)` : 
+                    `总等熵效率 (η_total = Ws / W_in)`;
+                
+                const powerInputLabel = (power_mode === 'shaft') ? 
+                    `轴功率 (Win)` : 
+                    `输入功率 (Win)`;
+
+                let output = `
+--- 计算概览 (工质: ${fluid}) ---
+蒸发压力 (Pe): ${(Pe_Pa / 1e5).toFixed(3)} bar
+冷凝压力 (Pc): ${(Pc_Pa / 1e5).toFixed(3)} bar
+压缩比 (PR):   ${(Pc_Pa / Pe_Pa).toFixed(2)}
+
+--- 关键状态点 ---
+状态 1 (入口):
+  T1 = ${T1_K.toFixed(2)} K (${(T1_K - 273.15).toFixed(2)} °C)
+  h1 = ${(h1_J_kg / 1000).toFixed(2)} kJ/kg
+  s1 = ${(s1_J_kgK / 1000).toFixed(4)} kJ/kg·K
+  v1 = ${v1_m3_kg.toFixed(5)} m³/kg
+
+状态 3 (阀前):
+  T3 = ${T3_K.toFixed(2)} K (${(T3_K - 273.15).toFixed(2)} °C)
+  h3 = ${(h3_J_kg / 1000).toFixed(2)} kJ/kg
+
+状态 2s (等熵出口):
+  h2s = ${(h2s_J_kg / 1000).toFixed(2)} kJ/kg
+
+--- 流量与功率 ---
+制冷焓差:     ${(h_evap_J_kg / 1000).toFixed(2)} kJ/kg
+质量流量 (m_dot): ${m_dot_kg_s.toFixed(5)} kg/s
+等熵功率 (Ws):   ${(Ws_W / 1000).toFixed(3)} kW
+${powerInputLabel}: ${Win_kW.toFixed(3)} kW
+
+--- 体积流量 (转速: ${rpm_val.toFixed(0)} RPM) ---
+`;
+
+                // 根据模式显示不同的输入/计算结果
+                if (flow_mode === 'rpm') {
+                    output += `输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
+                    output += `计算流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
                 } else {
-                    const Q_evap_W_calc = Q_W - P_shaft_W;
-                    m_actual_kg_s = Q_evap_W_calc / q_evap_J_kg;
-                    details += `基于制热量 ${Q_kW} kW 和轴功率 ${P_shaft_kW} kW 计算...\n`;
-                    details += `计算得到的制冷量 (Q_evap): ${(Q_evap_W_calc / 1000).toFixed(2)} kW\n`;
+                    output += `输入流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
+                    output += `计算排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
                 }
-                
-                // 理论质量流量
-                const m_theo_kg_s = V_theo_m3s / v1_m3_kg;
-                // 总等熵功率
-                const W_isen_W = m_actual_kg_s * w_isen_J_kg;
-                
-                details += `实际质量流量 (m_actual): ${m_actual_kg_s.toFixed(4)} kg/s\n`;
-                details += `理论质量流量 (m_theo): ${m_theo_kg_s.toFixed(4)} kg/s\n`;
-                details += `总等熵功率 (W_isen): ${(W_isen_W / 1000).toFixed(2)} kW\n`;
-                details += `输入轴功率 (P_shaft): ${P_shaft_kW.toFixed(2)} kW\n`;
 
-                // 5. 计算效率
-                const eta_vol = m_actual_kg_s / m_theo_kg_s;
-                const eta_isen = W_isen_W / P_shaft_W;
-                const eta_total = eta_vol * eta_isen;
+                output += `
+理论体积流量 (V_th): ${V_th_m3_s.toFixed(6)} m³/s
+实际体积流量 (V_act): ${V_actual_m3_s.toFixed(6)} m³/s
 
-                // 6. 显示结果
-                resultsContainer.style.display = 'block';
+========================================
+           最终效率计算
+========================================
+${efficiencyLabel}: ${(eta_s * 100).toFixed(2)} %
+容积效率 (η_v = V_act / V_th):       ${(eta_v * 100).toFixed(2)} %
+`;
+                resultsDiv.textContent = output;
 
-                summaryEl.innerHTML = `
-                    <div class="result-item">
-                        容积效率 (η_v):<br>
-                        <strong>${(eta_vol * 100).toFixed(2)} %</strong>
-                    </div>
-                    <div class="result-item">
-                        等熵效率 (η_s):<br>
-                        <strong>${(eta_isen * 100).toFixed(2)} %</strong>
-                    </div>
-                    <div class="result-item">
-                        总效率 (η_total = η_v × η_s):<br>
-                        <strong>${(eta_total * 100).toFixed(2)} %</strong>
-                    </div>
-                `;
-                detailsEl.textContent = details;
-
-            } catch (err) {
-                // 捕获计算错误
-                resultsContainer.style.display = 'block';
-                summaryEl.innerHTML = `<p class="error">计算失败!</p>`;
-                detailsEl.textContent = `错误信息: ${err.message}\n\n请检查您的输入参数是否在制冷剂的有效范围内 (例如，蒸发温度是否低于临界温度等)。`;
+            } catch (error) {
+                // 捕获物性计算或逻辑错误
+                resultsDiv.textContent = `计算出错: ${error.message}\n\n请检查输入参数是否在工质的有效范围内。`;
+                console.error(error);
             }
         }
 
+        // 5. 页面加载时，禁用按钮并开始初始化
+        calcButton.disabled = true;
+        initializeCoolProp();
+
     </script>
+
 </body>
 </html>
