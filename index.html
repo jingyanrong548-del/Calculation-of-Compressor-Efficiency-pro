@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>压缩机效率计算器 (CoolProp)</title>
-    <!-- 加载 Tailwind CSS 以实现现代化样式 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 增加输入框的默认垂直间距 */
@@ -24,22 +23,19 @@
 
         <div class="bg-white shadow-xl rounded-lg p-6 sm:p-8">
             
-            <!-- 输入表单 -->
             <form id="calc-form">
                 <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">1. 输入参数</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                    <!-- 左侧：工质和压缩机 -->
                     <div>
                         <fieldset class="border p-4 rounded-lg mb-4">
                             <legend class="font-medium px-2">工质与压缩机</legend>
                             
-                            <!-- 更改 1: 制冷剂下拉菜单 -->
                             <div class="input-group">
                                 <label for="fluid" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
                                 <select id="fluid" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white" required>
-                                    <option value="R134a" selected>R134a</option>
-                                    <option value="R245fa">R245fa</option>
+                                    <option value="R134a">R134a</option>
+                                    <option value="R245fa" selected>R245fa</option>
                                     <option value="R1233zd(E)">R1233zd(E)</option>
                                     <option value="R1234ze(E)">R1234ze(E)</option>
                                     <option value="R515B">R515B</option>
@@ -52,8 +48,6 @@
                                 </select>
                             </div>
                             
-                            <!-- 更改 3: 理论输气量模式 (已修改) -->
-
                             <div class="input-group">
                                 <label for="rpm" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
                                 <input type="number" id="rpm" value="3000" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
@@ -73,7 +67,6 @@
                                 </div>
                             </div>
 
-                            <!-- 模式1: 转速与排量 -->
                             <div id="rpm-inputs">
                                 <div class="input-group">
                                     <label for="displacement" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³)</label>
@@ -81,7 +74,6 @@
                                 </div>
                             </div>
 
-                            <!-- 模式2: 体积流量 -->
                             <div id="vol-inputs" style="display: none;">
                                 <div class="input-group">
                                     <label for="flow_m3h" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
@@ -97,7 +89,6 @@
                                 <input type="number" id="capacity" value="50" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
                             </div>
                             
-                            <!-- 更改 4: 功率模式 -->
                             <div class="input-group">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">功率模式</label>
                                 <div class="flex space-x-4">
@@ -119,7 +110,6 @@
                         </fieldset>
                     </div>
 
-                    <!-- 右侧：热力学工况 -->
                     <div>
                         <fieldset class="border p-4 rounded-lg mb-4">
                             <legend class="font-medium px-2">热力学工况</legend>
@@ -146,7 +136,6 @@
                     </div>
                 </div>
 
-                <!-- 提交按钮 -->
                 <div class="mt-4 text-center">
                     <button type="submit" id="calc-button" class="w-full md:w-1/2 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
                         正在加载物性库...
@@ -154,10 +143,8 @@
                 </div>
             </form>
 
-            <!-- 结果显示 -->
             <div class="mt-8">
                 <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">2. 计算结果</h2>
-                <!-- 更改 2: 结果区背景色 -->
                 <pre id="results" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[200px] font-mono text-sm">
 --- 请输入参数并点击计算 ---
 --- 确保 coolprop.js 和 coolprop.wasm 与此 html 文件在同一文件夹中 ---
@@ -165,12 +152,7 @@
                 </pre>
             </div>
 
-        </div> <!-- end card -->
-    </div> <!-- end container -->
-
-
-    <!-- JavaScript 逻辑 -->
-    <script type="module">
+        </div> </div> <script type="module">
         // 1. 导入 CoolProp 模块
         // 假设 coolprop.js 和 coolprop.wasm 在同一目录下
         import Module from './coolprop.js';
@@ -249,19 +231,15 @@
             calculate();
         });
 
-        // 4. 主计算函数 (已更新以处理新逻辑)
+        // 4. 主计算函数 (已更新以处理新逻辑和错误隔离)
         function calculate() {
             try {
                 // --- A. 获取所有输入值 ---
                 const fluid = document.getElementById('fluid').value;
-                // 新增: 获取模式
                 const flow_mode = document.querySelector('input[name="flow_mode"]:checked').value;
                 const power_mode = document.querySelector('input[name="power_mode"]:checked').value;
 
-                // 获取 RPM (现在是共享的)
                 const rpm_val = parseFloat(document.getElementById('rpm').value);
-                if (isNaN(rpm_val)) throw new Error("请输入有效的压缩机转速 (RPM)。");
-
                 const Qe_kW = parseFloat(document.getElementById('capacity').value);
                 const Win_kW = parseFloat(document.getElementById('power').value);
                 const Te_C = parseFloat(document.getElementById('temp_evap').value);
@@ -269,9 +247,8 @@
                 const dT_sh_K = parseFloat(document.getElementById('superheat').value);
                 const dT_sc_K = parseFloat(document.getElementById('subcooling').value);
 
-                // 检查无效输入
-                if (isNaN(Qe_kW) || isNaN(Win_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
-                    throw new Error("输入包含无效数字，请检查热力学工况、功率或容量字段。");
+                if (isNaN(rpm_val) || isNaN(Qe_kW) || isNaN(Win_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
+                    throw new Error("输入包含无效数字，请检查所有字段。");
                 }
 
                 // --- B. 单位转换 (CoolProp 使用 SI 单位) ---
@@ -280,91 +257,73 @@
                 const Qe_W = Qe_kW * 1000;
                 const Win_W = Win_kW * 1000;
                 
-                // 理论体积流量 (m³/s) - 根据模式计算 (更改 3)
+                // 理论体积流量 (m³/s) - 根据模式计算
                 let V_th_m3_s;
                 let V_rev_cm3_val = NaN, V_th_m3_h_val = NaN;
 
                 if (flow_mode === 'rpm') {
                     V_rev_cm3_val = parseFloat(document.getElementById('displacement').value);
                     if (isNaN(V_rev_cm3_val)) throw new Error("请检查每转排量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0 才能计算体积流量。");
-                    
+                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
                     V_th_m3_s = (V_rev_cm3_val / 1e6) * (rpm_val / 60);
-                    // 额外计算 m³/h 用于显示
                     V_th_m3_h_val = V_th_m3_s * 3600;
-
                 } else { // flow_mode === 'vol'
                     V_th_m3_h_val = parseFloat(document.getElementById('flow_m3h').value);
                     if (isNaN(V_th_m3_h_val)) throw new Error("请检查体积流量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0 才能计算每转排量。");
-
-                    V_th_m3_s = V_th_m3_h_val / 3600; // m³/h -> m³/s
-                    // 额外反算 cm³/rev 用于显示
+                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
+                    V_th_m3_s = V_th_m3_h_val / 3600;
                     V_rev_cm3_val = (V_th_m3_s * 60 / rpm_val) * 1e6;
                 }
+                if (V_th_m3_s <= 0) throw new Error("理论排量必须大于零。");
 
-
-                // --- C. 计算热力学状态点 (SI 单位) ---
-
-                // 状态点 1 (压缩机入口)
+                // --- C. 计算稳定状态点 (1, 3, 4) ---
+                const Pe_Pa = CP.PropsSI('P', 'T', Te_K, 'Q', 1, fluid);
                 const T1_K = Te_K + dT_sh_K;
-                const Pe_Pa = CP.PropsSI('P', 'T', Te_K, 'Q', 1, fluid); // 蒸发压力 (Pa)
-                const h1_J_kg = CP.PropsSI('H', 'T', T1_K, 'P', Pe_Pa, fluid); // 焓 (J/kg)
-                const s1_J_kgK = CP.PropsSI('S', 'T', T1_K, 'P', Pe_Pa, fluid); // 熵 (J/kg·K)
-                const rho1_kg_m3 = CP.PropsSI('D', 'T', T1_K, 'P', Pe_Pa, fluid); // 密度 (kg/m³)
-                const v1_m3_kg = 1 / rho1_kg_m3; // 比容 (m³/kg)
+                const h1_J_kg = CP.PropsSI('H', 'T', T1_K, 'P', Pe_Pa, fluid);
+                const s1_J_kgK = CP.PropsSI('S', 'T', T1_K, 'P', Pe_Pa, fluid);
+                const rho1_kg_m3 = CP.PropsSI('D', 'T', T1_K, 'P', Pe_Pa, fluid);
+                const v1_m3_kg = 1 / rho1_kg_m3;
 
-                // 状态点 3 (膨胀阀入口)
+                const Pc_Pa = CP.PropsSI('P', 'T', Tc_K, 'Q', 0, fluid);
                 const T3_K = Tc_K - dT_sc_K;
-                const Pc_Pa = CP.PropsSI('P', 'T', Tc_K, 'Q', 0, fluid); // 冷凝压力 (Pa)
-                const h3_J_kg = CP.PropsSI('H', 'T', T3_K, 'P', Pc_Pa, fluid); // 焓 (J/kg)
-
-                // 状态点 4 (蒸发器入口)
+                const h3_J_kg = CP.PropsSI('H', 'T', T3_K, 'P', Pc_Pa, fluid);
                 const h4_J_kg = h3_J_kg; // 等焓膨胀
 
-                // 状态点 2s (等熵压缩出口)
-                const h2s_J_kg = CP.PropsSI('H', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); // 等熵焓 (J/kg)
-
-                // --- D. 计算性能参数 ---
-
-                // 1. 质量流量 (kg/s)
-                const h_evap_J_kg = h1_J_kg - h4_J_kg; // 蒸发器焓差
-                if (h_evap_J_kg <= 0) {
-                    throw new Error("计算出错：制冷焓差小于等于零。");
-                }
+                // --- D. 计算稳定的性能参数 (质量流, 容积效率) ---
+                const h_evap_J_kg = h1_J_kg - h4_J_kg;
+                if (h_evap_J_kg <= 0) throw new Error("计算出错：制冷焓差小于等于零。");
+                
                 const m_dot_kg_s = Qe_W / h_evap_J_kg;
-
-                // 2. 等熵功率 (W)
-                const h_isen_J_kg = h2s_J_kg - h1_J_kg; // 等熵压缩焓升
-                const Ws_W = m_dot_kg_s * h_isen_J_kg;
-
-                // 3. 实际入口体积流量 (m³/s)
                 const V_actual_m3_s = m_dot_kg_s * v1_m3_kg;
-
-                // --- E. 计算效率 ---
-
-                // 1. 等熵效率
-                if (Win_W <= 0) {
-                    throw new Error("输入功率必须大于零。");
-                }
-                const eta_s = (Ws_W / Win_W); // 核心计算 (Ws / W_provided)
-
-                // 2. 容积效率
-                if (V_th_m3_s <= 0) {
-                    throw new Error("理论排量必须大于零。");
-                }
                 const eta_v = (V_actual_m3_s / V_th_m3_s);
 
-                // --- F. 格式化输出 (已更新 更改 3 & 4) ---
-                
-                // 确定效率标签
-                const efficiencyLabel = (power_mode === 'shaft') ? 
-                    `等熵效率 (η_s = Ws / W_shaft)` : 
-                    `总等熵效率 (η_total = Ws / W_in)`;
-                
-                const powerInputLabel = (power_mode === 'shaft') ? 
-                    `轴功率 (Win)` : 
-                    `输入功率 (Win)`;
+
+                // --- E. 【核心修改】将不稳定的等熵计算隔离 ---
+                let Ws_W, eta_s, h2s_J_kg;
+                let isentropic_error_msg = null;
+
+                try {
+                    // 这行是主要失败点
+                    h2s_J_kg = CP.PropsSI('H', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); 
+                    
+                    const h_isen_J_kg = h2s_J_kg - h1_J_kg;
+                    Ws_W = m_dot_kg_s * h_isen_J_kg;
+
+                    if (Win_W <= 0) throw new Error("输入功率必须大于零。");
+                    eta_s = (Ws_W / Win_W);
+
+                } catch (isen_error) {
+                    console.error("Isentropic calculation failed:", isen_error);
+                    // 记录错误，但不要停止
+                    isentropic_error_msg = `计算失败 (理论T2s可能超出物性库 ${fluid} 模型上限)`;
+                    Ws_W = NaN;
+                    eta_s = NaN;
+                    h2s_J_kg = NaN;
+                }
+
+                // --- F. 格式化输出 (现在可以处理 N/A) ---
+                const efficiencyLabel = (power_mode === 'shaft') ? `等熵效率 (η_s)` : `总等熵效率 (η_total)`;
+                const powerInputLabel = (power_mode === 'shaft') ? `轴功率 (Win)` : `输入功率 (Win)`;
 
                 let output = `
 --- 计算概览 (工质: ${fluid}) ---
@@ -384,18 +343,16 @@
   h3 = ${(h3_J_kg / 1000).toFixed(2)} kJ/kg
 
 状态 2s (等熵出口):
-  h2s = ${(h2s_J_kg / 1000).toFixed(2)} kJ/kg
+  h2s = ${isNaN(h2s_J_kg) ? `N/A (${isentropic_error_msg})` : `${(h2s_J_kg / 1000).toFixed(2)} kJ/kg`}
 
 --- 流量与功率 ---
 制冷焓差:     ${(h_evap_J_kg / 1000).toFixed(2)} kJ/kg
 质量流量 (m_dot): ${m_dot_kg_s.toFixed(5)} kg/s
-等熵功率 (Ws):   ${(Ws_W / 1000).toFixed(3)} kW
+等熵功率 (Ws):   ${isNaN(Ws_W) ? 'N/A' : `${(Ws_W / 1000).toFixed(3)} kW`}
 ${powerInputLabel}: ${Win_kW.toFixed(3)} kW
 
 --- 体积流量 (转速: ${rpm_val.toFixed(0)} RPM) ---
 `;
-
-                // 根据模式显示不同的输入/计算结果
                 if (flow_mode === 'rpm') {
                     output += `输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
                     output += `计算流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
@@ -403,7 +360,6 @@ ${powerInputLabel}: ${Win_kW.toFixed(3)} kW
                     output += `输入流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
                     output += `计算排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
                 }
-
                 output += `
 理论体积流量 (V_th): ${V_th_m3_s.toFixed(6)} m³/s
 实际体积流量 (V_act): ${V_actual_m3_s.toFixed(6)} m³/s
@@ -411,13 +367,13 @@ ${powerInputLabel}: ${Win_kW.toFixed(3)} kW
 ========================================
            最终效率计算
 ========================================
-${efficiencyLabel}: ${(eta_s * 100).toFixed(2)} %
+${efficiencyLabel}: ${isNaN(eta_s) ? 'N/A' : `${(eta_s * 100).toFixed(2)} %`}
 容积效率 (η_v = V_act / V_th):       ${(eta_v * 100).toFixed(2)} %
 `;
                 resultsDiv.textContent = output;
 
             } catch (error) {
-                // 捕获物性计算或逻辑错误
+                // 捕获主要逻辑或输入错误
                 resultsDiv.textContent = `计算出错: ${error.message}\n\n请检查输入参数是否在工质的有效范围内。`;
                 console.error(error);
             }
