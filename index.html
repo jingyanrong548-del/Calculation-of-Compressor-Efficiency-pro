@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>压缩机效率计算器 v2.7 (CoolProp)</title>
+    <title>压缩机性能计算器 v3.0 (MVR)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .input-group {
@@ -17,7 +17,7 @@
             cursor: not-allowed;
         }
         
-        /* v2.6 新增: 备注提示框 (Tooltip) 样式 */
+        /* 备注提示框 (Tooltip) 样式 */
         .tooltip {
             position: relative;
             cursor: help;
@@ -37,13 +37,13 @@
             padding: 8px 12px;
             position: absolute;
             z-index: 10;
-            bottom: 125%; /* Position above the text */
+            bottom: 125%;
             left: 50%;
-            margin-left: -130px; /* Center it */
+            margin-left: -130px;
             opacity: 0;
             transition: opacity 0.3s;
             font-size: 0.8rem;
-            font-family: sans-serif; /* Not mono */
+            font-family: sans-serif;
             font-weight: normal;
             line-height: 1.4;
         }
@@ -52,14 +52,40 @@
             opacity: 1;
         }
 
-        /* v2.6 新增: A4 打印样式 */
+        /* 选项卡 (Tabs) 样式 */
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            border: 2px solid transparent;
+            border-bottom: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #4b5563; /* gray-600 */
+            background-color: #f3f4f6; /* gray-100 */
+            border-radius: 6px 6px 0 0;
+        }
+        .tab-button.active {
+            color: #1d4ed8; /* blue-700 */
+            background-color: #ffffff; /* white */
+            border-color: #d1d5db; /* gray-300 */
+            border-bottom: 2px solid #ffffff; /* white */
+            margin-bottom: -2px;
+        }
+        .tab-content {
+            display: none;
+            border: 2px solid #d1d5db; /* gray-300 */
+            border-radius: 0 6px 6px 6px;
+            background-color: #ffffff;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 打印样式 */
         @media print {
-            /* 隐藏所有非打印内容 */
             body > *:not(#print-container) {
                 display: none !important;
             }
-            
-            /* 打印容器设置 */
             #print-container {
                 display: block !important;
                 width: 100%;
@@ -69,20 +95,16 @@
                 box-shadow: none;
                 border: none;
             }
-
-            /* 页面设置 */
             @page {
                 size: A4;
                 margin: 1.5cm;
             }
-
             body {
                 background-color: #fff;
                 color: #000;
                 font-size: 10pt;
                 font-family: 'Times New Roman', serif;
             }
-
             h1, h2, h3 {
                 color: #000 !important;
                 border-bottom: 2px solid #000;
@@ -93,8 +115,6 @@
             h1 { font-size: 18pt; margin-bottom: 1rem; }
             h2 { font-size: 14pt; margin-bottom: 0.5rem; }
             h3 { font-size: 12pt; }
-
-            /* 打印表格样式 */
             .print-table {
                 width: 100%;
                 border-collapse: collapse;
@@ -114,8 +134,6 @@
             .print-table td {
                 width: 60%;
             }
-
-            /* 打印结果 pre 样式 */
             pre.print-results {
                 white-space: pre-wrap;
                 word-wrap: break-word;
@@ -133,370 +151,535 @@
 <body class="bg-gray-100 font-sans antialiased">
 
     <div class="container mx-auto p-4 sm:p-8 max-w-4xl">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">压缩机性能计算器 v2.7</h1>
-
-        <div class="mb-4 bg-white p-4 rounded-lg shadow-md">
-            <label class="text-xl font-semibold text-gray-800">选择计算模式:</label>
-            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-6 mt-2">
-                <label class="inline-flex items-center">
-                    <input type="radio" name="main_mode" id="mode-1-radio" value="eval" class="form-radio h-5 w-5 text-blue-600" checked>
-                    <span class="ml-2 text-lg">模式一: 性能评估 (输入功率/容量, 计算效率)</span>
-                </label>
-                <label class="inline-flex items-center">
-                    <input type="radio" name="main_mode" id="mode-2-radio" value="predict" class="form-radio h-5 w-5 text-blue-600">
-                    <span class="ml-2 text-lg">模式二: 性能预测 (输入效率, 计算功率/容量)</span>
-                </label>
-            </div>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">压缩机性能计算器 v3.0 (MVR)</h1>
+        
+        <div class="flex border-b-2 border-gray-300 mb-0">
+            <button id="tab-btn-dry" class="tab-button active">
+                ⚙️ 干式压缩 (模式 1 & 2)
+            </button>
+            <button id="tab-btn-mvr" class="tab-button">
+                💧 MVR 喷水 (模式 3)
+            </button>
         </div>
 
-        <div id="mode-1-container">
-            <div class="bg-white shadow-xl rounded-lg p-6 sm:p-8">
-                
-                <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">模式一: 性能评估</h2>
+        <div id="tab-content-dry" class="tab-content active">
+            
+            <div class="mb-4 bg-white p-4 rounded-lg shadow-md border-b">
+                <label class="text-xl font-semibold text-gray-800">选择计算模式:</label>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-6 mt-2">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="main_mode" id="mode-1-radio" value="eval" class="form-radio h-5 w-5 text-blue-600" checked>
+                        <span class="ml-2 text-lg">模式一: 性能评估 (输入功率/容量, 计算效率)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="main_mode" id="mode-2-radio" value="predict" class="form-radio h-5 w-5 text-blue-600">
+                        <span class="ml-2 text-lg">模式二: 性能预测 (输入效率, 计算功率/容量)</span>
+                    </label>
+                </div>
+            </div>
 
-                <form id="calc-form-mode-1">
-                    <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">1. 输入参数</h2>
+            <div id="mode-1-container">
+                <div class="bg-white p-6 sm:p-8">
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                        <div>
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">工质与压缩机</legend>
-                                
-                                <div class="input-group">
-                                    <label for="fluid" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
-                                    <select id="fluid" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white" required>
-                                        <option value="R134a">R134a</option>
-                                        <option value="R245fa" selected>R245fa</option>
-                                        <option value="R1233zd(E)">R1233zd(E)</option>
-                                        <option value="R1234ze(E)">R1234ze(E)</option>
-                                        <option value="R123">R123</option>
-                                        <option value="R22">R22</option>
-                                        <option value="R410A">R410A</option>
-                                        <option value="R32">R32</option>
-                                        <option value="R290">R290</option>
-                                        <option value="R717">R717 (Ammonia)</option>
-                                        <option value="R515B">R515B</option>
-                                        <option value="R142b">R142b</option>
-                                        <option value="R1336mzz(Z)">R1336mzz(Z)</option>
-                                        <option value="R744">R744 (CO2)</option>
-                                        <option value="R600a">R600a (Isobutane)</option>
-                                        <option value="R152a">R152a</option>
-                                        <option value="R454B">R454B</option>
-                                        <option value="R513A">R513A</option>
-                                    </select>
-                                </div>
+                    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">模式一: 性能评估</h2>
 
-                                <pre id="fluid-info" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
---- 正在加载物性库 ---
-                                </pre>
-                                
-                                <div class="input-group">
-                                    <label for="rpm" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
-                                    <input type="number" id="rpm" value="2900" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-
-                                <div class="input-group">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">理论输气量模式</label>
-                                    <div class="flex space-x-4">
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="flow_mode" id="flow_mode_rpm_m1" value="rpm" class="form-radio" checked>
-                                            <span class="ml-2">按转速与排量</span>
-                                        </label>
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="flow_mode" id="flow_mode_vol_m1" value="vol" class="form-radio">
-                                            <span class="ml-2">按体积流量</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div id="rpm-inputs">
-                                    <div class="input-group">
-                                        <label for="displacement" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³/rev)</label>
-                                        <input type="number" id="displacement" value="437.5" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                    </div>
-                                </div>
-
-                                <div id="vol-inputs" style="display: none;">
-                                    <div class="input-group">
-                                        <label for="flow_m3h" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
-                                        <input type="number" id="flow_m3h" value="100" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
-                                </div>
-                            </fieldset>
-
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">功率与容量</legend>
-
-                                <div class="input-group">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">容量模式</label>
-                                    <div class="flex space-x-4">
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="capacity_mode" value="refrigeration" class="form-radio">
-                                            <span class="ml-2">制冷量</span>
-                                        </label>
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="capacity_mode" value="heating" class="form-radio" checked>
-                                            <span class="ml-2">制热量 (冷凝器)</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="capacity" id="capacity-label" class="block text-sm font-medium text-gray-700 mb-1">制热量 (kW)</label>
-                                    <input type="number" id="capacity" value="44.9" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">功率模式</label>
-                                    <div class="flex space-x-4">
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="power_mode" id="power_mode_shaft" value="shaft" class="form-radio">
-                                            <span class="ml-2">轴功率</span>
-                                        </label>
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="power_mode" id="power_mode_input" value="input" class="form-radio" checked>
-                                            <span class="ml-2">输入功率 (电机)</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="power" id="power-label" class="block text-sm font-medium text-gray-700 mb-1">输入功率 (kW) (电机)</label>
-                                    <input type="number" id="power" value="19.4" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-
-                                <div id="motor-eff-group" class="input-group" style="display: block;"> <label for="motor_eff" class="block text-sm font-medium text-gray-700 mb-1">电机效率</label>
-                                    <input type="number" id="motor_eff" value="0.95" step="0.01" min="0.5" max="1.0" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                                </div>
-
-                            </fieldset>
-                        </div>
-
-                        <div>
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">热力学工况</legend>
-                                <div class="input-group">
-                                    <label for="temp_evap" class="block text-sm font-medium text-gray-700 mb-1">蒸发温度 (°C)</label>
-                                    <input type="number" id="temp_evap" value="50" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label for="temp_cond" class="block text-sm font-medium text-gray-700 mb-1">冷凝温度 (°C)</label>
-                                    <input type="number" id="temp_cond" value="125" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label for="superheat" class="block text-sm font-medium text-gray-700 mb-1">
-                                        有效过热度 (K)
-                                        <span class="tooltip">(?)
-                                            <span class="tooltiptext">指压缩机吸气口温度高出蒸发饱和温度的度数。这是计算吸气点(状态1)的关键参数。</span>
-                                        </span>
-                                    </label>
-                                    <input type="number" id="superheat" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="subcooling" class="block text-sm font-medium text-gray-700 mb-1">
-                                        过冷度 (K)
-                                        <span class="tooltip">(?)
-                                            <span class="tooltiptext">指冷凝器出口液体温度低于冷凝饱和温度的度数。这是计算节流阀前(状态3)的关键参数。</span>
-                                        </span>
-                                    </label>
-                                    <input type="number" id="subcooling" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
-                                </div>
-                            </fieldset>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 text-center">
-                        <button type="submit" id="calc-button-mode-1" class="w-full md:w-1/2 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
-                            正在加载物性库...
-                        </button>
-                    </div>
-                </form>
-
-                <div class="mt-8">
-                    <div>
-                        <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">2. 计算结果 (模式一)</h2>
-                        <pre id="results-mode-1" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[400px] font-mono text-sm">
---- 请输入参数并点击计算 ---
---- 确保 coolprop.js 和 coolprop.wasm 与此 html 文件在同一文件夹中 ---
---- 并且, 您必须通过本地服务器 (如 VSCode "Go Live") 运行此文件, 否则 .wasm 可能加载失败 ---
-                        </pre>
+                    <form id="calc-form-mode-1">
+                        <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">1. 输入参数 (模式一)</h2>
+                        <blockquote class="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 mb-4" role="alert">
+                            <p><b>适用范围:</b> 涡旋机、无油螺杆、活塞机等干式压缩容积式压缩机。</p>
+                        </blockquote>
                         
-                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button type="button" id="print-button-mode-1" class="w-full bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300" disabled>
-                                🖨️ 打印报告 (A4)
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">工质与压缩机</legend>
+                                    
+                                    <div class="input-group">
+                                        <label for="fluid" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
+                                        <select id="fluid" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white" required>
+                                            <option value="R134a">R134a</option>
+                                            <option value="R245fa" selected>R245fa</option>
+                                            <option value="R1233zd(E)">R1233zd(E)</option>
+                                            <option value="R1234ze(E)">R1234ze(E)</option>
+                                            <option value="R123">R123</option>
+                                            <option value="R22">R22</option>
+                                            <option value="R410A">R410A</option>
+                                            <option value="R32">R32</option>
+                                            <option value="R290">R290</option>
+                                            <option value="R717">R717 (Ammonia)</option>
+                                            <option value="R515B">R515B</option>
+                                            <option value="R142b">R142b</option>
+                                            <option value="R1336mzz(Z)">R1336mzz(Z)</option>
+                                            <option value="R744">R744 (CO2)</option>
+                                            <option value="R600a">R600a (Isobutane)</option>
+                                            <option value="R152a">R152a</option>
+                                            <option value="R454B">R454B</option>
+                                            <option value="R513A">R513A</option>
+                                            <option value="Water">Water (IAPWS-IF97)</option>
+                                        </select>
+                                    </div>
+
+                                    <pre id="fluid-info" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
+--- 正在加载物性库 ---
+                                    </pre>
+                                    
+                                    <div class="input-group">
+                                        <label for="rpm" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
+                                        <input type="number" id="rpm" value="2900" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">理论输气量模式</label>
+                                        <div class="flex space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="flow_mode" value="rpm" class="form-radio" checked>
+                                                <span class="ml-2">按转速与排量</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="flow_mode" value="vol" class="form-radio">
+                                                <span class="ml-2">按体积流量</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div id="rpm-inputs-m1">
+                                        <div class="input-group">
+                                            <label for="displacement" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³/rev)</label>
+                                            <input type="number" id="displacement" value="437.5" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                        </div>
+                                    </div>
+
+                                    <div id="vol-inputs-m1" style="display: none;">
+                                        <div class="input-group">
+                                            <label for="flow_m3h" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
+                                            <input type="number" id="flow_m3h" value="100" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">功率与容量</legend>
+
+                                    <div class="input-group">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">容量模式</label>
+                                        <div class="flex space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="capacity_mode" value="refrigeration" class="form-radio">
+                                                <span class="ml-2">制冷量</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="capacity_mode" value="heating" class="form-radio" checked>
+                                                <span class="ml-2">制热量 (冷凝器)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="capacity" id="capacity-label" class="block text-sm font-medium text-gray-700 mb-1">制热量 (kW)</label>
+                                        <input type="number" id="capacity" value="44.9" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">功率模式</label>
+                                        <div class="flex space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="power_mode" id="power_mode_shaft" value="shaft" class="form-radio">
+                                                <span class="ml-2">轴功率</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="power_mode" id="power_mode_input" value="input" class="form-radio" checked>
+                                                <span class="ml-2">输入功率 (电机)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="power" id="power-label" class="block text-sm font-medium text-gray-700 mb-1">输入功率 (kW) (电机)</label>
+                                        <input type="number" id="power" value="19.4" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+
+                                    <div id="motor-eff-group-m1" class="input-group" style="display: block;"> <label for="motor_eff" class="block text-sm font-medium text-gray-700 mb-1">电机效率</label>
+                                        <input type="number" id="motor_eff" value="0.95" step="0.01" min="0.5" max="1.0" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+
+                                </fieldset>
+                            </div>
+
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">热力学工况</legend>
+                                    <div class="input-group">
+                                        <label for="temp_evap" class="block text-sm font-medium text-gray-700 mb-1">蒸发温度 (°C)</label>
+                                        <input type="number" id="temp_evap" value="50" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="temp_cond" class="block text-sm font-medium text-gray-700 mb-1">冷凝温度 (°C)</label>
+                                        <input type="number" id="temp_cond" value="125" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="superheat" class="block text-sm font-medium text-gray-700 mb-1">
+                                            有效过热度 (K)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext">指压缩机吸气口温度高出蒸发饱和温度的度数。这是计算吸气点(状态1)的关键参数。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="superheat" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="subcooling" class="block text-sm font-medium text-gray-700 mb-1">
+                                            过冷度 (K)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext">指冷凝器出口液体温度低于冷凝饱和温度的度数。这是计算节流阀前(状态3)的关键参数。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="subcooling" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                </fieldset>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-center">
+                            <button type="submit" id="calc-button-mode-1" class="w-full md:w-1/2 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
+                                正在加载物性库...
                             </button>
-                            <button type="button" id="transfer-to-mode-2" class="w-full bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
-                                ➜ 将此工况代入模式二 (预测)
+                        </div>
+                    </form>
+
+                    <div class="mt-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-blue-700 mb-4 border-b pb-2">2. 计算结果 (模式一)</h2>
+                            <pre id="results-mode-1" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[400px] font-mono text-sm">
+--- 请输入参数并点击计算 ---
+                            </pre>
+                            
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button type="button" id="print-button-mode-1" class="w-full bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300" disabled>
+                                    🖨️ 打印报告 (A4)
+                                </button>
+                                <button type="button" id="transfer-to-mode-2" class="w-full bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
+                                    ➜ 将此工况代入模式二 (预测)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="mode-2-container" style="display: none;">
+                <div class="bg-white p-6 sm:p-8">
+
+                    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">模式二: 性能预测</h2>
+                    
+                    <form id="calc-form-mode-2">
+                        <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">1. 输入参数 (模式二)</h2>
+                        <blockquote class="bg-green-50 border-l-4 border-green-500 text-green-800 p-4 mb-4" role="alert">
+                            <p><b>适用范围:</b> 涡旋机、无油螺杆、活塞机等干式压缩容积式压缩机。</p>
+                        </blockquote>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">工质与压缩机</legend>
+                                    
+                                    <div class="input-group">
+                                        <label for="fluid_m2" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
+                                        <select id="fluid_m2" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500 bg-white" required>
+                                            <option value="R134a">R134a</option>
+                                            <option value="R245fa" selected>R245fa</option>
+                                            <option value="R1233zd(E)">R1233zd(E)</option>
+                                            <option value="R1234ze(E)">R1234ze(E)</option>
+                                            <option value="R123">R123</option>
+                                            <option value="R22">R22</option>
+                                            <option value="R410A">R410A</option>
+                                            <option value="R32">R32</option>
+                                            <option value="R290">R290</option>
+                                            <option value="R717">R717 (Ammonia)</option>
+                                            <option value="R515B">R515B</option>
+                                            <option value="R142b">R142b</option>
+                                            <option value="R1336mzz(Z)">R1336mzz(Z)</option>
+                                            <option value="R744">R744 (CO2)</option>
+                                            <option value="R600a">R600a (Isobutane)</option>
+                                            <option value="R152a">R152a</option>
+                                            <option value="R454B">R454B</option>
+                                            <option value="R513A">R513A</option>
+                                            <option value="Water">Water (IAPWS-IF97)</option>
+                                        </select>
+                                    </div>
+
+                                    <pre id="fluid-info-m2" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
+--- 正在加载物性库 ---
+                                    </pre>
+                                    
+                                    <div class="input-group">
+                                        <label for="rpm_m2" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
+                                        <input type="number" id="rpm_m2" value="2900" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">理论输气量模式</label>
+                                        <div class="flex space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="flow_mode_m2" value="rpm" class="form-radio" checked>
+                                                <span class="ml-2">按转速与排量</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="flow_mode_m2" value="vol" class="form-radio">
+                                                <span class="ml-2">按体积流量</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div id="rpm-inputs-m2">
+                                        <div class="input-group">
+                                            <label for="displacement_m2" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³/rev)</label>
+                                            <input type="number" id="displacement_m2" value="437.5" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                        </div>
+                                    </div>
+
+                                    <div id="vol-inputs-m2" style="display: none;">
+                                        <div class="input-group">
+                                            <label for="flow_m3h_m2" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
+                                            <input type="number" id="flow_m3h_m2" value="100" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                                        </div>
+                                    </div>
+                                </fieldset>
+                            </div>
+
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">热力学工况</legend>
+                                    <div class="input-group">
+                                        <label for="temp_evap_m2" class="block text-sm font-medium text-gray-700 mb-1">蒸发温度 (°C)</label>
+                                        <input type="number" id="temp_evap_m2" value="50" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="temp_cond_m2" class="block text-sm font-medium text-gray-700 mb-1">冷凝温度 (°C)</label>
+                                        <input type="number" id="temp_cond_m2" value="125" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="superheat_m2" class="block text-sm font-medium text-gray-700 mb-1">有效过热度 (K)</label>
+                                        <input type="number" id="superheat_m2" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="subcooling_m2" class="block text-sm font-medium text-gray-700 mb-1">过冷度 (K)</label>
+                                        <input type="number" id="subcooling_m2" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+                                </fieldset>
+
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">效率参数</legend>
+                                    
+                                    <div class="input-group">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">效率基准</label>
+                                        <div class="flex space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="eff_mode_m2" value="shaft" class="form-radio">
+                                                <span class="ml-2">基于轴功率 (η_s)</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" name="eff_mode_m2" value="input" class="form-radio" checked>
+                                                <span class="ml-2">基于输入功率 (η_total)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="eta_s_m2" id="eta_s_label_m2" class="block text-sm font-medium text-gray-700 mb-1">
+                                            总等熵效率 (η_total)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext" id="tooltip-eta-s-m2">基于【输入功率】。η_total = 理论等熵功率 / 电机输入功率。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="eta_s_m2" value="0.581" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="eta_v_m2" class="block text-sm font-medium text-gray-700 mb-1">
+                                            容积效率 (η_v)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext">η_v = 实际吸气体积流量 / 理论输气量。反映了压缩机内容积泄漏和余隙容积的影响。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="eta_v_m2" value="0.901" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                    </div>
+                                    <div id="motor-eff-group-m2" class="input-group" style="display: block;"> <label for="motor_eff_m2" class="block text-sm font-medium text-gray-700 mb-1">电机效率</label>
+                                        <input type="number" id="motor_eff_m2" value="0.95" step="0.01" min="0.5" max="1.0" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                                    </div>
+                                </fieldset>
+
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">可选计算: 后冷却器</legend>
+                                    
+                                    <div class="input-group">
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="enable_cooler_calc_m2" class="form-checkbox h-5 w-5 text-green-600">
+                                            <span class="ml-2 font-medium text-gray-700">计算后冷却器负荷</span>
+                                        </label>
+                                    </div>
+
+                                    <div id="cooler-inputs-m2" style="display: none;">
+                                        <div class="input-group">
+                                            <label for="target_temp_m2" class="block text-sm font-medium text-gray-700 mb-1">
+                                                目标冷却后温度 (°C)
+                                                <span class="tooltip">(?)
+                                                    <span class="tooltiptext">
+                                                        输入制冷剂气体经过后冷却器(Desuperheater)后，进入冷凝器之前的目标温度。此温度必须低于计算出的 T2a (实际排气温度)。
+                                                    </span>
+                                                </span>
+                                            </label>
+                                            <input type="number" id="target_temp_m2" value="100" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-center">
+                            <button type="submit" id="calc-button-mode-2" class="w-full md:w-1/2 bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
+                                正在加载物性库...
                             </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">2. 计算结果 (模式二)</h2>
+                            <pre id="results-mode-2" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[400px] font-mono text-sm">
+--- 请输入参数并点击计算 ---
+                            </pre>
+                            <div class="mt-4 text-center">
+                                <button type="button" id="print-button-mode-2" class="w-full md:w-1/2 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300" disabled>
+                                    🖨️ 打印报告 (A4)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <div id="mode-2-container" style="display: none;">
-            <div class="bg-white shadow-xl rounded-lg p-6 sm:p-8">
 
-                <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">模式二: 性能预测</h2>
-                
-                <form id="calc-form-mode-2">
-                    <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">1. 输入参数</h2>
+        <div id="tab-content-mvr" class="tab-content">
+            <div id="mode-3-container">
+                <div class="bg-white p-6 sm:p-8">
+
+                    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">模式三: MVR 喷水计算</h2>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                        <div>
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">工质与压缩机</legend>
-                                
-                                <div class="input-group">
-                                    <label for="fluid_m2" class="block text-sm font-medium text-gray-700 mb-1">制冷剂</label>
-                                    <select id="fluid_m2" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500 bg-white" required>
-                                        <option value="R134a">R134a</option>
-                                        <option value="R245fa" selected>R245fa</option>
-                                        <option value="R1233zd(E)">R1233zd(E)</option>
-                                        <option value="R1234ze(E)">R1234ze(E)</option>
-                                        <option value="R123">R123</option>
-                                        <option value="R22">R22</option>
-                                        <option value="R410A">R410A</option>
-                                        <option value="R32">R32</option>
-                                        <option value="R290">R290</option>
-                                        <option value="R717">R717 (Ammonia)</option>
-                                        <option value="R515B">R515B</option>
-                                        <option value="R142b">R142b</option>
-                                        <option value="R1336mzz(Z)">R1336mzz(Z)</option>
-                                        <option value="R744">R744 (CO2)</option>
-                                        <option value="R600a">R600a (Isobutane)</option>
-                                        <option value="R152a">R152a</option>
-                                        <option value="R454B">R454B</option>
-                                        <option value="R513A">R513A</option>
-                                    </select>
-                                </div>
+                    <form id="calc-form-mode-3">
+                        <h2 class="text-2xl font-semibold text-purple-700 mb-4 border-b pb-2">1. 输入参数 (模式三)</h2>
+                        <blockquote class="bg-purple-50 border-l-4 border-purple-500 text-purple-800 p-4 mb-4" role="alert">
+                            <p><b>适用范围:</b> 无油螺杆、无油罗茨等容积式压缩机在 MVR 喷水场景下的计算。</p>
+                            <p class="mt-1"><b>计算目标:</b> 根据能量平衡，计算为达到“目标出口状态”所需的**喷水量**。</p>
+                        </blockquote>
 
-                                <pre id="fluid-info-m2" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">工质与压缩机</legend>
+                                    
+                                    <div class="input-group">
+                                        <label for="fluid_m3" class="block text-sm font-medium text-gray-700 mb-1">工质</label>
+                                        <select id="fluid_m3" class="w-full p-2 border border-gray-300 rounded-md bg-gray-200" required disabled>
+                                            <option value="Water" selected>Water (IAPWS-IF97)</option>
+                                        </select>
+                                        <small class="text-xs text-gray-600">MVR 模式默认工质为水。</small>
+                                    </div>
+
+                                    <pre id="fluid-info-m3" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
 --- 正在加载物性库 ---
-                                </pre>
-                                
-                                <div class="input-group">
-                                    <label for="rpm_m2" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
-                                    <input type="number" id="rpm_m2" value="2900" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-
-                                <div class="input-group">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">理论输气量模式</label>
-                                    <div class="flex space-x-4">
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="flow_mode_m2" id="flow_mode_rpm_m2" value="rpm" class="form-radio" checked>
-                                            <span class="ml-2">按转速与排量</span>
-                                        </label>
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="flow_mode_m2" id="flow_mode_vol_m2" value="vol" class="form-radio">
-                                            <span class="ml-2">按体积流量</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div id="rpm-inputs-m2">
+                                    </pre>
+                                    
                                     <div class="input-group">
-                                        <label for="displacement_m2" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³/rev)</label>
-                                        <input type="number" id="displacement_m2" value="437.5" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
+                                        <label for="rpm_m3" class="block text-sm font-medium text-gray-700 mb-1">压缩机转速 (RPM)</label>
+                                        <input type="number" id="rpm_m3" value="2900" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
                                     </div>
-                                </div>
-
-                                <div id="vol-inputs-m2" style="display: none;">
+                                    
                                     <div class="input-group">
-                                        <label for="flow_m3h_m2" class="block text-sm font-medium text-gray-700 mb-1">理论体积流量 (m³/h)</label>
-                                        <input type="number" id="flow_m3h_m2" value="100" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                                        <label for="displacement_m3" class="block text-sm font-medium text-gray-700 mb-1">每转排量 (cm³/rev)</label>
+                                        <input type="number" id="displacement_m3" value="437.5" step="any" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
                                     </div>
-                                </div>
-                            </fieldset>
+                                    
+                                </fieldset>
+
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">效率参数</legend>
+
+                                    <div class="input-group">
+                                        <label for="eta_s_m3" class="block text-sm font-medium text-gray-700 mb-1">
+                                            等熵效率 (η_s)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext">基于【轴功率】。η_s = 理论等熵功率 / 压缩机轴功率。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="eta_s_m3" value="0.70" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="eta_v_m3" class="block text-sm font-medium text-gray-700 mb-1">
+                                            容积效率 (η_v)
+                                            <span class="tooltip">(?)
+                                                <span class="tooltiptext">η_v = 实际吸气体积流量 / 理论输气量。</span>
+                                            </span>
+                                        </label>
+                                        <input type="number" id="eta_v_m3" value="0.90" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
+                                    </div>
+                                </fieldset>
+                            </div>
+
+                            <div>
+                                <fieldset class="border p-4 rounded-lg mb-4">
+                                    <legend class="font-medium px-2">工艺与喷水工况</legend>
+                                    <div class="input-group">
+                                        <label for="temp_evap_m3" class="block text-sm font-medium text-gray-700 mb-1">入口饱和温度 (°C)</label>
+                                        <input type="number" id="temp_evap_m3" value="100" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
+                                    </div>
+                                    
+                                    <div class="input-group">
+                                        <label for="temp_cond_m3" class="block text-sm font-medium text-gray-700 mb-1">出口饱和温度 (°C)</label>
+                                        <input type="number" id="temp_cond_m3" value="120" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+
+                                    <div class="input-group">
+                                        <label for="temp_water_in_m3" class="block text-sm font-medium text-gray-700 mb-1">喷水温度 (°C)</label>
+                                        <input type="number" id="temp_water_in_m3" value="25" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500" required>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="target_state_m3" class="block text-sm font-medium text-gray-700 mb-1">目标出口状态</label>
+                                        <select id="target_state_m3" class="w-full p-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500 bg-white" required>
+                                            <option value="SaturatedVapor" selected>饱和蒸汽 (Q=1)</option>
+                                            <option value="SaturatedLiquid">饱和水 (Q=0)</option>
+                                        </select>
+                                        <small class="text-xs text-gray-600">通常目标是出口为饱和蒸汽。</small>
+                                    </div>
+                                </fieldset>
+                            </div>
                         </div>
 
-                        <div>
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">热力学工况</legend>
-                                <div class="input-group">
-                                    <label for="temp_evap_m2" class="block text-sm font-medium text-gray-700 mb-1">蒸发温度 (°C)</label>
-                                    <input type="number" id="temp_evap_m2" value="50" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label for="temp_cond_m2" class="block text-sm font-medium text-gray-700 mb-1">冷凝温度 (°C)</label>
-                                    <input type="number" id="temp_cond_m2" value="125" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label for="superheat_m2" class="block text-sm font-medium text-gray-700 mb-1">有效过热度 (K)</label>
-                                    <input type="number" id="superheat_m2" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="subcooling_m2" class="block text-sm font-medium text-gray-700 mb-1">过冷度 (K)</label>
-                                    <input type="number" id="subcooling_m2" value="5" step="0.1" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-                            </fieldset>
-
-                            <fieldset class="border p-4 rounded-lg mb-4">
-                                <legend class="font-medium px-2">效率参数</legend>
-                                
-                                <div class="input-group">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">效率基准</label>
-                                    <div class="flex space-x-4">
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="eff_mode_m2" id="eff_mode_shaft_m2" value="shaft" class="form-radio">
-                                            <span class="ml-2">基于轴功率 (η_s)</span>
-                                        </label>
-                                        <label class="inline-flex items-center">
-                                            <input type="radio" name="eff_mode_m2" id="eff_mode_input_m2" value="input" class="form-radio" checked>
-                                            <span class="ml-2">基于输入功率 (η_total)</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="eta_s_m2" id="eta_s_label_m2" class="block text-sm font-medium text-gray-700 mb-1">
-                                        总等熵效率 (η_total)
-                                        <span class="tooltip">(?)
-                                            <span class="tooltiptext" id="tooltip-eta-s-m2">基于【输入功率】。η_total = 理论等熵功率 / 电机输入功率。</span>
-                                        </span>
-                                    </label>
-                                    <input type="number" id="eta_s_m2" value="0.581" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-                                <div class="input-group">
-                                    <label for="eta_v_m2" class="block text-sm font-medium text-gray-700 mb-1">
-                                        容积效率 (η_v)
-                                        <span class="tooltip">(?)
-                                            <span class="tooltiptext">η_v = 实际吸气体积流量 / 理论输气量。反映了压缩机内容积泄漏和余隙容积的影响。</span>
-                                        </span>
-                                    </label>
-                                    <input type="number" id="eta_v_m2" value="0.901" step="any" min="0.1" max="1.5" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" required>
-                                </div>
-                                <div id="motor-eff-group-m2" class="input-group" style="display: block;"> <label for="motor_eff_m2" class="block text-sm font-medium text-gray-700 mb-1">电机效率</label>
-                                    <input type="number" id="motor_eff_m2" value="0.95" step="0.01" min="0.5" max="1.0" class="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
-                                </div>
-                            </fieldset>
-
-                        </div>
-                    </div>
-
-                    <div class="mt-4 text-center">
-                        <button type="submit" id="calc-button-mode-2" class="w-full md:w-1/2 bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
-                            正在加载物性库...
-                        </button>
-                    </div>
-                </form>
-
-                <div class="mt-8">
-                    <div>
-                        <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">2. 计算结果 (模式二)</h2>
-                        <pre id="results-mode-2" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[400px] font-mono text-sm">
---- 请输入参数并点击计算 ---
-                        </pre>
                         <div class="mt-4 text-center">
-                            <button type="button" id="print-button-mode-2" class="w-full md:w-1/2 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300" disabled>
-                                🖨️ 打印报告 (A4)
+                            <button type="submit" id="calc-button-mode-3" class="w-full md:w-1/2 bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 transition duration-300 ease-in-out" disabled>
+                                正在加载物性库...
                             </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-8">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-purple-700 mb-4 border-b pb-2">2. 计算结果 (模式三)</h2>
+                            <pre id="results-mode-3" class="bg-gray-50 text-gray-900 p-6 rounded-lg shadow-inner overflow-x-auto min-h-[400px] font-mono text-sm">
+--- 请输入参数并点击计算 ---
+                            </pre>
+                            <div class="mt-4 text-center">
+                                <button type="button" id="print-button-mode-3" class="w-full md:w-1/2 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-300" disabled>
+                                    🖨️ 打印报告 (A4)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -506,998 +689,14 @@
     </div>
 
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4 max-w-4xl mx-auto px-4">
-        <p><strong>版本:</strong> v2.7 (增加排气温度 T2s / T2a 计算)</p>
+        <p><strong>版本:</strong> v3.0 (增加 MVR 喷水计算模式)</p>
         <p><strong>编者:</strong> 荆炎荣 (Jing Yanrong)</p>
         <blockquote class="mt-2 border-l-4 border-gray-300 pl-4 italic">
             编者已尽力确保本计算器结果的准确性，但不对任何因使用本工具而导致的潜在错误或损失承担责任。计算结果仅供参考。
         </blockquote>
     </footer>
 
-    <script type="module">
-        // 1. 导入 CoolProp 模块
-        import Module from './coolprop.js';
-
-        let CP; // 全局变量，用于持有 CoolProp 实例
-        let lastMode1Results = null; // 用于存储模式一的结果以进行转换
-        
-        // v2.6 新增: 存储原始文本用于打印
-        let lastMode1ResultText = null;
-        let lastMode2ResultText = null;
-
-        // v2.6 更新: 增加 8 种新工质
-        const fluidInfoData = {
-            'R134a':        { gwp: 1430, odp: 0,    safety: 'A1' },
-            'R245fa':       { gwp: 1030, odp: 0,    safety: 'B1' },
-            'R1233zd(E)':   { gwp: 7,    odp: 0,    safety: 'A1' },
-            'R1234ze(E)':   { gwp: 1,    odp: 0,    safety: 'A2L' },
-            'R123':         { gwp: 77,   odp: 0.02, safety: 'B1' },
-            'R22':          { gwp: 1810, odp: 0.055,safety: 'A1' },
-            'R410A':        { gwp: 2088, odp: 0,    safety: 'A1' },
-            'R32':          { gwp: 675,  odp: 0,    safety: 'A2L' },
-            'R290':         { gwp: 3,    odp: 0,    safety: 'A3' },
-            'R717':         { gwp: 0,    odp: 0,    safety: 'B2L' },
-            // --- v2.6 新增工质 ---
-            'R515B':        { gwp: 299,  odp: 0,    safety: 'A1' },
-            'R142b':        { gwp: 1980, odp: 0.057,safety: 'A2' },
-            'R1336mzz(Z)':  { gwp: 7,    odp: 0,    safety: 'A1' },
-            'R744':         { gwp: 1,    odp: 0,    safety: 'A1' },
-            'R600a':        { gwp: 3,    odp: 0,    safety: 'A3' }, // Isobutane
-            'R152a':        { gwp: 138,  odp: 0,    safety: 'A2' },
-            'R454B':        { gwp: 466,  odp: 0,    safety: 'A2L' },
-            'R513A':        { gwp: 631,  odp: 0,    safety: 'A1' }
-        };
-
-        // --- DOM 元素引用 (通用) ---
-        const mode1Container = document.getElementById('mode-1-container');
-        const mode2Container = document.getElementById('mode-2-container');
-        const mode1Radio = document.getElementById('mode-1-radio');
-        const mode2Radio = document.getElementById('mode-2-radio');
-
-        // --- DOM 元素引用 (模式一) ---
-        const calcButtonM1 = document.getElementById('calc-button-mode-1');
-        const resultsDivM1 = document.getElementById('results-mode-1');
-        const calcFormM1 = document.getElementById('calc-form-mode-1');
-        const transferButton = document.getElementById('transfer-to-mode-2');
-        const printButtonM1 = document.getElementById('print-button-mode-1'); // v2.6 新增
-        
-        const fluidSelectM1 = document.getElementById('fluid');
-        const fluidInfoDivM1 = document.getElementById('fluid-info');
-
-        const flowModeRadiosM1 = document.querySelectorAll('input[name="flow_mode"]');
-        const flowModeRpmM1 = document.getElementById('flow_mode_rpm_m1');
-        const flowModeVolM1 = document.getElementById('flow_mode_vol_m1');
-        const rpmInputsM1 = document.getElementById('rpm-inputs');
-        const volInputsM1 = document.getElementById('vol-inputs');
-        const flowM3hInputM1 = document.getElementById('flow_m3h');
-        const displacementInputM1 = document.getElementById('displacement');
-        const rpmInputM1 = document.getElementById('rpm');
-
-        const powerModeRadiosM1 = document.querySelectorAll('input[name="power_mode"]');
-        const powerLabelM1 = document.getElementById('power-label');
-        const motorEffGroupM1 = document.getElementById('motor-eff-group'); 
-        
-        const capacityModeRadiosM1 = document.querySelectorAll('input[name="capacity_mode"]'); 
-        const capacityLabelM1 = document.getElementById('capacity-label'); 
-
-        // --- DOM 元素引用 (模式二) ---
-        const calcButtonM2 = document.getElementById('calc-button-mode-2');
-        const resultsDivM2 = document.getElementById('results-mode-2');
-        const calcFormM2 = document.getElementById('calc-form-mode-2');
-        const printButtonM2 = document.getElementById('print-button-mode-2'); // v2.6 新增
-
-        const fluidSelectM2 = document.getElementById('fluid_m2');
-        const fluidInfoDivM2 = document.getElementById('fluid-info-m2');
-
-        const flowModeRadiosM2 = document.querySelectorAll('input[name="flow_mode_m2"]');
-        const flowModeRpmM2 = document.getElementById('flow_mode_rpm_m2');
-        const flowModeVolM2 = document.getElementById('flow_mode_vol_m2');
-        const rpmInputsM2 = document.getElementById('rpm-inputs-m2');
-        const volInputsM2 = document.getElementById('vol-inputs-m2');
-        const flowM3hInputM2 = document.getElementById('flow_m3h_m2');
-        const displacementInputM2 = document.getElementById('displacement_m2');
-        const rpmInputM2 = document.getElementById('rpm_m2');
-        
-        const effModeRadiosM2 = document.querySelectorAll('input[name="eff_mode_m2"]');
-        const effModeShaftM2 = document.getElementById('eff_mode_shaft_m2');
-        const effModeInputM2 = document.getElementById('eff_mode_input_m2');
-        const etaSLabelM2 = document.getElementById('eta_s_label_m2');
-        const etaSInputM2 = document.getElementById('eta_s_m2');
-        const etaVInputM2 = document.getElementById('eta_v_m2');
-        const motorEffGroupM2 = document.getElementById('motor-eff-group-m2');
-        const motorEffInputM2 = document.getElementById('motor_eff_m2');
-        const tooltipEtaSM2 = document.getElementById('tooltip-eta-s-m2'); // v2.6 新增
-
-        const tempEvapM2 = document.getElementById('temp_evap_m2');
-        const tempCondM2 = document.getElementById('temp_cond_m2');
-        const superheatM2 = document.getElementById('superheat_m2');
-        const subcoolingM2 = document.getElementById('subcooling_m2');
-
-        // --- 按钮状态常量 ---
-        const btnTextM1 = "计算效率 (模式一)";
-        const btnTextM2 = "计算性能 (模式二)";
-        const btnTextStaleM1 = "重新计算 (模式一)";
-        const btnTextStaleM2 = "重新计算 (模式二)";
-
-        const classesFreshM1 = ['bg-blue-600', 'hover:bg-blue-700', 'text-white'];
-        const classesStaleM1 = ['bg-yellow-500', 'hover:bg-yellow-600', 'text-black'];
-        const classesFreshM2 = ['bg-green-600', 'hover:bg-green-700', 'text-white'];
-        const classesStaleM2 = ['bg-yellow-500', 'hover:bg-yellow-600', 'text-black'];
-
-        // 2. 异步初始化物性库
-        async function initializeCoolProp() {
-            try {
-                const initMsg = "--- 正在加载物性库 (coolprop.js & coolprop.wasm)... ---";
-                resultsDivM1.textContent = initMsg;
-                resultsDivM2.textContent = initMsg;
-
-                CP = await Module();
-                
-                const successMsg = "--- 物性库加载成功，请输入参数并点击计算 ---";
-                resultsDivM1.textContent = successMsg;
-                resultsDivM2.textContent = successMsg.replace("点击计算", "点击计算 (模式二)");
-
-                calcButtonM1.disabled = false;
-                calcButtonM1.textContent = btnTextM1;
-                calcButtonM2.disabled = false;
-                calcButtonM2.textContent = btnTextM2;
-
-                updateFluidInfo(fluidSelectM1, fluidInfoDivM1);
-                updateFluidInfo(fluidSelectM2, fluidInfoDivM2);
-
-            } catch (err) {
-                const errorMsg = `物性库加载失败: ${err.message}\n\n请检查文件路径是否正确，并确保使用本地服务器 (http://) 运行。`;
-                resultsDivM1.textContent = errorMsg;
-                resultsDivM2.textContent = errorMsg;
-                fluidInfoDivM1.textContent = "物性库加载失败";
-                fluidInfoDivM2.textContent = "物性库加载失败";
-                console.error(err);
-            }
-        }
-
-        // --- UI 切换逻辑 (通用) ---
-        mode1Radio.addEventListener('change', () => {
-            mode1Container.style.display = 'block';
-            mode2Container.style.display = 'none';
-        });
-        mode2Radio.addEventListener('change', () => {
-            mode1Container.style.display = 'none';
-            mode2Container.style.display = 'block';
-        });
-
-        // --- UI 切换逻辑 (模式一) ---
-        flowModeRadiosM1.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.value === 'rpm') {
-                    rpmInputsM1.style.display = 'block';
-                    volInputsM1.style.display = 'none';
-                    displacementInputM1.required = true;
-                    flowM3hInputM1.required = false;
-                } else {
-                    rpmInputsM1.style.display = 'none';
-                    volInputsM1.style.display = 'block';
-                    displacementInputM1.required = false;
-                    flowM3hInputM1.required = true;
-                }
-            });
-        });
-        powerModeRadiosM1.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.value === 'shaft') {
-                    powerLabelM1.textContent = '轴功率 (kW)';
-                    motorEffGroupM1.style.display = 'none'; 
-                } else {
-                    powerLabelM1.textContent = '输入功率 (kW) (电机)';
-                    motorEffGroupM1.style.display = 'block'; 
-                }
-            });
-        });
-        capacityModeRadiosM1.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.value === 'refrigeration') {
-                    capacityLabelM1.textContent = '制冷量 (kW)';
-                } else {
-                    capacityLabelM1.textContent = '制热量 (kW)';
-                }
-            });
-        });
-        fluidSelectM1.addEventListener('change', () => updateFluidInfo(fluidSelectM1, fluidInfoDivM1));
-
-        // --- UI 切换逻辑 (模式二) ---
-        flowModeRadiosM2.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.value === 'rpm') {
-                    rpmInputsM2.style.display = 'block';
-                    volInputsM2.style.display = 'none';
-                    displacementInputM2.required = true;
-                    flowM3hInputM2.required = false;
-                } else {
-                    rpmInputsM2.style.display = 'none';
-                    volInputsM2.style.display = 'block';
-                    displacementInputM2.required = false;
-                    flowM3hInputM2.required = true;
-                }
-            });
-        });
-        effModeRadiosM2.forEach(radio => {
-            radio.addEventListener('change', () => {
-                // v2.6 更新: 同步修改备注提示
-                if (radio.value === 'shaft') {
-                    etaSLabelM2.childNodes[0].nodeValue = '等熵效率 (η_s) '; // 更新 Label 文本
-                    tooltipEtaSM2.textContent = '基于【轴功率】。η_s = 理论等熵功率 / 压缩机轴功率。';
-                    motorEffGroupM2.style.display = 'none'; 
-                    motorEffInputM2.required = false;
-                } else {
-                    etaSLabelM2.childNodes[0].nodeValue = '总等熵效率 (η_total) '; // 更新 Label 文本
-                    tooltipEtaSM2.textContent = '基于【输入功率】。η_total = 理论等熵功率 / 电机输入功率。';
-                    motorEffGroupM2.style.display = 'block'; 
-                    motorEffInputM2.required = true;
-                }
-            });
-        });
-        fluidSelectM2.addEventListener('change', () => updateFluidInfo(fluidSelectM2, fluidInfoDivM2));
-
-        // --- 辅助功能 (可重用) ---
-        function updateFluidInfo(selectElement, infoElement) {
-            if (!CP) return; 
-            const fluid = selectElement.value;
-            const info = fluidInfoData[fluid]; 
-            if (!info) {
-                infoElement.textContent = `未找到 ${fluid} 的 GWP/ODP/安全信息。`;
-                return;
-            }
-            try {
-                // 特殊处理 R744 (CO2)
-                if (fluid === 'R744') {
-                    const Tcrit_K = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
-                    const Pcrit_Pa = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
-                    infoElement.innerHTML = `
-<b>${fluid} (CO2) 关键参数:</b>
-----------------------------------------
-GWP (AR4/AR5): ${info.gwp}
-ODP:           ${info.odp}
-安全级别:      ${info.safety}
-----------------------------------------
-临界温度 (Tc): ${Tcrit_K.toFixed(2)} K (${(Tcrit_K - 273.15).toFixed(2)} °C)
-临界压力 (Pc): ${(Pcrit_Pa / 1e5).toFixed(2)} bar
-(注意: 沸点为升华点, 不适用标准沸点计算)
-(警告: R744 常用于跨临界循环)
-                    `.trim();
-                    return;
-                }
-
-                const Tcrit_K = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
-                const Pcrit_Pa = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
-                const Tboil_K = CP.PropsSI('T', 'P', 101325, 'Q', 0, fluid); 
-                infoElement.innerHTML = `
-<b>${fluid} 关键参数:</b>
-----------------------------------------
-GWP (AR4/AR5): ${info.gwp}
-ODP:           ${info.odp}
-安全级别:      ${info.safety} (毒性[A/B] / 可燃性[1/2L/2/3])
-----------------------------------------
-临界温度 (Tc): ${Tcrit_K.toFixed(2)} K (${(Tcrit_K - 273.15).toFixed(2)} °C)
-临界压力 (Pc): ${(Pcrit_Pa / 1e5).toFixed(2)} bar
-标准沸点 (Tb): ${Tboil_K.toFixed(2)} K (${(Tboil_K - 273.15).toFixed(2)} °C)
-                `.trim(); 
-            } catch (err) {
-                console.error("Update Fluid Info Failed:", err);
-                if (err.message.includes("sublimation")) {
-                    // 再次特殊处理 R744
-                    const Tcrit_K = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
-                    const Pcrit_Pa = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
-                     infoElement.innerHTML = `
-<b>${fluid} (CO2) 关键参数:</b>
-----------------------------------------
-GWP (AR4/AR5): ${info.gwp}
-ODP:           ${info.odp}
-安全级别:      ${info.safety}
-----------------------------------------
-临界温度 (Tc): ${Tcrit_K.toFixed(2)} K (${(Tcrit_K - 273.15).toFixed(2)} °C)
-临界压力 (Pc): ${(Pcrit_Pa / 1e5).toFixed(2)} bar
-(注意: 1 atm 下为升华点, 非沸点)
-(警告: R744 常用于跨临界循环)
-                    `.trim();
-                } else {
-                    infoElement.textContent = `获取 ${fluid} 热力学参数失败: ${err.message}`;
-                }
-            }
-        }
-        
-        function setButtonStale(button, staleText, freshClasses, staleClasses) {
-            button.textContent = staleText;
-            button.classList.remove(...freshClasses);
-            button.classList.add(...staleClasses);
-        }
-        function setButtonFresh(button, freshText, freshClasses, staleClasses) {
-            button.textContent = freshText;
-            button.classList.remove(...staleClasses);
-            button.classList.add(...freshClasses);
-        }
-
-        // --- 主计算与事件绑定 ---
-        calcFormM1.addEventListener('submit', (event) => {
-            event.preventDefault(); 
-            if (!CP) {
-                resultsDivM1.textContent = "物性库未加载，请刷新页面。";
-                return;
-            }
-            calculateMode1();
-        });
-
-        calcFormM2.addEventListener('submit', (event) => {
-            event.preventDefault(); 
-            if (!CP) {
-                resultsDivM2.textContent = "物性库未加载，请刷新页面。";
-                return;
-            }
-            calculateMode2();
-        });
-
-        // 11. 主计算函数 (模式一：评估)
-        function calculateMode1() {
-            try {
-                // --- A. 获取所有输入值 ---
-                const fluid = fluidSelectM1.value;
-                const flow_mode = document.querySelector('input[name="flow_mode"]:checked').value;
-                const power_mode = document.querySelector('input[name="power_mode"]:checked').value;
-                const capacity_mode = document.querySelector('input[name="capacity_mode"]:checked').value; 
-                const rpm_val = parseFloat(rpmInputM1.value);
-                const Q_input_kW = parseFloat(document.getElementById('capacity').value); 
-                const Win_box_kW = parseFloat(document.getElementById('power').value);
-                const motor_eff_val = parseFloat(document.getElementById('motor_eff').value); 
-                const Te_C = parseFloat(document.getElementById('temp_evap').value);
-                const Tc_C = parseFloat(document.getElementById('temp_cond').value);
-                const dT_sh_K = parseFloat(document.getElementById('superheat').value);
-                const dT_sc_K = parseFloat(document.getElementById('subcooling').value);
-                if (isNaN(rpm_val) || isNaN(Q_input_kW) || isNaN(Win_box_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
-                    throw new Error("输入包含无效数字，请检查所有字段。");
-                }
-                
-                // --- B. 单位转换 ---
-                const Te_K = Te_C + 273.15;
-                const Tc_K = Tc_C + 273.15;
-                const Q_input_W = Q_input_kW * 1000;
-                const Win_box_W = Win_box_kW * 1000; 
-
-                // --- C. 功率和容量计算 ---
-                let W_shaft_W; 
-                let Win_input_W;
-                if (power_mode === 'shaft') {
-                    W_shaft_W = Win_box_W; 
-                    Win_input_W = NaN; 
-                } else {
-                    Win_input_W = Win_box_W;
-                    W_shaft_W = Win_input_W * motor_eff_val;
-                }
-                let Qe_W;
-                let Qh_W; 
-                if (capacity_mode === 'refrigeration') {
-                    Qe_W = Q_input_W;
-                    Qh_W = Qe_W + W_shaft_W;
-                } else { 
-                    Qh_W = Q_input_W;
-                    Qe_W = Qh_W - W_shaft_W;
-                }
-                if (Qe_W <= 0) {
-                    throw new Error(`计算的制冷量 (Qe = Qh - W_shaft) 小于等于零 (${(Qe_W/1000).toFixed(2)} kW)。请检查输入。`);
-                }
-
-                // --- D. 理论体积流量 (m³/s) ---
-                let V_th_m3_s;
-                let V_rev_cm3_val = NaN, V_th_m3_h_val = NaN;
-                if (flow_mode === 'rpm') {
-                    V_rev_cm3_val = parseFloat(displacementInputM1.value);
-                    if (isNaN(V_rev_cm3_val)) throw new Error("请检查每转排量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
-                    V_th_m3_s = (V_rev_cm3_val / 1e6) * (rpm_val / 60);
-                    V_th_m3_h_val = V_th_m3_s * 3600;
-                } else { 
-                    V_th_m3_h_val = parseFloat(flowM3hInputM1.value);
-                    if (isNaN(V_th_m3_h_val)) throw new Error("请检查体积流量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
-                    V_th_m3_s = V_th_m3_h_val / 3600;
-                    V_rev_cm3_val = (V_th_m3_s * 60 / rpm_val) * 1e6;
-                }
-                if (V_th_m3_s <= 0) throw new Error("理论排量必须大于零。");
-
-                // --- E. 计算稳定状态点 (1, 3, 4) ---
-                const Pe_Pa = CP.PropsSI('P', 'T', Te_K, 'Q', 1, fluid);
-                const T1_K = Te_K + dT_sh_K;
-                const h1_J_kg = CP.PropsSI('H', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const s1_J_kgK = CP.PropsSI('S', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const rho1_kg_m3 = CP.PropsSI('D', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const v1_m3_kg = 1 / rho1_kg_m3;
-                const Pc_Pa = CP.PropsSI('P', 'T', Tc_K, 'Q', 0, fluid);
-                const T3_K = Tc_K - dT_sc_K;
-                const h3_J_kg = CP.PropsSI('H', 'T', T3_K, 'P', Pc_Pa, fluid);
-                const h4_J_kg = h3_J_kg; 
-
-                // --- F. 计算稳定的性能参数 (质量流, 容积效率) ---
-                const h_evap_J_kg = h1_J_kg - h4_J_kg;
-                if (h_evap_J_kg <= 0) throw new Error("计算出错：制冷焓差小于等于零。");
-                const m_dot_kg_s = Qe_W / h_evap_J_kg; 
-                const V_actual_m3_s = m_dot_kg_s * v1_m3_kg;
-                const eta_v = (V_actual_m3_s / V_th_m3_s);
-
-                // --- G. 计算两种效率 ---
-                let Ws_W, h2s_J_kg, T2s_K, T2s_C; // v2.7 增加 T2s
-                let eta_s_shaft = NaN; 
-                let eta_s_total = NaN; 
-                let isentropic_error_msg = null;
-                try {
-                    h2s_J_kg = CP.PropsSI('H', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); 
-                    T2s_K = CP.PropsSI('T', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); // v2.7 计算 T2s
-                    T2s_C = T2s_K - 273.15; // v2.7
-                    
-                    const h_isen_J_kg = h2s_J_kg - h1_J_kg;
-                    if (h_isen_J_kg <= 0) throw new Error("理论等熵焓升小于等于零, 工况错误。");
-                    Ws_W = m_dot_kg_s * h_isen_J_kg; 
-                    if (W_shaft_W <= 0) throw new Error("计算出的轴功率必须大于零。");
-                    eta_s_shaft = Ws_W / W_shaft_W;
-                    if (power_mode === 'input') {
-                        if (Win_input_W <= 0) throw new Error("输入功率必须大于零。");
-                        eta_s_total = Ws_W / Win_input_W;
-                    }
-                } catch (isen_error) {
-                    console.error("Isentropic calculation failed (Mode 1):", isen_error);
-                    isentropic_error_msg = `计算失败 (${isen_error.message})`;
-                    Ws_W = NaN;
-                    h2s_J_kg = NaN;
-                    T2s_K = NaN; T2s_C = NaN; // v2.7
-                    eta_s_shaft = NaN; 
-                    eta_s_total = NaN;
-                }
-
-                // --- G.2 (v2.7) 计算实际排气温度 T2a ---
-                let T2a_K = NaN, T2a_C = NaN, h2a_J_kg = NaN;
-                let actual_temp_error_msg = null;
-                try {
-                    if (m_dot_kg_s <= 0) throw new Error("质量流量为零，无法计算。");
-                    h2a_J_kg = (W_shaft_W / m_dot_kg_s) + h1_J_kg;
-                    T2a_K = CP.PropsSI('T', 'P', Pc_Pa, 'H', h2a_J_kg, fluid);
-                    T2a_C = T2a_K - 273.15;
-                } catch (actual_temp_error) {
-                    console.error("Actual temp calculation failed (Mode 1):", actual_temp_error);
-                    actual_temp_error_msg = `计算失败 (${actual_temp_error.message})`;
-                    T2a_K = NaN; T2a_C = NaN; h2a_J_kg = NaN;
-                }
-
-                // --- H. 格式化输出 ---
-                const powerInputLabel = (power_mode === 'shaft') ? `轴功率 (Win)` : `输入功率 (Win)`;
-                const capacityInputLabel = (capacity_mode === 'refrigeration') ? `制冷量 (Qe)` : `制热量 (Qh)`;
-
-                let output = `
---- 计算概览 (工质: ${fluid}) ---
-蒸发压力 (Pe): ${(Pe_Pa / 1e5).toFixed(3)} bar
-冷凝压力 (Pc): ${(Pc_Pa / 1e5).toFixed(3)} bar
-压缩比 (PR):   ${(Pc_Pa / Pe_Pa).toFixed(2)}
-
---- 关键状态点 ---
-状态 1 (入口):
-  T1 = ${T1_K.toFixed(2)} K (${(T1_K - 273.15).toFixed(2)} °C)
-  h1 = ${(h1_J_kg / 1000).toFixed(2)} kJ/kg
-  s1 = ${(s1_J_kgK / 1000).toFixed(4)} kJ/kg·K
-  v1 = ${v1_m3_kg.toFixed(5)} m³/kg
-状态 3 (阀前):
-  T3 = ${T3_K.toFixed(2)} K (${(T3_K - 273.15).toFixed(2)} °C)
-  h3 = ${(h3_J_kg / 1000).toFixed(2)} kJ/kg
-状态 2s (等熵出口):
-  T2s = ${isNaN(T2s_C) ? `N/A (${isentropic_error_msg})` : `${T2s_C.toFixed(2)} °C`}
-  h2s = ${isNaN(h2s_J_kg) ? `N/A (${isentropic_error_msg})` : `${(h2s_J_kg / 1000).toFixed(2)} kJ/kg`}
-状态 2a (实际出口):
-  T2a = ${isNaN(T2a_C) ? `N/A (${actual_temp_error_msg})` : `${T2a_C.toFixed(2)} °C`}
-  h2a = ${isNaN(h2a_J_kg) ? `N/A (${actual_temp_error_msg})` : `${(h2a_J_kg / 1000).toFixed(2)} kJ/kg`}
-
---- 功率与容量 (基于能量平衡) ---
-输入 ${capacityInputLabel}: ${Q_input_kW.toFixed(3)} kW
-输入 ${powerInputLabel}: ${Win_box_kW.toFixed(3)} kW
-${(power_mode === 'input') ? `电机效率:       ${(motor_eff_val * 100).toFixed(1)} %` : ''}
-${(power_mode === 'input') ? `计算轴功率:     ${(W_shaft_W / 1000).toFixed(3)} kW` : ''}
-
-计算 ${capacity_mode === 'refrigeration' ? '制热量 (Qh)' : '制冷量 (Qe)'}: ${capacity_mode === 'refrigeration' ? (Qh_W / 1000).toFixed(3) : (Qe_W / 1000).toFixed(3)} kW
-
---- 流量与等熵功率 ---
-制冷焓差:     ${(h_evap_J_kg / 1000).toFixed(2)} kJ/kg
-质量流量 (m_dot): ${m_dot_kg_s.toFixed(5)} kg/s
-等熵功率 (Ws):   ${isNaN(Ws_W) ? 'N/A' : `${(Ws_W / 1000).toFixed(3)} kW`}
-
---- 体积流量 (转速: ${rpm_val.toFixed(0)} RPM) ---
-`;
-                if (flow_mode === 'rpm') {
-                    output += `输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
-                    output += `计算流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
-                } else {
-                    output += `输入流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
-                    output += `计算排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
-                }
-                output += `
-理论体积流量 (V_th): ${V_th_m3_s.toFixed(6)} m³/s
-实际体积流量 (V_act): ${V_actual_m3_s.toFixed(6)} m³/s
-
-========================================
-           最终效率计算 (备注)
-========================================
-等熵效率 (η_s):       ${isNaN(eta_s_shaft) ? 'N/A' : `${(eta_s_shaft * 100).toFixed(2)} %`}\n`;
-                output += `  (备注: 理论等熵功率 / 实际轴功率)\n`; // v2.6 备注
-
-                if (power_mode === 'input') {
-                    output += `总等熵效率 (η_total):   ${isNaN(eta_s_total) ? 'N/A' : `${(eta_s_total * 100).toFixed(2)} %`}\n`;
-                    output += `  (备注: 理论等熵功率 / 电机输入功率)\n`; // v2.6 备注
-                }
-                
-                output += `容积效率 (η_v):         ${(eta_v * 100).toFixed(2)} %`;
-                output += `\n  (备注: 实际吸气体积流量 / 理论输气量)`; // v2.6 备注
-
-                resultsDivM1.textContent = output;
-                lastMode1ResultText = output; // v2.6 存储纯文本
-
-                // 缓存结果并启用转换按钮
-                lastMode1Results = {
-                    fluid,
-                    rpm_val,
-                    flow_mode,
-                    V_rev_cm3_val,
-                    V_th_m3_h_val,
-                    Te_C,
-                    Tc_C,
-                    dT_sh_K,
-                    dT_sc_K,
-                    power_mode,
-                    motor_eff_val,
-                    eta_v: isNaN(eta_v) ? null : eta_v,
-                    eta_s_shaft: isNaN(eta_s_shaft) ? null : eta_s_shaft,
-                    eta_s_total: isNaN(eta_s_total) ? null : eta_s_total
-                };
-                transferButton.disabled = false;
-                printButtonM1.disabled = false; // v2.6 启用打印
-
-                setButtonFresh(calcButtonM1, btnTextM1, classesFreshM1, classesStaleM1);
-
-            } catch (error) {
-                resultsDivM1.textContent = `计算出错: ${error.message}\n\n请检查输入参数是否在工质的有效范围内。`;
-                console.error(error);
-                
-                lastMode1Results = null;
-                lastMode1ResultText = null;
-                transferButton.disabled = true;
-                printButtonM1.disabled = true;
-            }
-        }
-
-        // 11_M2. 主计算函数 (模式二：预测)
-        function calculateMode2() {
-            try {
-                // --- A. 获取所有输入值 ---
-                const fluid = fluidSelectM2.value;
-                const flow_mode = document.querySelector('input[name="flow_mode_m2"]:checked').value;
-                const eff_mode = document.querySelector('input[name="eff_mode_m2"]:checked').value;
-                const rpm_val = parseFloat(rpmInputM2.value);
-                const eta_s_input = parseFloat(etaSInputM2.value);
-                const eta_v_input = parseFloat(etaVInputM2.value);
-                const motor_eff_val = parseFloat(motorEffInputM2.value);
-                const Te_C = parseFloat(tempEvapM2.value);
-                const Tc_C = parseFloat(tempCondM2.value);
-                const dT_sh_K = parseFloat(superheatM2.value);
-                const dT_sc_K = parseFloat(subcoolingM2.value);
-                if (isNaN(rpm_val) || isNaN(eta_s_input) || isNaN(eta_v_input) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
-                    throw new Error("输入包含无效数字，请检查所有字段。");
-                }
-                if (eff_mode === 'input' && isNaN(motor_eff_val)) {
-                    throw new Error("在'基于输入功率'模式下，必须提供有效的电机效率。");
-                }
-
-                // --- B. 单位转换 ---
-                const Te_K = Te_C + 273.15;
-                const Tc_K = Tc_C + 273.15;
-
-                // --- C. 理论体积流量 (m³/s) ---
-                let V_th_m3_s;
-                let V_rev_cm3_val = NaN, V_th_m3_h_val = NaN;
-                if (flow_mode === 'rpm') {
-                    V_rev_cm3_val = parseFloat(displacementInputM2.value);
-                    if (isNaN(V_rev_cm3_val)) throw new Error("请检查每转排量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
-                    V_th_m3_s = (V_rev_cm3_val / 1e6) * (rpm_val / 60);
-                    V_th_m3_h_val = V_th_m3_s * 3600;
-                } else { 
-                    V_th_m3_h_val = parseFloat(flowM3hInputM2.value);
-                    if (isNaN(V_th_m3_h_val)) throw new Error("请检查体积流量输入。");
-                    if (rpm_val <= 0) throw new Error("转速必须大于 0。");
-                    V_th_m3_s = V_th_m3_h_val / 3600;
-                    V_rev_cm3_val = (V_th_m3_s * 60 / rpm_val) * 1e6;
-                }
-                if (V_th_m3_s <= 0) throw new Error("理论排量必须大于零。");
-
-                // --- D. 计算状态点 (1, 3, 4) ---
-                const Pe_Pa = CP.PropsSI('P', 'T', Te_K, 'Q', 1, fluid);
-                const T1_K = Te_K + dT_sh_K;
-                const h1_J_kg = CP.PropsSI('H', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const s1_J_kgK = CP.PropsSI('S', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const rho1_kg_m3 = CP.PropsSI('D', 'T', T1_K, 'P', Pe_Pa, fluid);
-                const v1_m3_kg = 1 / rho1_kg_m3;
-                const Pc_Pa = CP.PropsSI('P', 'T', Tc_K, 'Q', 0, fluid);
-                const T3_K = Tc_K - dT_sc_K;
-                const h3_J_kg = CP.PropsSI('H', 'T', T3_K, 'P', Pc_Pa, fluid);
-                const h4_J_kg = h3_J_kg; 
-
-                // --- E. 计算理论比焓 (和 T2s) ---
-                const h_evap_J_kg = h1_J_kg - h4_J_kg;
-                if (h_evap_J_kg <= 0) throw new Error("计算出错：制冷焓差小于等于零。");
-                let h_isen_J_kg, h2s_J_kg, T2s_K, T2s_C; // v2.7 增加 T2s
-                let isentropic_error_msg = null;
-                try {
-                    h2s_J_kg = CP.PropsSI('H', 'P', Pc_Pa, 'S', s1_J_kgK, fluid);
-                    T2s_K = CP.PropsSI('T', 'P', Pc_Pa, 'S', s1_J_kgK, fluid); // v2.7
-                    T2s_C = T2s_K - 273.15; // v2.7
-                    h_isen_J_kg = h2s_J_kg - h1_J_kg;
-                    if (h_isen_J_kg <= 0) throw new Error("理论等熵焓升小于等于零, 工况错误。");
-                } catch (isen_error) {
-                    console.error("Isentropic calculation failed (Mode 2):", isen_error);
-                    isentropic_error_msg = `计算失败 (${isen_error.message})`;
-                    T2s_K = NaN; T2s_C = NaN; // v2.7
-                    throw new Error(`等熵点计算失败: ${isentropic_error_msg}`);
-                }
-
-                // --- F. 应用效率 (核心逻辑) ---
-                const V_actual_m3_s = V_th_m3_s * eta_v_input;
-                const m_dot_kg_s = V_actual_m3_s / v1_m3_kg;
-                const Ws_W = m_dot_kg_s * h_isen_J_kg;
-
-                // --- G. 计算实际功率 ---
-                let W_shaft_W, Win_input_W = NaN;
-                let eta_s_shaft = NaN, eta_s_total = NaN;
-                if (eff_mode === 'input') {
-                    eta_s_total = eta_s_input; 
-                    Win_input_W = Ws_W / eta_s_total;
-                    W_shaft_W = Win_input_W * motor_eff_val;
-                    eta_s_shaft = Ws_W / W_shaft_W; 
-                } else { 
-                    eta_s_shaft = eta_s_input; 
-                    W_shaft_W = Ws_W / eta_s_shaft;
-                    eta_s_total = NaN;
-                }
-
-                // --- H. 计算实际容量 ---
-                const Qe_W = m_dot_kg_s * h_evap_J_kg;
-                const Qh_W = Qe_W + W_shaft_W; 
-
-                // --- H.2 (v2.7) 计算实际排气温度 T2a ---
-                let T2a_K = NaN, T2a_C = NaN, h2a_J_kg = NaN;
-                let actual_temp_error_msg = null;
-                try {
-                    if (m_dot_kg_s <= 0) throw new Error("质量流量为零，无法计算。");
-                    h2a_J_kg = (W_shaft_W / m_dot_kg_s) + h1_J_kg;
-                    T2a_K = CP.PropsSI('T', 'P', Pc_Pa, 'H', h2a_J_kg, fluid);
-                    T2a_C = T2a_K - 273.15;
-                } catch (actual_temp_error) {
-                    console.error("Actual temp calculation failed (Mode 2):", actual_temp_error);
-                    actual_temp_error_msg = `计算失败 (${actual_temp_error.message})`;
-                    T2a_K = NaN; T2a_C = NaN; h2a_J_kg = NaN;
-                }
-
-                // --- I. 计算 COP ---
-                const COP_R = Qe_W / W_shaft_W;
-                const COP_H = Qh_W / W_shaft_W;
-                const EER_R = isNaN(Win_input_W) ? NaN : (Qe_W / Win_input_W);
-                const EER_H = isNaN(Win_input_W) ? NaN : (Qh_W / Win_input_W);
-
-                // --- J. 格式化输出 ---
-                let output = `
---- 计算概览 (工质: ${fluid}) ---
-蒸发压力 (Pe): ${(Pe_Pa / 1e5).toFixed(3)} bar
-冷凝压力 (Pc): ${(Pc_Pa / 1e5).toFixed(3)} bar
-压缩比 (PR):   ${(Pc_Pa / Pe_Pa).toFixed(2)}
-
---- 关键状态点 ---
-状态 1 (入口):
-  T1 = ${T1_K.toFixed(2)} K (${(T1_K - 273.15).toFixed(2)} °C)
-  v1 = ${v1_m3_kg.toFixed(5)} m³/kg
-  h1 = ${(h1_J_kg / 1000).toFixed(2)} kJ/kg
-状态 3 (阀前):
-  h3 = ${(h3_J_kg / 1000).toFixed(2)} kJ/kg
-状态 2s (等熵出口):
-  T2s = ${isNaN(T2s_C) ? 'N/A' : `${T2s_C.toFixed(2)} °C`}
-  h2s = ${(h2s_J_kg / 1000).toFixed(2)} kJ/kg
-状态 2a (实际出口):
-  T2a = ${isNaN(T2a_C) ? `N/A (${actual_temp_error_msg})` : `${T2a_C.toFixed(2)} °C`}
-  h2a = ${isNaN(h2a_J_kg) ? `N/A (${actual_temp_error_msg})` : `${(h2a_J_kg / 1000).toFixed(2)} kJ/kg`}
-
---- 理论流量与比焓 ---
-制冷焓差:     ${(h_evap_J_kg / 1000).toFixed(2)} kJ/kg
-等熵焓升:     ${(h_isen_J_kg / 1000).toFixed(2)} kJ/kg
-`;
-                if (flow_mode === 'rpm') {
-                    output += `输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev ( @ ${rpm_val.toFixed(0)} RPM )\n`;
-                    output += `理论流量(V_th): ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
-                } else {
-                    output += `输入流量(V_th): ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
-                    output += `计算排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev ( @ ${rpm_val.toFixed(0)} RPM )\n`;
-                }
-output += `
---- 输入效率 ---
-容积效率 (η_v):         ${(eta_v_input * 100).toFixed(2)} %
-${(eff_mode === 'shaft') ? `等熵效率 (η_s):       ${(eta_s_shaft * 100).toFixed(2)} %` : `总等熵效率 (η_total):   ${(eta_s_total * 100).toFixed(2)} %`}
-${(eff_mode === 'input') ? `电机效率:             ${(motor_eff_val * 100).toFixed(1)} %` : ''}
-${(eff_mode === 'input') ? `(计算的 η_s):         ${(eta_s_shaft * 100).toFixed(2)} %` : ''}
-
---- 实际流量 ---
-实际体积流量 (V_act): ${(V_actual_m3_s * 3600).toFixed(2)} m³/h
-实际质量流量 (m_dot): ${m_dot_kg_s.toFixed(5)} kg/s
-理论等熵功率 (Ws):   ${(Ws_W / 1000).toFixed(3)} kW
-
-========================================
-           最终性能计算 (备注)
-========================================
-制冷量 (Qe):     ${(Qe_W / 1000).toFixed(2)} kW
-制热量 (Qh):     ${(Qh_W / 1000).toFixed(2)} kW
-轴功率 (W_shaft): ${(W_shaft_W / 1000).toFixed(2)} kW
-${isNaN(Win_input_W) ? '' : `输入功率 (W_in):  ${(Win_input_W / 1000).toFixed(2)} kW`}
-
-COP (制冷):      ${COP_R.toFixed(3)}
-  (备注: Qe / W_shaft)
-COP (制热):      ${COP_H.toFixed(3)}
-  (备注: Qh / W_shaft)
-${isNaN(EER_R) ? '' : `总 COP (制冷):   ${EER_R.toFixed(3)}
-  (备注: Qe / W_in)`}
-${isNaN(EER_H) ? '' : `总 COP (制热):   ${EER_H.toFixed(3)}
-  (备注: Qh / W_in)`}
-`;
-                resultsDivM2.textContent = output;
-                lastMode2ResultText = output; // v2.6 存储纯文本
-
-                setButtonFresh(calcButtonM2, btnTextM2, classesFreshM2, classesStaleM2);
-                printButtonM2.disabled = false; // v2.6 启用打印
-
-            } catch (error) {
-                resultsDivM2.textContent = `计算出错: ${error.message}\n\n请检查输入参数是否在工质的有效范围内。`;
-                console.error(error);
-                lastMode2ResultText = null;
-                printButtonM2.disabled = true;
-            }
-        }
-
-        // 12. 页面加载时，禁用按钮并开始初始化
-        calcButtonM1.disabled = true;
-        calcButtonM2.disabled = true;
-        initializeCoolProp();
-
-        // --- 监听所有输入变化，用于设置按钮“脏”状态 ---
-        const allInputsM1 = calcFormM1.querySelectorAll('input, select');
-        const allInputsM2 = calcFormM2.querySelectorAll('input, select');
-
-        allInputsM1.forEach(input => {
-            const handler = () => {
-                setButtonStale(calcButtonM1, btnTextStaleM1, classesFreshM1, classesStaleM1);
-                transferButton.disabled = true;
-                lastMode1Results = null;
-                // v2.6 新增: 禁用打印并清除缓存
-                printButtonM1.disabled = true;
-                lastMode1ResultText = null;
-            };
-            input.addEventListener('input', handler);
-            input.addEventListener('change', handler);
-        });
-
-        allInputsM2.forEach(input => {
-            const handler = () => {
-                setButtonStale(calcButtonM2, btnTextStaleM2, classesFreshM2, classesStaleM2);
-                // v2.6 新增: 禁用打印并清除缓存
-                printButtonM2.disabled = true;
-                lastMode2ResultText = null;
-            };
-            input.addEventListener('input', handler);
-            input.addEventListener('change', handler);
-        });
-        
-        // --- 转换按钮的点击事件 ---
-        transferButton.addEventListener('click', () => {
-            if (!lastMode1Results) {
-                alert("没有可代入的数据。请先在模式一中成功计算。");
-                return;
-            }
-            
-            const data = lastMode1Results;
-
-            // 1. 代入通用工况
-            fluidSelectM2.value = data.fluid;
-            rpmInputM2.value = data.rpm_val;
-            tempEvapM2.value = data.Te_C;
-            tempCondM2.value = data.Tc_C;
-            superheatM2.value = data.dT_sh_K;
-            subcoolingM2.value = data.dT_sc_K;
-            
-            // 2. 代入流量模式
-            if (data.flow_mode === 'rpm') {
-                flowModeRpmM2.checked = true;
-                displacementInputM2.value = data.V_rev_cm3_val;
-                flowModeRpmM2.dispatchEvent(new Event('change'));
-            } else {
-                flowModeVolM2.checked = true;
-                flowM3hInputM2.value = data.V_th_m3_h_val;
-                flowModeVolM2.dispatchEvent(new Event('change'));
-            }
-
-            // 3. 代入核心效率 (智能判断)
-            if (data.eta_v === null) {
-                alert("警告: 模式一未能算出有效的容积效率 (η_v)。");
-                etaVInputM2.value = 0.85; // 填入默认值
-            } else {
-                etaVInputM2.value = data.eta_v.toFixed(3);
-            }
-            
-            if (data.power_mode === 'input' && data.eta_s_total !== null) {
-                // 基于输入功率
-                effModeInputM2.checked = true;
-                etaSInputM2.value = data.eta_s_total.toFixed(3);
-                motorEffInputM2.value = data.motor_eff_val;
-                effModeInputM2.dispatchEvent(new Event('change'));
-                
-            } else if (data.power_mode === 'shaft' && data.eta_s_shaft !== null) {
-                // 基于轴功率
-                effModeShaftM2.checked = true;
-                etaSInputM2.value = data.eta_s_shaft.toFixed(3);
-                effModeShaftM2.dispatchEvent(new Event('change'));
-
-            } else if (data.eta_s_shaft !== null) {
-                // v2.7 修正: 即使模式一是 input, 但如果 eta_s_total 失败了, 仍然尝试使用 eta_s_shaft
-                effModeShaftM2.checked = true;
-                etaSInputM2.value = data.eta_s_shaft.toFixed(3);
-                effModeShaftM2.dispatchEvent(new Event('change'));
-                
-            } else {
-                // 模式一计算失败或模式未知
-                alert("警告: 模式一未能算出有效的等熵效率 (η_s)。将使用默认值。");
-                effModeShaftM2.checked = true;
-                etaSInputM2.value = 0.7; // 填入默认值
-                effModeShaftM2.dispatchEvent(new Event('change'));
-            }
-
-            // 4. 更新制冷剂信息
-            updateFluidInfo(fluidSelectM2, fluidInfoDivM2);
-            
-            // 5. 自动切换视图
-            mode2Radio.checked = true;
-            mode2Radio.dispatchEvent(new Event('change'));
-            
-            // 6. 触发模式二“脏检查”
-            setButtonStale(calcButtonM2, btnTextStaleM2, classesFreshM2, classesStaleM2);
-            
-            // 提示用户
-            resultsDivM2.textContent = "--- 数据已从模式一代入 --- \n--- 请点击下方按钮计算性能 ---";
-        });
-        
-        // --- v2.6 新增: 打印功能 ---
-        
-        /**
-         * 打印报告的核心函数
-         * @param {string} printHtml - 要打印的 HTML 内容
-         */
-        function callPrint(printHtml) {
-            // 1. 查找或创建打印容器
-            let printContainer = document.getElementById('print-container');
-            if (printContainer) {
-                printContainer.remove(); // 移除旧的
-            }
-            printContainer = document.createElement('div');
-            printContainer.id = 'print-container';
-            printContainer.innerHTML = printHtml;
-            
-            // 2. 将容器添加到 body
-            document.body.appendChild(printContainer);
-
-            // 3. 调用打印
-            window.print();
-
-            // 4. 打印后清理 (使用延迟)
-            setTimeout(() => {
-                if (document.body.contains(printContainer)) {
-                    document.body.removeChild(printContainer);
-                }
-            }, 500); // 0.5秒延迟, 确保打印对话框已处理
-        }
-
-        /**
-         * 准备模式一的打印报告
-         */
-        function printReportMode1() {
-            if (!lastMode1ResultText) {
-                alert("没有可打印的结果。");
-                return;
-            }
-
-            // 1. 收集所有输入
-            const inputs = {
-                "报告类型": "模式一: 性能评估",
-                "制冷剂": fluidSelectM1.value,
-                "压缩机转速 (RPM)": rpmInputM1.value,
-                "理论输气量模式": document.querySelector('input[name="flow_mode"]:checked').value === 'rpm' ? '按转速与排量' : '按体积流量',
-                "每转排量 (cm³/rev)": flowModeRpmM1.checked ? displacementInputM1.value : 'N/A',
-                "理论体积流量 (m³/h)": flowModeVolM1.checked ? flowM3hInputM1.value : 'N/A',
-                "容量模式": document.querySelector('input[name="capacity_mode"]:checked').value === 'heating' ? '制热量 (冷凝器)' : '制冷量',
-                "输入容量 (kW)": document.getElementById('capacity').value,
-                "功率模式": document.querySelector('input[name="power_mode"]:checked').value === 'input' ? '输入功率 (电机)' : '轴功率',
-                "输入功率 (kW)": document.getElementById('power').value,
-                "电机效率": document.querySelector('input[name="power_mode"]:checked').value === 'input' ? document.getElementById('motor_eff').value : 'N/A',
-                "蒸发温度 (°C)": document.getElementById('temp_evap').value,
-                "冷凝温度 (°C)": document.getElementById('temp_cond').value,
-                "有效过热度 (K)": document.getElementById('superheat').value,
-                "过冷度 (K)": document.getElementById('subcooling').value,
-            };
-
-            // 2. 生成打印HTML
-            let printHtml = `
-                <h1>压缩机性能计算报告</h1>
-                <p>计算时间: ${new Date().toLocaleString('zh-CN')}</p>
-                <h2>1. 输入参数 (模式一)</h2>
-                <table class="print-table">
-                    ${Object.entries(inputs).map(([key, value]) => `
-                        <tr>
-                            <th>${key}</th>
-                            <td>${value}</td>
-                        </tr>
-                    `).join('')}
-                </table>
-                <h2>2. 计算结果 (模式一)</h2>
-                <pre class="print-results">${lastMode1ResultText}</pre>
-                <h3>--- 报告结束 (编者: 荆炎荣) ---</h3>
-            `;
-            
-            // 3. 执行打印
-            callPrint(printHtml);
-        }
-
-        /**
-         * 准备模式二的打印报告
-         */
-        function printReportMode2() {
-            if (!lastMode2ResultText) {
-                alert("没有可打印的结果。");
-                return;
-            }
-            
-            const inputs = {
-                "报告类型": "模式二: 性能预测",
-                "制冷剂": fluidSelectM2.value,
-                "压缩机转速 (RPM)": rpmInputM2.value,
-                "理论输气量模式": document.querySelector('input[name="flow_mode_m2"]:checked').value === 'rpm' ? '按转速与排量' : '按体积流量',
-                "每转排量 (cm³/rev)": flowModeRpmM2.checked ? displacementInputM2.value : 'N/A',
-                "理论体积流量 (m³/h)": flowModeVolM2.checked ? flowM3hInputM2.value : 'N/A',
-                "蒸发温度 (°C)": tempEvapM2.value,
-                "冷凝温度 (°C)": tempCondM2.value,
-                "有效过热度 (K)": superheatM2.value,
-                "过冷度 (K)": subcoolingM2.value,
-                "效率基准": document.querySelector('input[name="eff_mode_m2"]:checked').value === 'input' ? '基于输入功率 (η_total)' : '基于轴功率 (η_s)',
-                "输入等熵效率": etaSInputM2.value,
-                "容积效率 (η_v)": etaVInputM2.value,
-                "电机效率": document.querySelector('input[name="eff_mode_m2"]:checked').value === 'input' ? motorEffInputM2.value : 'N/A',
-            };
-
-            let printHtml = `
-                <h1>压缩机性能计算报告</h1>
-                <p>计算时间: ${new Date().toLocaleString('zh-CN')}</p>
-                <h2>1. 输入参数 (模式二)</h2>
-                <table class="print-table">
-                    ${Object.entries(inputs).map(([key, value]) => `
-                        <tr>
-                            <th>${key}</th>
-                            <td>${value}</td>
-                        </tr>
-                    `).join('')}
-                </table>
-                <h2>2. 计算结果 (模式二)</h2>
-                <pre class="print-results">${lastMode2ResultText}</pre>
-                <h3>--- 报告结束 (编者: 荆炎荣) ---</h3>
-            `;
-
-            callPrint(printHtml);
-        }
-
-        // 绑定打印按钮事件
-        printButtonM1.addEventListener('click', printReportMode1);
-        printButtonM2.addEventListener('click', printReportMode2);
-
-
-    </script>
+    <script type="module" src="js/main.js"></script>
 
 </body>
 </html>
