@@ -1,6 +1,6 @@
 // =====================================================================
 // mode1_eval.js: 模式一 (性能评估) 模块
-// 版本: v3.0
+// 版本: v4.3 (RPM 逻辑修复)
 // 职责: 1. 初始化模式一的 UI 事件
 //        2. 执行模式一 (评估) 的计算
 //        3. 处理打印和数据传输
@@ -57,7 +57,13 @@ function calculateMode1() {
         const flow_mode = document.querySelector('input[name="flow_mode"]:checked').value;
         const power_mode = document.querySelector('input[name="power_mode"]:checked').value;
         const capacity_mode = document.querySelector('input[name="capacity_mode"]:checked').value;
-        const rpm_val = parseFloat(document.getElementById('rpm').value);
+        
+        // v4.3 修复: 仅在 'rpm' 模式下读取 rpm
+        let rpm_val = NaN;
+        if (flow_mode === 'rpm') {
+             rpm_val = parseFloat(document.getElementById('rpm').value);
+        }
+
         const Q_input_kW = parseFloat(document.getElementById('capacity').value);
         const Win_box_kW = parseFloat(document.getElementById('power').value);
         const motor_eff_val = parseFloat(document.getElementById('motor_eff').value);
@@ -66,8 +72,12 @@ function calculateMode1() {
         const dT_sh_K = parseFloat(document.getElementById('superheat').value);
         const dT_sc_K = parseFloat(document.getElementById('subcooling').value);
         
-        if (isNaN(rpm_val) || isNaN(Q_input_kW) || isNaN(Win_box_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
+        // v4.3 修复: 更新 NaN 检查
+        if (isNaN(Q_input_kW) || isNaN(Win_box_kW) || isNaN(Te_C) || isNaN(Tc_C) || isNaN(dT_sh_K) || isNaN(dT_sc_K)) {
             throw new Error("输入包含无效数字，请检查所有字段。");
+        }
+        if (flow_mode === 'rpm' && isNaN(rpm_val)) {
+             throw new Error("在'按转速'模式下，必须提供有效的转速。");
         }
         if (power_mode === 'input' && isNaN(motor_eff_val)) {
              throw new Error("在'输入功率'模式下，必须提供有效的电机效率。");
@@ -112,11 +122,11 @@ function calculateMode1() {
             V_th_m3_s = (V_rev_cm3_val / 1e6) * (rpm_val / 60);
             V_th_m3_h_val = V_th_m3_s * 3600;
         } else {
+            // 'vol' 模式
             V_th_m3_h_val = parseFloat(document.getElementById('flow_m3h').value);
             if (isNaN(V_th_m3_h_val)) throw new Error("请检查体积流量输入。");
-            if (rpm_val <= 0) throw new Error("转速必须大于 0。");
             V_th_m3_s = V_th_m3_h_val / 3600;
-            V_rev_cm3_val = (V_th_m3_s * 60 / rpm_val) * 1e6;
+            // v4.3 修复: rpm_val 和 V_rev_cm3_val 此时为 NaN, 跳过无效计算
         }
         if (V_th_m3_s <= 0) throw new Error("理论排量必须大于零。");
 
@@ -217,16 +227,24 @@ ${(power_mode === 'input') ? `计算轴功率:     ${(W_shaft_W / 1000).toFixed(
 制冷焓差:     ${(h_evap_J_kg / 1000).toFixed(2)} kJ/kg
 质量流量 (m_dot): ${m_dot_kg_s.toFixed(5)} kg/s
 等熵功率 (Ws):   ${isNaN(Ws_W) ? 'N/A' : `${(Ws_W / 1000).toFixed(3)} kW`}
-
---- 体积流量 (转速: ${rpm_val.toFixed(0)} RPM) ---
 `;
+        // v4.3 修复: 调整输出
+        let flow_output = '';
         if (flow_mode === 'rpm') {
-            output += `输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
-            output += `计算流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
+            flow_output = `
+--- 体积流量 (转速: ${rpm_val.toFixed(0)} RPM) ---
+输入排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev
+计算流量:     ${V_th_m3_h_val.toFixed(2)} m³/h
+`;
         } else {
-            output += `输入流量:     ${V_th_m3_h_val.toFixed(2)} m³/h\n`;
-            output += `计算排量:     ${V_rev_cm3_val.toFixed(1)} cm³/rev\n`;
+            flow_output = `
+--- 体积流量 ---
+输入流量:     ${V_th_m3_h_val.toFixed(2)} m³/h
+`;
         }
+        
+        output += flow_output; // 添加条件块
+
         output += `
 理论体积流量 (V_th): ${V_th_m3_s.toFixed(6)} m³/s
 实际体积流量 (V_act): ${V_actual_m3_s.toFixed(6)} m³/s
@@ -251,9 +269,9 @@ ${(power_mode === 'input') ? `计算轴功率:     ${(W_shaft_W / 1000).toFixed(
         // 缓存结果并启用转换按钮
         lastMode1Results = {
             fluid,
-            rpm_val,
+            rpm_val, // 可能为 NaN
             flow_mode,
-            V_rev_cm3_val,
+            V_rev_cm3_val, // 可能为 NaN
             V_th_m3_h_val,
             Te_C,
             Tc_C,
@@ -291,13 +309,15 @@ function printReportMode1() {
     }
 
     // 1. 收集所有输入
+    const flow_mode_val = document.querySelector('input[name="flow_mode"]:checked').value;
+    
     const inputs = {
         "报告类型": "模式一: 性能评估",
         "制冷剂": fluidSelectM1.value,
-        "压缩机转速 (RPM)": document.getElementById('rpm').value,
-        "理论输气量模式": document.querySelector('input[name="flow_mode"]:checked').value === 'rpm' ? '按转速与排量' : '按体积流量',
-        "每转排量 (cm³/rev)": document.querySelector("input[name='flow_mode']:checked").value === 'rpm' ? document.getElementById('displacement').value : 'N/A',
-        "理论体积流量 (m³/h)": document.querySelector("input[name='flow_mode']:checked").value === 'vol' ? document.getElementById('flow_m3h').value : 'N/A',
+        "理论输气量模式": flow_mode_val === 'rpm' ? '按转速与排量' : '按体积流量',
+        "压缩机转速 (RPM)": flow_mode_val === 'rpm' ? document.getElementById('rpm').value : 'N/A',
+        "每转排量 (cm³/rev)": flow_mode_val === 'rpm' ? document.getElementById('displacement').value : 'N/A',
+        "理论体积流量 (m³/h)": flow_mode_val === 'vol' ? document.getElementById('flow_m3h').value : 'N/A',
         "容量模式": document.querySelector('input[name="capacity_mode"]:checked').value === 'heating' ? '制热量 (冷凝器)' : '制冷量',
         "输入容量 (kW)": document.getElementById('capacity').value,
         "功率模式": document.querySelector('input[name="power_mode"]:checked').value === 'input' ? '输入功率 (电机)' : '轴功率',
@@ -344,22 +364,24 @@ function transferToMode2() {
 
     // 1. 代入通用工况
     document.getElementById('fluid_m2').value = data.fluid;
-    document.getElementById('rpm_m2').value = data.rpm_val;
     document.getElementById('temp_evap_m2').value = data.Te_C;
     document.getElementById('temp_cond_m2').value = data.Tc_C;
     document.getElementById('superheat_m2').value = data.dT_sh_K;
     document.getElementById('subcooling_m2').value = data.dT_sc_K;
     
-    // 2. 代入流量模式
+    // 2. 代入流量模式 (v4.3 修复)
     const flowModeRpmM2 = document.getElementById('flow_mode_rpm_m2');
     const flowModeVolM2 = document.getElementById('flow_mode_vol_m2');
     if (data.flow_mode === 'rpm') {
         flowModeRpmM2.checked = true;
+        document.getElementById('rpm_m2').value = data.rpm_val; // rpm_val 是有效的
         document.getElementById('displacement_m2').value = data.V_rev_cm3_val;
         flowModeRpmM2.dispatchEvent(new Event('change')); // 触发 UI 切换
     } else {
+        // 'vol' 模式
         flowModeVolM2.checked = true;
         document.getElementById('flow_m3h_m2').value = data.V_th_m3_h_val;
+        // rpm_val 和 V_rev_cm3_val 为 NaN, 不需要设置
         flowModeVolM2.dispatchEvent(new Event('change')); // 触发 UI 切换
     }
 
