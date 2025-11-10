@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>压缩机性能计算器 v4.3 (RPM 逻辑修复)</title>
+    <title>压缩机性能计算器 v4.5 (增加工质)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* ... 样式表 (大部分无变化) ... */
@@ -177,7 +177,7 @@
 <body class="bg-gray-100 font-sans antialiased">
 
     <div class="container mx-auto p-4 sm:p-8 max-w-4xl">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">压缩机性能计算器 v4.3 (RPM 逻辑修复)</h1>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">压缩机性能计算器 v4.5 (增加工质)</h1>
         
         <div class="flex border-b-2 border-gray-300 mb-0">
             <button id="tab-btn-m1" class="tab-button active">
@@ -233,6 +233,11 @@
                                             <option value="R152a">R152a</option>
                                             <option value="R454B">R454B</option>
                                             <option value="R513A">R513A</option>
+                                            <option value="R236fa">R236fa</option>
+                                            <option value="R23">R23</option>
+                                            <option value="R1234yf">R1234yf</option>
+                                            <option value="R1270">R1270 (Propylene)</option>
+                                            <option value="R1150">R1150 (Ethylene)</option>
                                         </select>
                                     </div>
 
@@ -384,7 +389,7 @@
                 </div>
             </div>
             
-            </div>
+        </div>
 
         <div id="tab-content-m2" class="tab-content">
             <div id="mode-2-container">
@@ -434,6 +439,11 @@
                                                 <option value="R152a">R152a</option>
                                                 <option value="R454B">R454B</option>
                                                 <option value="R513A">R513A</option>
+                                                <option value="R236fa">R236fa</option>
+                                                <option value="R23">R23</option>
+                                                <option value="R1234yf">R1234yf</option>
+                                                <option value="R1270">R1270 (Propylene)</option>
+                                                <option value="R1150">R1150 (Ethylene)</option>
                                             </select>
                                         </div>
 
@@ -610,6 +620,10 @@
                                                 <option value="Neon">Neon (氖气)</option>
                                                 <option value="Argon">Argon (氩气)</option>
                                                 <option value="Water">Water (IAPWS-IF97)</option>
+                                                <option value="R744">R744 (CO2 / 二氧化碳)</option>
+                                                <option value="Hydrogen">Hydrogen (氢气)</option>
+                                                <option value="Oxygen">Oxygen (氧气)</option>
+                                                <option value="Methane">Methane (甲烷)</option>
                                             </select>
                                         </div>
 
@@ -985,7 +999,7 @@
                                     </div>
 
                                     <pre id="fluid-info-m4" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-200 mb-3 font-mono">
---- 正在加载物性库 ---
+--- N/A (MVR 模式固定为水) ---
                                     </pre>
                                 </fieldset>
 
@@ -1171,7 +1185,7 @@
     </div>
 
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4 max-w-4xl mx-auto px-4">
-        <p><strong>版本:</strong> v4.3 (RPM 逻辑修复)</p>
+        <p><strong>版本:</strong> v4.5 (增加工质)</p>
         <p><strong>编者:</strong> 荆炎荣 (Jing Yanrong)</p>
         <blockquote class="mt-2 border-l-4 border-gray-300 pl-4 italic">
             编者已尽力确保本计算器结果的准确性，但不对任何因使用本工具而导致的潜在错误或损失承担责任。计算结果仅供参考。
