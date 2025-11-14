@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v5.0 (增加模式 2C)</title>
+    <title>无油压缩机性能计算器 v5.3 (修复所有 'step' 错误)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link rel="stylesheet" href="style.css">
-    </head>
+
+</head>
 <body class="bg-gray-100 text-gray-800">
 
     <div class="container mx-auto max-w-7xl p-4">
         
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md">
             <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v5.0 (增加模式 2C: 空压机湿空气计算)</p>
+            <p class="text-lg text-gray-600 mt-2">v5.3 (增加模式 2C, 修复所有 'step' 错误)</p>
         </header>
 
         <div class="bg-white rounded-lg shadow-md">
@@ -71,12 +72,12 @@
                             <div class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="p_in" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                    <input type="number" id="p_in" name="p_in" value="3.5" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="p_in" name="p_in" value="3.5" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="T_in" class="block text-sm font-medium text-gray-700">进口温度 (T_in)</label>
-                                    <input type="number" id="T_in" name="T_in" value="25" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="T_in" name="T_in" value="25" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: °C</span>
                                 </div>
                             </div>
@@ -88,12 +89,12 @@
                             <div class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="p_out" class="block text-sm font-medium text-gray-700">出口压力 (P_out)</label>
-                                    <input type="number" id="p_out" name="p_out" value="12" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="p_out" name="p_out" value="12" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="T_out" class="block text-sm font-medium text-gray-700">出口温度 (T_out)</label>
-                                    <input type="number" id="T_out" name="T_out" value="120" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="T_out" name="T_out" value="120" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: °C</span>
                                 </div>
                             </div>
@@ -133,13 +134,13 @@
 
                             <div id="flow-inputs-mass-m1" class="input-group" style="display: none;">
                                 <label for="mass_flow" class="block text-sm font-medium text-gray-700">质量流量 (M_flow)</label>
-                                <input type="number" id="mass_flow" name="mass_flow" value="1.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="mass_flow" name="mass_flow" value="1.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                 <span class="text-xs text-gray-500">单位: kg/s</span>
                             </div>
 
                             <div id="flow-inputs-vol-m1" class="input-group" style="display: none;">
                                 <label for="vol_flow" class="block text-sm font-medium text-gray-700">进口体积流量 (V_flow)</label>
-                                <input type="number" id="vol_flow" name="vol_flow" value="300" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="vol_flow" name="vol_flow" value="300" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                 <span class="text-xs text-gray-500">单位: m³/h</span>
                             </div>
                             
@@ -152,19 +153,19 @@
                                         <span class="tooltiptext">指输入到压缩机轴上的实际功率。如果为0，将使用电机功率和效率。</span>
                                     </div>
                                 </label>
-                                <input type="number" id="power" name="power" value="0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="power" name="power" value="0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                 <span class="text-xs text-gray-500">单位: kW</span>
                             </div>
                             
                             <div class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="motor_power" class="block text-sm font-medium text-gray-700">电机功率 (Motor)</label>
-                                    <input type="number" id="motor_power" name="motor_power" value="30" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="motor_power" name="motor_power" value="30" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: kW</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="motor_eff" class="block text-sm font-medium text-gray-700">电机效率 (Eff_motor)</label>
-                                    <input type="number" id="motor_eff" name="motor_eff" value="95" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="motor_eff" name="motor_eff" value="95" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <span class="text-xs text-gray-500">单位: %</span>
                                 </div>
                             </div>
@@ -204,11 +205,10 @@
                         <button id="tab-btn-mode-2b" class="sub-tab-btn py-3 px-6 text-lg font-medium text-gray-600 transition-all duration-200">
                             模式 2B (气体)
                         </button>
-                        
                         <button id="tab-btn-mode-2c" class="sub-tab-btn py-3 px-6 text-lg font-medium text-gray-600 transition-all duration-200">
                             模式 2C (空压机)
                         </button>
-                        </div>
+                    </div>
 
                     <div id="mode-2a-content">
                         <form id="calc-form-mode-2" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -239,12 +239,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_in_m2" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                        <input type="number" id="p_in_m2" name="p_in_m2" value="3.5" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="p_in_m2" name="p_in_m2" value="3.5" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="T_in_m2" class="block text-sm font-medium text-gray-700">进口温度 (T_in)</label>
-                                        <input type="number" id="T_in_m2" name="T_in_m2" value="25" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="T_in_m2" name="T_in_m2" value="25" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: °C</span>
                                     </div>
                                 </div>
@@ -254,12 +254,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_out_m2" class="block text-sm font-medium text-gray-700">出口压力 (P_out)</label>
-                                        <input type="number" id="p_out_m2" name="p_out_m2" value="12" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="p_out_m2" name="p_out_m2" value="12" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="eff_isen_m2" class="block text-sm font-medium text-gray-700">等熵效率 (Eff_is)</label>
-                                        <input type="number" id="eff_isen_m2" name="eff_isen_m2" value="80" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="eff_isen_m2" name="eff_isen_m2" value="80" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: %</span>
                                     </div>
                                 </div>
@@ -269,12 +269,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="vol_eff_m2" class="block text-sm font-medium text-gray-700">容积效率 (Eff_vol)</label>
-                                        <input type="number" id="vol_eff_m2" name="vol_eff_m2" value="95" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="vol_eff_m2" name="vol_eff_m2" value="95" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: %</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="motor_eff_m2" class="block text-sm font-medium text-gray-700">电机效率 (Eff_motor)</label>
-                                        <input type="number" id="motor_eff_m2" name="motor_eff_m2" value="95" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                        <input type="number" id="motor_eff_m2" name="motor_eff_m2" value="95" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                         <span class="text-xs text-gray-500">单位: %</span>
                                     </div>
                                 </div>
@@ -316,13 +316,13 @@
 
                                 <div id="flow-inputs-mass-m2" class="input-group" style="display: none;">
                                     <label for="mass_flow_m2" class="block text-sm font-medium text-gray-700">质量流量 (M_flow)</label>
-                                    <input type="number" id="mass_flow_m2" name="mass_flow_m2" value="1.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                    <input type="number" id="mass_flow_m2" name="mass_flow_m2" value="1.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                     <span class="text-xs text-gray-500">单位: kg/s</span>
                                 </div>
 
                                 <div id="flow-inputs-vol-m2" class="input-group" style="display: none;">
                                     <label for="vol_flow_m2" class="block text-sm font-medium text-gray-700">进口体积流量 (V_flow)</label>
-                                    <input type="number" id="vol_flow_m2" name="vol_flow_m2" value="300" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                    <input type="number" id="vol_flow_m2" name="vol_flow_m2" value="300" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                     <span class="text-xs text-gray-500">单位: m³/h</span>
                                 </div>
                                 
@@ -397,12 +397,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_in_m2b" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                        <input type="number" id="p_in_m2b" name="p_in_m2b" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="p_in_m2b" name="p_in_m2b" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="T_in_m2b" class="block text-sm font-medium text-gray-700">进口温度 (T_in)</label>
-                                        <input type="number" id="T_in_m2b" name="T_in_m2b" value="20" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="T_in_m2b" name="T_in_m2b" value="20" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: °C</span>
                                     </div>
                                 </div>
@@ -412,12 +412,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_out_m2b" class="block text-sm font-medium text-gray-700">出口压力 (P_out)</label>
-                                        <input type="number" id="p_out_m2b" name="p_out_m2b" value="8.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="p_out_m2b" name="p_out_m2b" value="8.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="eff_isen_m2b" class="block text-sm font-medium text-gray-700">等熵效率 (Eff_is)</label>
-                                        <input type="number" id="eff_isen_m2b" name="eff_isen_m2b" value="80" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="eff_isen_m2b" name="eff_isen_m2b" value="80" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: %</span>
                                     </div>
                                 </div>
@@ -430,7 +430,7 @@
                                                 <span class="tooltiptext">可选。如果输入大于0，将覆盖等熵效率计算排气温度，用于评估冷却效果 (如喷油机)。</span>
                                             </div>
                                         </label>
-                                        <input type="number" id="eff_iso_m2b" name="eff_iso_m2b" value="0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="eff_iso_m2b" name="eff_iso_m2b" value="0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: % (0 = 不使用)</span>
                                     </div>
                                 </div>
@@ -472,13 +472,13 @@
 
                                 <div id="flow-inputs-mass-m2b" class="input-group" style="display: none;">
                                     <label for="mass_flow_m2b" class="block text-sm font-medium text-gray-700">质量流量 (M_flow)</label>
-                                    <input type="number" id="mass_flow_m2b" name="mass_flow_m2b" value="1.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                    <input type="number" id="mass_flow_m2b" name="mass_flow_m2b" value="1.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                     <span class="text-xs text-gray-500">单位: kg/s</span>
                                 </div>
 
                                 <div id="flow-inputs-vol-m2b" class="input-group" style="display: none;">
                                     <label for="vol_flow_m2b" class="block text-sm font-medium text-gray-700">进口体积流量 (V_flow)</label>
-                                    <input type="number" id="vol_flow_m2b" name="vol_flow_m2b" value="300" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                    <input type="number" id="vol_flow_m2b" name="vol_flow_m2b" value="300" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                     <span class="text-xs text-gray-500">单位: m³/h</span>
                                 </div>
 
@@ -533,12 +533,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_in_m2c" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                        <input type="number" id="p_in_m2c" name="p_in_m2c" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="p_in_m2c" name="p_in_m2c" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="T_in_m2c" class="block text-sm font-medium text-gray-700">进口干球温度 (T_in)</label>
-                                        <input type="number" id="T_in_m2c" name="T_in_m2c" value="20" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="T_in_m2c" name="T_in_m2c" value="20" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: °C</span>
                                     </div>
                                 </div>
@@ -551,7 +551,7 @@
                                     </div>
                                     <div class="input-group">
                                         <label for="V_flow_in_m2c" class="block text-sm font-medium text-gray-700">进口体积流量 (V_flow)</label>
-                                        <input type="number" id="V_flow_in_m2c" name="V_flow_in_m2c" value="1000" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="V_flow_in_m2c" name="V_flow_in_m2c" value="1000" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: m³/h</span>
                                     </div>
                                 </div>
@@ -561,12 +561,12 @@
                                 <div class="grid grid-cols-2 gap-x-4">
                                     <div class="input-group">
                                         <label for="p_out_m2c" class="block text-sm font-medium text-gray-700">出口压力 (P_out)</label>
-                                        <input type="number" id="p_out_m2c" name="p_out_m2c" value="8.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="p_out_m2c" name="p_out_m2c" value="8.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: bar (a)</span>
                                     </div>
                                     <div class="input-group">
                                         <label for="eff_isen_m2c" class="block text-sm font-medium text-gray-700">等熵效率 (Eff_is)</label>
-                                        <input type="number" id="eff_isen_m2c" name="eff_isen_m2c" value="80" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                        <input type="number" id="eff_isen_m2c" name="eff_isen_m2c" value="80" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                         <span class="text-xs text-gray-500">单位: %</span>
                                     </div>
                                 </div>
@@ -638,7 +638,8 @@
                             </div>
                         </div>
                     </div>
-                    </div>
+                    
+                </div>
                 
                 <div id="tab-content-m3" class="tab-content" style="display: none;">
                     <form id="calc-form-mode-3" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -680,12 +681,12 @@
                             <div id="state-inputs-pt-m3" class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="p_in_m3" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                    <input type="number" id="p_in_m3" name="p_in_m3" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                    <input type="number" id="p_in_m3" name="p_in_m3" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="T_in_m3" class="block text-sm font-medium text-gray-700">进口温度 (T_in)</label>
-                                    <input type="number" id="T_in_m3" name="T_in_m3" value="100" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                    <input type="number" id="T_in_m3" name="T_in_m3" value="100" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                     <span class="text-xs text-gray-500">单位: °C</span>
                                 </div>
                             </div>
@@ -693,12 +694,12 @@
                             <div id="state-inputs-pq-m3" class="grid grid-cols-2 gap-x-4" style="display: none;">
                                 <div class="input-group">
                                     <label for="p_in_pq_m3" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                    <input type="number" id="p_in_pq_m3" name="p_in_pq_m3" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                    <input type="number" id="p_in_pq_m3" name="p_in_pq_m3" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="q_in_m3" class="block text-sm font-medium text-gray-700">进口干度 (Q_in)</label>
-                                    <input type="number" id="q_in_m3" name="q_in_m3" value="1.0" min="0" max="1" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                    <input type="number" id="q_in_m3" name="q_in_m3" value="1.0" min="0" max="1" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                     <span class="text-xs text-gray-500">单位: 0-1 (1 = 饱和蒸汽)</span>
                                 </div>
                             </div>
@@ -715,7 +716,7 @@
                                         <span class="tooltiptext">指压缩机出口饱和温度与进口饱和温度之差。</span>
                                     </div>
                                 </label>
-                                <input type="number" id="delta_T_m3" name="delta_T_m3" value="10" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                <input type="number" id="delta_T_m3" name="delta_T_m3" value="10" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                 <span class="text-xs text-gray-500">单位: K 或 °C</span>
                             </div>
 
@@ -736,7 +737,7 @@
                             
                             <div class="input-group">
                                 <label for="vol_eff_m3" class="block text-sm font-medium text-gray-700">容积效率 (Eff_vol)</label>
-                                <input type="number" id="vol_eff_m3" name="vol_eff_m3" value="90" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                <input type="number" id="vol_eff_m3" name="vol_eff_m3" value="90" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                 <span class="text-xs text-gray-500">单位: %</span>
                             </div>
                             
@@ -745,7 +746,7 @@
                             <div class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="eff_isen_m3" class="block text-sm font-medium text-gray-700">等熵效率 (Eff_is)</label>
-                                    <input type="number" id="eff_isen_m3" name="eff_isen_m3" value="80" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                    <input type="number" id="eff_isen_m3" name="eff_isen_m3" value="80" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                     <span class="text-xs text-gray-500">单位: %</span>
                                 </div>
                                 <div class="input-group">
@@ -818,12 +819,12 @@
                             <div id="state-inputs-pt-m4" class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="p_in_m4" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                    <input type="number" id="p_in_m4" name="p_in_m4" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <input type="number" id="p_in_m4" name="p_in_m4" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="T_in_m4" class="block text-sm font-medium text-gray-700">进口温度 (T_in)</label>
-                                    <input type="number" id="T_in_m4" name="T_in_m4" value="100" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <input type="number" id="T_in_m4" name="T_in_m4" value="100" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <span class="text-xs text-gray-500">单位: °C</span>
                                 </div>
                             </div>
@@ -831,12 +832,12 @@
                             <div id="state-inputs-pq-m4" class="grid grid-cols-2 gap-x-4" style="display: none;">
                                 <div class="input-group">
                                     <label for="p_in_pq_m4" class="block text-sm font-medium text-gray-700">进口压力 (P_in)</label>
-                                    <input type="number" id="p_in_pq_m4" name="p_in_pq_m4" value="1.013" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <input type="number" id="p_in_pq_m4" name="p_in_pq_m4" value="1.013" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <span class="text-xs text-gray-500">单位: bar (a)</span>
                                 </div>
                                 <div class="input-group">
                                     <label for="q_in_m4" class="block text-sm font-medium text-gray-700">进口干度 (Q_in)</label>
-                                    <input type="number" id="q_in_m4" name="q_in_m4" value="1.0" min="0" max="1" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <input type="number" id="q_in_m4" name="q_in_m4" value="1.0" min="0" max="1" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <span class="text-xs text-gray-500">单位: 0-1 (1 = 饱和蒸汽)</span>
                                 </div>
                             </div>
@@ -853,7 +854,7 @@
                                         <span class="tooltiptext">指压缩机出口饱和温度与进口饱和温度之差。</span>
                                     </div>
                                 </label>
-                                <input type="number" id="delta_T_m4" name="delta_T_m4" value="10" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                <input type="number" id="delta_T_m4" name="delta_T_m4" value="10" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                 <span class="text-xs text-gray-500">单位: K 或 °C</span>
                             </div>
 
@@ -875,13 +876,13 @@
 
                             <div id="flow-inputs-mass-m4" class="input-group">
                                 <label for="mass_flow_m4" class="block text-sm font-medium text-gray-700">质量流量 (M_flow)</label>
-                                <input type="number" id="mass_flow_m4" name="mass_flow_m4" value="1.0" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                <input type="number" id="mass_flow_m4" name="mass_flow_m4" value="1.0" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                 <span class="text-xs text-gray-500">单位: kg/s</span>
                             </div>
 
                             <div id="flow-inputs-vol-m4" class="input-group" style="display: none;">
                                 <label for="vol_flow_m4" class="block text-sm font-medium text-gray-700">进口体积流量 (V_flow)</label>
-                                <input type="number" id="vol_flow_m4" name="vol_flow_m4" value="300" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                <input type="number" id="vol_flow_m4" name="vol_flow_m4" value="300" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                 <span class="text-xs text-gray-500">单位: m³/h</span>
                             </div>
 
@@ -890,7 +891,7 @@
                             <div class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group">
                                     <label for="eff_poly_m4" class="block text-sm font-medium text-gray-700">多变效率 (Eff_poly)</label>
-                                    <input type="number" id="eff_poly_m4" name="eff_poly_m4" value="80" step="0.1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <input type="number" id="eff_poly_m4" name="eff_poly_m4" value="80" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <span class="text-xs text-gray-500">单位: %</span>
                                 </div>
                                 <div class="input-group">
@@ -928,7 +929,7 @@
     </div>
 
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4 max-w-4xl mx-auto px-4">
-        <p><strong>版本:</strong> v5.0 (增加模式 2C)</p>
+        <p><strong>版本:</strong> v5.3 (修复所有 'step' 错误)</p>
         <p><strong>编者:</strong> 荆炎荣 (Jing Yanrong)</p>
         <blockquote class="mt-2 border-l-4 border-gray-300 pl-4 text-left text-gray-500 italic">
             <strong>v5.0 更新 (2025-11-14):</strong><br>

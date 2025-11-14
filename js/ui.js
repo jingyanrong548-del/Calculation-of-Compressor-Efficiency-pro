@@ -1,10 +1,10 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑
-// 版本: v5.1 (修复版)
+// 版本: v5.4 (最终版)
 // 职责: 1. (v4.4) 处理主选项卡 (M1, M2, M3, M4)
-//        2. (v5.1) [重写] 使用通用的 setupDynamicToggle 修复 N-way 切换
+//        2. (v5.3) [修复] 切换时增加 disabled 属性, 确保 FormData 独立性
 //        3. (v5.0) 处理后冷却器复选框 (M2A, M2B, M2C)
-//        4. (v5.0) 处理 M2A / M2B / M2C 子选项卡
+//        4. (v5.4) [修复] 修正 v5.3 中意外引入的 'mode-c-content' 拼写错误
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,12 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // =====================================================================
-    // (v5.1 修复) 通用动态切换器
+    // (v5.3 最终修复) 通用动态切换器
     // =====================================================================
     /**
-     * (v5.1 修复)
+     * (v5.3 修复)
      * 通用单选按钮 (Radio) 切换器 (N-way)
-     * 自动匹配 radio 的 value 和 div 的 ID
      * @param {string} radioName - The 'name' attribute of the radio buttons.
      * @param {string} prefix - The common prefix for the target div IDs (e.g., 'flow-inputs-')
      * @param {string} suffix - The common suffix for the target div IDs (e.g., '-m1')
@@ -69,8 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // 存储所有相关的 div
         const contentDivs = new Map();
         radios.forEach(radio => {
-            // e.g., radio.value = 'rpm'
-            // divId = 'flow-inputs-rpm-m1'
             const divId = `${prefix}${radio.value}${suffix}`;
             const div = document.getElementById(divId);
             if (div) {
@@ -87,12 +84,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toggle = (selectedValue) => {
             contentDivs.forEach((div, value) => {
+                // (v5.2 修正) 确保 'rpm' 和 'PT'/'PQ' 使用 grid 布局
+                const currentDisplayType = (value === 'rpm' || value === 'PT' || value === 'PQ') ? 'grid' : displayType;
+
                 if (value === selectedValue) {
-                    div.style.display = displayType;
-                    div.querySelectorAll('input').forEach(i => i.required = true);
+                    // --- (v5.3 修复) 设为可见并启用 ---
+                    div.style.display = currentDisplayType;
+                    div.querySelectorAll('input').forEach(i => {
+                        i.required = true;
+                        i.disabled = false; // <<< 关键修复: 启用
+                    });
                 } else {
+                    // --- (v5.3 修复) 设为隐藏并禁用 ---
                     div.style.display = 'none';
-                    div.querySelectorAll('input').forEach(i => i.required = false);
+                    div.querySelectorAll('input').forEach(i => {
+                        i.required = false;
+                        i.disabled = true;  // <<< 关键修复: 禁用
+                    });
                 }
             });
         };
@@ -105,25 +113,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkedRadio = document.querySelector(`input[name="${radioName}"]:checked`);
         if (checkedRadio) {
             toggle(checkedRadio.value);
-        } else {
+        } else if (radios.length > 0) {
             toggle(radios[0].value); // 默认激活第一个
         }
     }
 
     // --- (v5.1 修复) 流量模式 (Flow Mode) ---
-    // M1: 3-way (rpm, mass, vol)
     setupDynamicToggle('flow_mode_m1', 'flow-inputs-', '-m1');
-    // M2A: 3-way (rpm, mass, vol)
     setupDynamicToggle('flow_mode_m2', 'flow-inputs-', '-m2');
-    // M2B: 3-way (rpm, mass, vol)
     setupDynamicToggle('flow_mode_m2b', 'flow-inputs-', '-m2b');
-    // M4: 2-way (mass, vol)
     setupDynamicToggle('flow_mode_m4', 'flow-inputs-', '-m4');
 
     // --- (v5.1 修复) MVR 状态定义 (Inlet/Outlet) ---
-    // M3: 2-way (PT, PQ)
     setupDynamicToggle('state_define_m3', 'state-inputs-', '-m3', 'grid');
-    // M4: 2-way (PT, PQ)
     setupDynamicToggle('state_define_m4', 'state-inputs-', '-m4', 'grid');
 
 
@@ -138,11 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const toggle = () => {
-            if (checkbox.checked) {
-                inputsDiv.style.display = 'block';
-            } else {
-                inputsDiv.style.display = 'none';
-            }
+            const isChecked = checkbox.checked;
+            inputsDiv.style.display = isChecked ? 'block' : 'none';
+            // (v5.3 修复) 同样禁用后冷却器输入
+            inputsDiv.querySelectorAll('input').forEach(i => {
+                i.disabled = !isChecked;
+            });
         };
 
         checkbox.addEventListener('change', toggle);
@@ -163,7 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const content2A = document.getElementById('mode-2a-content');
     const content2B = document.getElementById('mode-2b-content');
-    const content2C = document.getElementById('mode-2c-content'); // v5.0 新增
+    
+    // ================== v5.4 修复开始 ==================
+    // 修复拼写错误: 'mode-c-content' -> 'mode-2c-content'
+    const content2C = document.getElementById('mode-2c-content'); 
+    // ================== v5.4 修复结束 ==================
 
     // (v5.0 采用更健壮的列表循环方式)
     const subTabs2 = [

@@ -1,8 +1,9 @@
 // =====================================================================
 // mode2_predict.js: 模式二 (性能预测) 模块
-// 版本: v4.4 (M2B 增加等温效率) - (v5.1 修复版)
+// 版本: v5.2 (修复 2B 的 formData name 错误)
 // 职责: 1. 初始化 2A (热泵) 和 2B (气体) 的 UI 事件
-//        2. (v5.1 修复) 确保计算函数只使用 v4.6 index.html 中存在的 ID
+//        2. (v5.2 修复) 确保 2A 和 2B 的
+//           formData.get() 名称各自匹配 HTML
 //        3. 处理打印
 // =====================================================================
 
@@ -75,7 +76,7 @@ async function calculateMode2A() {
             const rpm = parseFloat(formData.get('rpm_m2'));
             const vol_disp_cm3 = parseFloat(formData.get('vol_disp_m2'));
             const mass_flow_kgs = parseFloat(formData.get('mass_flow_m2'));
-            const vol_flow_m3h = parseFloat(formData.get('vol_flow_m2'));
+            const vol_flow_m3h = parseFloat(formData.get('vol_flow_m2')); // (v5.1 修复) 使用 m2
 
             const enable_cooler_calc = formData.get('enable_cooler_calc_m2') === 'on';
             const target_temp_C = parseFloat(formData.get('target_temp_m2'));
@@ -122,35 +123,21 @@ async function calculateMode2A() {
 
             // 6. 后冷却器/冷凝器
             let Q_cooler = 0;
-            let T_cond_K = 0, P_cond_Pa = 0;
             let cooler_notes = "后冷却器/冷凝器: 未启用";
             
             if (enable_cooler_calc) {
-                // 检查出口是否在过热区
                 const T_sat_out_K = CP.PropsSI('T', 'P', p_out_Pa, 'Q', 1, fluid);
-                
                 if (T_out_real_K > T_sat_out_K) {
-                    // 状态1: 压缩机出口 (过热)
-                    // H_out_real, p_out_Pa
-
-                    // 状态2: 饱和蒸汽点
-                    const H_sat_vap = CP.PropsSI('H', 'P', p_out_Pa, 'Q', 1, fluid);
-                    const Q_de_superheat = (H_out_real - H_sat_vap) * m_flow; // 显热 (J/s 或 W)
-                    
-                    // 状态3: 目标温度 (假定在两相区或饱和液)
-                    // 检查目标温度是否低于出口饱和温度
                     if (target_temp_K <= T_sat_out_K) {
                         const H_target = CP.PropsSI('H', 'P', p_out_Pa, 'T', target_temp_K, fluid);
                         Q_cooler = (H_out_real - H_target) * m_flow / 1000.0; // 总热负荷 (kW)
                         cooler_notes = `冷凝器热负荷 (Q_cond): ${Q_cooler.toFixed(2)} kW (显热 + 潜热)`;
                     } else {
-                        // 目标温度高于饱和温度，只是过热器
                         const H_target = CP.PropsSI('H', 'P', p_out_Pa, 'T', target_temp_K, fluid);
                         Q_cooler = (H_out_real - H_target) * m_flow / 1000.0; // 仅显热 (kW)
                         cooler_notes = `后冷却器热负荷 (Q_cooler): ${Q_cooler.toFixed(2)} kW (仅显热)`;
                     }
                 } else {
-                    // 压缩机出口已在两相区 (湿压缩)
                     const H_target = CP.PropsSI('H', 'P', p_out_Pa, 'T', target_temp_K, fluid);
                     Q_cooler = (H_out_real - H_target) * m_flow / 1000.0; // (kW)
                     cooler_notes = `冷凝器热负荷 (Q_cond): ${Q_cooler.toFixed(2)} kW`;
@@ -231,7 +218,7 @@ function printReportMode2A() {
         </head><body>
             <h1>模式 2A (热泵) 计算报告</h1>
             <pre>${lastMode2AResultText}</pre>
-            <footer><p>版本: v4.4</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v5.2</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     
@@ -268,7 +255,7 @@ function setButtonStale2B() {
 }
 
 /**
- * (v4.4) 模式 2B (气体) 计算
+ * (v5.2 修复版) 模式 2B (气体) 计算
  */
 async function calculateMode2B() {
     const CP = CP_INSTANCE;
@@ -286,7 +273,6 @@ async function calculateMode2B() {
             const formData = new FormData(calcFormM2B);
             const fluid = formData.get('fluid_m2b');
 
-            // (v5.1 修复) 严格使用 v4.6 HTML ID
             const p_in_bar = parseFloat(formData.get('p_in_m2b'));
             const T_in_C = parseFloat(formData.get('T_in_m2b'));
             const p_out_bar = parseFloat(formData.get('p_out_m2b'));
@@ -296,8 +282,12 @@ async function calculateMode2B() {
             const flow_mode = formData.get('flow_mode_m2b');
             const rpm = parseFloat(formData.get('rpm_m2b'));
             const vol_disp_cm3 = parseFloat(formData.get('vol_disp_m2b'));
+            
+            // ================== v5.2 修复开始 ==================
+            // 确保我们获取 'm2b' 的值, 而不是 'm2'
             const mass_flow_kgs = parseFloat(formData.get('mass_flow_m2b'));
             const vol_flow_m3h = parseFloat(formData.get('vol_flow_m2b'));
+            // ================== v5.2 修复结束 ==================
 
             const enable_cooler_calc = formData.get('enable_cooler_calc_m2b') === 'on';
             const target_temp_C = parseFloat(formData.get('target_temp_m2b'));
@@ -334,9 +324,6 @@ async function calculateMode2B() {
             if (eff_iso > 0.01) {
                 // 使用等温效率
                 W_real = W_iso / eff_iso; // 实际轴功 (J/kg)
-                // 假设冷却良好，但非理想，排温 T_out = T_in + (1 - eff_iso) * (T_is - T_in) (简化估算)
-                // 更准确：能量平衡 W_real = (H_out - H_in) - Q_cool
-                // 暂时无法仅从等温效率反推排温，先按等熵效率计算排温
                 H_out_real = H_in + (W_is / eff_isen);
                 T_out_real_K = CP.PropsSI('T', 'P', p_out_Pa, 'H', H_out_real, fluid);
                 eff_notes = `(基于等温效率 ${eff_iso * 100}%)`;
@@ -349,7 +336,6 @@ async function calculateMode2B() {
 
             // 4. 计算流量
             let m_flow, V_flow_in;
-            // (v4.3 修复) 假设容积效率为 100%, 因为气体压缩机通常用 FAD
             const vol_eff = 1.0; 
             
             if (flow_mode === 'rpm') {
@@ -447,7 +433,7 @@ function printReportMode2B() {
         </head><body>
             <h1>模式 2B (气体) 计算报告</h1>
             <pre>${lastMode2BResultText}</pre>
-            <footer><p>版本: v4.4</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v5.2</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     
@@ -482,32 +468,26 @@ export function initMode2(CP) {
     printButtonM2A = document.getElementById('print-button-mode-2');
     fluidSelectM2A = document.getElementById('fluid_m2');
     fluidInfoDivM2A = document.getElementById('fluid-info-m2');
-    enableCoolerCalcM2A = document.getElementById('enable_cooler_calc_m2');
-    targetTempM2A = document.getElementById('target_temp_m2'); // (v5.1 修复) ID 引用, 即使计算中未使用
     
     if (calcFormM2A) {
         allInputsM2A = calcFormM2A.querySelectorAll('input, select');
         
-        // 绑定计算事件 (2A)
         calcFormM2A.addEventListener('submit', (event) => {
             event.preventDefault();
             calculateMode2A();
         });
 
-        // 绑定“脏”状态检查 (2A)
         allInputsM2A.forEach(input => {
             input.addEventListener('input', setButtonStale2A);
             input.addEventListener('change', setButtonStale2A);
         });
         calcButtonM2A.addEventListener('stale', setButtonStale2A);
 
-        // 绑定流体信息更新 (2A)
         fluidSelectM2A.addEventListener('change', () => {
             updateFluidInfo(fluidSelectM2A, fluidInfoDivM2A, CP);
             setButtonStale2A();
         });
         
-        // 绑定打印事件
         printButtonM2A.addEventListener('click', printReportMode2A);
     }
     
@@ -519,32 +499,26 @@ export function initMode2(CP) {
     printButtonM2B = document.getElementById('print-button-mode-2b');
     fluidSelectM2B = document.getElementById('fluid_m2b');
     fluidInfoDivM2B = document.getElementById('fluid-info-m2b');
-    enableCoolerCalcM2B = document.getElementById('enable_cooler_calc_m2b');
-    targetTempM2B = document.getElementById('target_temp_m2b'); // (v5.1 修复) ID 引用
 
     if (calcFormM2B) {
         allInputsM2B = calcFormM2B.querySelectorAll('input, select');
         
-        // 绑定计算事件 (2B)
         calcFormM2B.addEventListener('submit', (event) => {
             event.preventDefault();
             calculateMode2B();
         });
 
-        // 绑定“脏”状态检查 (2B)
         allInputsM2B.forEach(input => {
             input.addEventListener('input', setButtonStale2B);
             input.addEventListener('change', setButtonStale2B);
         });
         calcButtonM2B.addEventListener('stale', setButtonStale2B);
 
-        // 绑定流体信息更新 (2B)
         fluidSelectM2B.addEventListener('change', () => {
             updateFluidInfo(fluidSelectM2B, fluidInfoDivM2B, CP);
             setButtonStale2B();
         });
         
-        // 绑定打印事件
         printButtonM2B.addEventListener('click', printReportMode2B);
     }
 

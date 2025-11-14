@@ -1,7 +1,7 @@
 // =====================================================================
 // main.js: 应用主入口 (总指挥)
 // 版本: v5.0 (增加模式 2C)
-// 职责: 1. 加载 UI 交互 (ui.js)
+// 职责: 1. (v5.2 修复) 加载 UI 交互 (ui.js) - 这是修复您问题的关键
 //        2. 加载 CoolProp 物性库 (coolprop_loader.js)
 //        3. 在物性库加载成功后, 初始化所有计算模式 (Mode 1, 2A, 2B, 2C, 3, 4)
 // =====================================================================
@@ -10,12 +10,12 @@
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
 import { initMode1 } from './mode1_eval.js';
 import { initMode2 } from './mode2_predict.js';
-import { initMode2C } from './mode2c_air.js'; // v5.0 新增
+import { initMode2C } from './mode2c_air.js'; // (v5.0)
 import { initMode3 } from './mode3_mvr.js';
 import { initMode4 } from './mode4_turbo.js';
 
 // 2. 导入并执行 UI 交互脚本
-// (这个导入会执行 ui.js 里的 'DOMContentLoaded' 监听器)
+// (v5.2 修复) 这一行至关重要, 它会加载和执行 ui.js, 激活所有选项卡和切换框
 import './ui.js'; 
 
 // 3. 主应用逻辑: 等待 DOM 加载完毕
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('calc-button-mode-1'),
         document.getElementById('calc-button-mode-2'),  // 模式 2A
         document.getElementById('calc-button-mode-2b'), // 模式 2B
-        document.getElementById('calc-button-mode-2c'), // v5.0 新增
+        document.getElementById('calc-button-mode-2c'), // (v5.0)
         document.getElementById('calc-button-mode-3'),
         document.getElementById('calc-button-mode-4')
     ];
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'calc-button-mode-1': "计算效率 (模式一)",
         'calc-button-mode-2': "计算性能 (模式 2A)",
         'calc-button-mode-2b': "计算性能 (模式 2B)",
-        'calc-button-mode-2c': "计算性能 (模式 2C)", // v5.0 新增
+        'calc-button-mode-2c': "计算性能 (模式 2C)", // (v5.0)
         'calc-button-mode-3': "计算喷水量 (模式三)",
         'calc-button-mode-4': "计算喷水量 (模式四)"
     };
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6.1 初始化所有计算模块, 将 CP 实例传入
             initMode1(CP);
             initMode2(CP); // 模式二(v4.2)会同时初始化 2A 和 2B
-            initMode2C(CP); // v5.0 新增
+            initMode2C(CP); // (v5.0)
             initMode3(CP);
             initMode4(CP);
 
