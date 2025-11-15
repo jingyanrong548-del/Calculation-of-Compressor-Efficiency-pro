@@ -1,9 +1,8 @@
 // =====================================================================
 // mode4_turbo.js: 模式四 (MVR 透平式计算) 模块
-// 版本: v4.6 (修复版)
-// 职责: 1. (v5.1 修复) 确保所有 'formData.get' 匹配 v4.6 HTML name 属性
-//        2. (v5.1 修复) 修复 'eta_s_m4' 为 'eff_poly_m4'
-//        3. 执行基于 'mass'/'vol' flow 输入的 MVR 能量平衡计算
+// 版本: v4.7 (修复 const 重复声明 和 P,Q 逻辑)
+// 职责: 1. (v4.6 修复) 匹配 HTML name 属性
+//        2. (v4.7 修复) 修正 'calculateMode4' 中的变量作用域和 P,Q 逻辑
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -36,7 +35,7 @@ function setButtonStale4() {
 }
 
 /**
- * (v4.6 修复版) 模式四：计算
+ * (v4.7 修复版) 模式四：计算
  */
 async function calculateMode4() {
     const CP = CP_INSTANCE;
@@ -69,25 +68,39 @@ async function calculateMode4() {
             // 单位换算
             const T_water_in_K = T_water_in_C + 273.15;
 
+            // ================== v4.7 修复开始 ==================
             // 1. 确定进口状态
             let p_in_Pa, T_in_K, H_in, S_in, D_in, T_sat_in_K;
-            if (state_define === 'PT') {
-                const p_in_bar = parseFloat(formData.get('p_in_m4'));
-                const T_in_C = parseFloat(formData.get('T_in_m4'));
+            let p_in_bar, T_in_C, q_in;
+
+            if (state_define === 'pt') {
+                p_in_bar = parseFloat(formData.get('p_in_m4'));
+                T_in_C = parseFloat(formData.get('T_in_m4'));
                 p_in_Pa = p_in_bar * 1e5;
                 T_in_K = T_in_C + 273.15;
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
-            } else { // state_define === 'PQ'
-                const p_in_bar = parseFloat(formData.get('p_in_pq_m4'));
-                const q_in = parseFloat(formData.get('q_in_m4'));
+
+                // (v4.7.1 修复) 使用 P, T 计算 H, S, D
+                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
+                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
+                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
+
+            } else { // state_define === 'pq'
+                p_in_bar = parseFloat(formData.get('p_in_pq_m4'));
+                q_in = parseFloat(formData.get('q_in_m4'));
                 p_in_Pa = p_in_bar * 1e5;
+                
+                // (v4.7.1 修复) 使用 P, Q 计算 H, S, D
+                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'Q', q_in, fluid);
+                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'Q', q_in, fluid);
+                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'Q', q_in, fluid);
+                
+                // (v4.7.1 修复) 仅为显示/后续计算 T
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
                 T_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', q_in, fluid);
+                T_in_C = T_in_K - 273.15; // 在这里计算 T_in_C
             }
-            
-            H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
-            S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
-            D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
+            // ================== v4.7 修复结束 ==================
             
             // 2. 确定出口状态
             const T_sat_out_K = T_sat_in_K + delta_T_sat;
@@ -95,7 +108,13 @@ async function calculateMode4() {
 
             // 3. 理论多变压缩
             const v_in = 1.0 / D_in;
-            const k = CP.PropsSI('Cpmass', 'P', p_in_Pa, 'T', T_in_K, fluid) / CP.PropsSI('Cvmass', 'P', p_in_Pa, 'T', T_in_K, fluid);
+
+            // ================== v4.8 修复 (模式四 NaN) ==================
+            // 'k' (等熵指数) 不能在饱和线上 (P,T) 计算, 会导致 Infinity
+            // 必须使用 (P,S) 或 (P,H) 来定义状态
+            const k = CP.PropsSI('Cpmass', 'P', p_in_Pa, 'S', S_in, fluid) / CP.PropsSI('Cvmass', 'P', p_in_Pa, 'S', S_in, fluid);
+            // ================== v4.8 修复结束 ==================
+            
             const n_poly = 1.0 / (1.0 - (k - 1) / (k * eff_poly)); // 多变指数
             
             // W_poly = (n_poly / (n_poly - 1)) * P1*v1 * [ (P2/P1)^((n-1)/n) - 1 ]
@@ -142,7 +161,7 @@ async function calculateMode4() {
             }
             
             // 7. 格式化输出
-            const T_in_C = T_in_K - 273.15;
+            // const T_in_C = T_in_K - 273.15; // (v4.7 修复) 移除
             const T_sat_in_C = T_sat_in_K - 273.15;
             const T_sat_out_C = T_sat_out_K - 273.15;
 
@@ -152,7 +171,7 @@ async function calculateMode4() {
 流量模式: ${flow_mode}
 
 --- 1. 进口状态 (P, T) ---
-进口压力 (P_in):    ${(p_in_Pa / 1e5).toFixed(3)} bar
+进口压力 (P_in):    ${p_in_bar.toFixed(3)} bar
 进口温度 (T_in):    ${T_in_C.toFixed(2)} °C
 (进口饱和温度 (T_sat_in): ${T_sat_in_C.toFixed(2)} °C)
   - 进口焓 (H_in):  ${(H_in / 1000.0).toFixed(2)} kJ/kg
@@ -222,7 +241,7 @@ function printReportMode4() {
         </head><body>
             <h1>模式四 (MVR 透平式) 计算报告</h1>
             <pre>${lastMode4ResultText}</pre>
-            <footer><p>版本: v4.6</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v4.7</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     

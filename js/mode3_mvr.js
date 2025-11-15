@@ -1,9 +1,8 @@
 // =====================================================================
 // mode3_mvr.js: 模式三 (MVR 容积式计算) 模块
-// 版本: v4.6 (修复版)
-// 职责: 1. (v5.1 修复) 确保所有 'formData.get' 匹配 v4.6 HTML name 属性
-//        2. (v5.1 修复) 移除对不存在的 'flow_mode_m3' 的查找
-//        3. 执行基于 'rpm'/'vol' 输入的 MVR 能量平衡计算
+// 版本: v4.7 (修复 const 重复声明的崩溃)
+// 职责: 1. (v4.6 修复) 匹配 HTML name 属性
+//        2. (v4.7 修复) 修正 'calculateMode3' 中的变量作用域
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -36,7 +35,7 @@ function setButtonStale() {
 }
 
 /**
- * (v4.6 修复版) 模式三：计算
+ * (v4.7 修复版) 模式三：计算
  */
 async function calculateMode3() {
     const CP = CP_INSTANCE;
@@ -68,25 +67,41 @@ async function calculateMode3() {
             const T_water_in_K = T_water_in_C + 273.15;
             const vol_disp_m3 = vol_disp_cm3 / 1e6;
 
+            // ================== v4.7 修复开始 ==================
             // 1. 确定进口状态
+            // 将 p_in_Pa, T_in_K, H_in, S_in, D_in, T_sat_in_K 声明在
+            // try...catch 块的顶层作用域
             let p_in_Pa, T_in_K, H_in, S_in, D_in, T_sat_in_K;
-            if (state_define === 'PT') {
-                const p_in_bar = parseFloat(formData.get('p_in_m3'));
-                const T_in_C = parseFloat(formData.get('T_in_m3'));
+            let p_in_bar, T_in_C, q_in; // q_in 也需要在此处
+
+            if (state_define === 'pt') {
+                p_in_bar = parseFloat(formData.get('p_in_m3'));
+                T_in_C = parseFloat(formData.get('T_in_m3'));
                 p_in_Pa = p_in_bar * 1e5;
                 T_in_K = T_in_C + 273.15;
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
-            } else { // state_define === 'PQ'
-                const p_in_bar = parseFloat(formData.get('p_in_pq_m3'));
-                const q_in = parseFloat(formData.get('q_in_m3'));
+
+                // (v4.7.1 修复) 使用 P, T 计算 H, S, D
+                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
+                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
+                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
+
+            } else { // state_define === 'pq'
+                p_in_bar = parseFloat(formData.get('p_in_pq_m3'));
+                q_in = parseFloat(formData.get('q_in_m3'));
                 p_in_Pa = p_in_bar * 1e5;
+                
+                // (v4.7.1 修复) 使用 P, Q 计算 H, S, D
+                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'Q', q_in, fluid);
+                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'Q', q_in, fluid);
+                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'Q', q_in, fluid);
+                
+                // (v4.7.1 修复) 仅为显示/后续计算 T
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
                 T_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', q_in, fluid);
+                T_in_C = T_in_K - 273.15; // 在这里计算 T_in_C
             }
-            
-            H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
-            S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
-            D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
+            // ================== v4.7 修复结束 ==================
             
             // 2. 确定出口状态
             const T_sat_out_K = T_sat_in_K + delta_T_sat;
@@ -100,13 +115,12 @@ async function calculateMode3() {
             const W_real_dry = W_is / eff_isen; // 实际干功 (J/kg)
             const H_out_dry = H_in + W_real_dry; // 干压缩出口焓
 
-            // 5. 流量计算 (v5.1 修复: 模式三固定使用 RPM)
+            // 5. 流量计算
             const V_flow_theo_s = (rpm / 60.0) * vol_disp_m3;
             const V_flow_in_s = V_flow_theo_s * vol_eff; // 实际进口体积流量 (m³/s)
             const m_flow_in = V_flow_in_s * D_in; // 进口蒸汽质量流量 (kg/s)
 
             // 6. 能量平衡计算 (带喷水)
-            // 目标：T_out = T_sat_out_K (出口为饱和蒸汽)
             const H_out_target = CP.PropsSI('H', 'P', p_out_Pa, 'Q', 1, fluid);
             const h_water_in = CP.PropsSI('H', 'T', T_water_in_K, 'P', p_out_Pa, 'Water');
 
@@ -135,11 +149,12 @@ async function calculateMode3() {
                 m_water_ratio = 0;
                 W_real_wet = W_real_dry;
                 Power_shaft = W_real_dry * m_flow_in / 1000.0; // kW
-                spray_notes = "计算结果为过热蒸汽，无需喷水。";
+                const T_out_dry_K = CP.PropsSI('T', 'P', p_out_Pa, 'H', H_out_dry, fluid); // (v4.7.1) 计算干出口温度
+                spray_notes = `计算结果为过热蒸汽 (${(T_out_dry_K-273.15).toFixed(2)} °C)，无需喷水。`;
             }
             
             // 7. 格式化输出
-            const T_in_C = T_in_K - 273.15;
+            // const T_in_C = T_in_K - 273.15; // (v4.7 修复) 移除, 已在上面声明和赋值
             const T_sat_in_C = T_sat_in_K - 273.15;
             const T_sat_out_C = T_sat_out_K - 273.15;
 
@@ -148,7 +163,7 @@ async function calculateMode3() {
 工质: ${fluid}
 
 --- 1. 进口状态 (P, T) ---
-进口压力 (P_in):    ${(p_in_Pa / 1e5).toFixed(3)} bar
+进口压力 (P_in):    ${p_in_bar.toFixed(3)} bar
 进口温度 (T_in):    ${T_in_C.toFixed(2)} °C
 (进口饱和温度 (T_sat_in): ${T_sat_in_C.toFixed(2)} °C)
   - 进口焓 (H_in):  ${(H_in / 1000.0).toFixed(2)} kJ/kg
@@ -221,7 +236,7 @@ function printReportMode3() {
         </head><body>
             <h1>模式三 (MVR 容积式) 计算报告</h1>
             <pre>${lastMode3ResultText}</pre>
-            <footer><p>版本: v4.6</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v4.7</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     
