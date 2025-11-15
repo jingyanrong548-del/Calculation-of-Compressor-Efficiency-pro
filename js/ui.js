@@ -1,10 +1,12 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑
-// 版本: v5.4 (最终版)
+// 版本: v6.0 (M1, M2A 热泵模式升级)
 // 职责: 1. (v4.4) 处理主选项卡 (M1, M2, M3, M4)
 //        2. (v5.3) [修复] 切换时增加 disabled 属性, 确保 FormData 独立性
 //        3. (v5.0) 处理后冷却器复选框 (M2A, M2B, M2C)
 //        4. (v5.4) [修复] 修正 v5.3 中意外引入的 'mode-c-content' 拼写错误
+//        5. (v5.5) [新增] 为 M3 增加流量模式切换
+//        6. (v6.0) [新增] 为 M1, M2A 增加热泵状态切换
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const toggle = (selectedValue) => {
             contentDivs.forEach((div, value) => {
                 // (v5.2 修正) 确保 'rpm' 和 'PT'/'PQ' 使用 grid 布局
-                const currentDisplayType = (value === 'rpm' || value === 'PT' || value === 'PQ') ? 'grid' : displayType;
+                const currentDisplayType = (value === 'rpm' || value === 'pt' || value === 'pq' || value === 't_sh' || value === 't_t') ? 'grid' : displayType;
 
                 if (value === selectedValue) {
                     // --- (v5.3 修复) 设为可见并启用 ---
@@ -123,10 +125,23 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDynamicToggle('flow_mode_m2', 'flow-inputs-', '-m2');
     setupDynamicToggle('flow_mode_m2b', 'flow-inputs-', '-m2b');
     setupDynamicToggle('flow_mode_m4', 'flow-inputs-', '-m4');
+    setupDynamicToggle('flow_mode_m3', 'flow-inputs-', '-m3');
+    
 
     // --- (v5.1 修复) MVR 状态定义 (Inlet/Outlet) ---
     setupDynamicToggle('state_define_m3', 'state-inputs-', '-m3', 'grid');
     setupDynamicToggle('state_define_m4', 'state-inputs-', '-m4', 'grid');
+
+    
+    // ================== v6.0 新增: M1/M2A 热泵状态切换 ==================
+    // 模式一 (评估)
+    setupDynamicToggle('inlet_define_m1', 'inlet-inputs-', '-m1', 'grid');
+    setupDynamicToggle('outlet_define_m1', 'outlet-inputs-', '-m1', 'grid');
+    
+    // 模式 2A (预测)
+    setupDynamicToggle('inlet_define_m2a', 'inlet-inputs-', '-m2a', 'grid');
+    setupDynamicToggle('outlet_define_m2a', 'outlet-inputs-', '-m2a', 'block');
+    // ================== v6.0 修复结束 ==================
 
 
     // --- (v5.0) 后冷却器 (Cooler) 复选框 ---
@@ -167,10 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const content2A = document.getElementById('mode-2a-content');
     const content2B = document.getElementById('mode-2b-content');
     
-    // ================== v5.4 修复开始 ==================
-    // 修复拼写错误: 'mode-c-content' -> 'mode-2c-content'
+    // (v5.4 修复)
     const content2C = document.getElementById('mode-2c-content'); 
-    // ================== v5.4 修复结束 ==================
 
     // (v5.0 采用更健壮的列表循环方式)
     const subTabs2 = [

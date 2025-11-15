@@ -1,9 +1,9 @@
 // =====================================================================
 // mode1_eval.js: 模式一 (性能评估) 模块
-// 版本: v4.7 (padEnd 修复)
-// 职责: 1. (v4.6 修复) 确保所有 'formData.get' 匹配 v4.6 HTML name 属性
-//        2. (v4.7 修复) 修复 resultText 格式化中的 .padEnd() 崩溃
-//        3. 执行模式一 (评估) 的计算
+// 版本: v6.0 (M1, M2A 热泵模式升级)
+// 职责: 1. (v6.0) 增加 (T_evap, SH) 和 (T_cond) 输入模式
+//        2. (v6.0) 增加 (SC) 输入, 并计算系统制冷/制热能力和 COP
+//        3. (v6.0) 升级 'transfer' 功能以匹配 M2A v6.0
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -39,7 +39,7 @@ function setButtonStale() {
 }
 
 /**
- * (v4.7 修复版) 模式一：计算
+ * (v6.0 修复版) 模式一：计算
  */
 async function calculateMode1() {
     const CP = CP_INSTANCE;
@@ -54,14 +54,55 @@ async function calculateMode1() {
 
     setTimeout(() => {
         try {
+            // (v5.1 修复) 使用 FormData 获取所有值
             const formData = new FormData(calcFormM1);
 
             const fluid = formData.get('fluid');
-            const p_in_bar = parseFloat(formData.get('p_in'));
-            const T_in_C = parseFloat(formData.get('T_in'));
-            const p_out_bar = parseFloat(formData.get('p_out'));
-            const T_out_C = parseFloat(formData.get('T_out'));
+            
+            // ================== v6.0 预处理 ==================
+            const inlet_define = formData.get('inlet_define_m1');
+            const outlet_define = formData.get('outlet_define_m1');
+            
+            let p_in_bar, T_in_C, p_out_bar, T_out_C;
+            let T_evap_C, SH_K, T_cond_C; // 用于存储和传输
 
+            // 1.a 确定进口 P, T
+            if (inlet_define === 'pt') {
+                p_in_bar = parseFloat(formData.get('p_in'));
+                T_in_C = parseFloat(formData.get('T_in'));
+                // 反算 T_evap 和 SH 用于数据存储
+                const p_in_Pa_temp = p_in_bar * 1e5;
+                const T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa_temp, 'Q', 1, fluid);
+                T_evap_C = T_sat_in_K - 273.15;
+                SH_K = T_in_C - T_evap_C;
+            } else { // 't_sh'
+                T_evap_C = parseFloat(formData.get('T_evap_m1'));
+                SH_K = parseFloat(formData.get('SH_m1'));
+                
+                const T_evap_K = T_evap_C + 273.15;
+                const p_in_Pa_temp = CP.PropsSI('P', 'T', T_evap_K, 'Q', 1, fluid);
+                p_in_bar = p_in_Pa_temp / 1e5;
+                T_in_C = T_evap_C + SH_K;
+            }
+
+            // 1.b 确定出口 P, T
+            if (outlet_define === 'pt') {
+                p_out_bar = parseFloat(formData.get('p_out'));
+                T_out_C = parseFloat(formData.get('T_out'));
+                // 反算 T_cond 用于数据存储
+                const p_out_Pa_temp = p_out_bar * 1e5;
+                const T_sat_out_K = CP.PropsSI('T', 'P', p_out_Pa_temp, 'Q', 1, fluid);
+                T_cond_C = T_sat_out_K - 273.15;
+            } else { // 't_t'
+                T_cond_C = parseFloat(formData.get('T_cond_m1'));
+                T_out_C = parseFloat(formData.get('T_out_m1_alt'));
+                
+                const T_cond_K = T_cond_C + 273.15;
+                const p_out_Pa_temp = CP.PropsSI('P', 'T', T_cond_K, 'Q', 1, fluid);
+                p_out_bar = p_out_Pa_temp / 1e5;
+            }
+            
+            // 1.c 获取流量和功率
             const flow_mode = formData.get('flow_mode_m1'); 
             const rpm = parseFloat(formData.get('rpm'));
             const vol_disp_cm3 = parseFloat(formData.get('vol_disp'));
@@ -71,10 +112,15 @@ async function calculateMode1() {
             let power_shaft_kW = parseFloat(formData.get('power'));
             const motor_power_kW = parseFloat(formData.get('motor_power'));
             const motor_eff = parseFloat(formData.get('motor_eff')) / 100.0;
+            
+            // 1.d 获取系统参数 (v6.0 新增)
+            const SC_K = parseFloat(formData.get('SC_m1'));
 
+            // 检查功率输入
             if (power_shaft_kW <= 0) {
                 power_shaft_kW = motor_power_kW * motor_eff;
             }
+            // ================== v6.0 预处理结束 ==================
 
             // 单位换算
             const p_in_Pa = p_in_bar * 1e5;
@@ -83,27 +129,27 @@ async function calculateMode1() {
             const T_out_K = T_out_C + 273.15;
             const vol_disp_m3 = vol_disp_cm3 / 1e6;
 
-            // 1. 进口状态
+            // 2. 进口状态
             const H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
             const S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
             const D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
             const v_in = 1.0 / D_in; // 进口比容 m³/kg
 
-            // 2. 出口状态
+            // 3. 出口状态
             const H_out = CP.PropsSI('H', 'P', p_out_Pa, 'T', T_out_K, fluid);
 
-            // 3. 理论等熵压缩
+            // 4. 理论等熵压缩
             const H_out_is = CP.PropsSI('H', 'P', p_out_Pa, 'S', S_in, fluid);
             const T_out_is_K = CP.PropsSI('T', 'P', p_out_Pa, 'S', S_in, fluid);
             const W_is = H_out_is - H_in; // 理论等熵功 (J/kg)
 
-            // 4. 实际压缩
+            // 5. 实际压缩
             const W_real = H_out - H_in; // 实际焓升 (J/kg)
 
-            // 5. 计算效率
+            // 6. 计算效率
             const eff_isen = W_is / W_real; // 等熵效率
             
-            // 6. 计算流量
+            // 7. 计算流量
             let m_flow, V_flow_in, vol_eff = 0;
             if (flow_mode === 'rpm') {
                 m_flow = (power_shaft_kW * 1000.0) / W_real; // 质量流量 (kg/s)
@@ -120,26 +166,46 @@ async function calculateMode1() {
                 // RPM 模式下的容积效率不适用
             }
             
-            // 7. 基于流量反算功率
+            // 8. 基于流量反算功率
             const Power_shaft_calc = (W_real * m_flow) / 1000.0; // kW
             const Power_motor_calc = Power_shaft_calc / motor_eff; // kW
             
-            // 8. 存储结果
+            // ================== v6.0 新增: 系统性能计算 ==================
+            const T_cond_K_calc = CP.PropsSI('T', 'P', p_out_Pa, 'Q', 1, fluid);
+            const T_liq_out_K = T_cond_K_calc - SC_K;
+            
+            // 节流前焓
+            const H_throttle = CP.PropsSI('H', 'T', T_liq_out_K, 'P', p_out_Pa, fluid);
+            
+            // 单位性能
+            const q_evap = H_in - H_throttle; // 单位制冷量 (J/kg)
+            const q_cond = H_out - H_throttle; // 单位制热量 (J/kg)
+            
+            // 系统总性能
+            const Q_evap_kW = q_evap * m_flow / 1000.0; // 制冷能力 (kW)
+            const Q_cond_kW = q_cond * m_flow / 1000.0; // 制热能力 (kW)
+            
+            // COP
+            const COP_R = q_evap / W_real; // 制冷 COP (基于轴功)
+            const COP_H = q_cond / W_real; // 制热 COP (基于轴功)
+            // ================== v6.0 新增结束 ==================
+
+            // 9. 存储结果 (v6.0 扩展)
             lastMode1Results = {
                 fluid,
-                p_in_bar, T_in_C,
-                p_out_bar, T_out_C,
+                p_in_bar, T_in_C, p_out_bar, T_out_C,
+                T_evap_C, SH_K, T_cond_C, SC_K, // (v6.0)
                 eff_isen, vol_eff, motor_eff,
                 rpm, vol_disp_cm3,
                 m_flow, V_flow_in,
-                Power_shaft_calc
+                Power_shaft_calc,
+                inlet_define, outlet_define // (v6.0)
             };
 
-            // 9. 格式化输出
+            // 10. 格式化输出
             const T_out_is_C = T_out_is_K - 273.15;
             
-            // ================== v4.7 修复开始 ==================
-            // 将所有数字转换为格式化的字符串, 然后再 padEnd
+            // (v4.7 修复)
             const p_in_str = p_in_bar.toFixed(3).padEnd(9);
             const T_in_str = T_in_C.toFixed(2).padEnd(9);
             const H_in_str = (H_in / 1000.0).toFixed(2).padEnd(11);
@@ -163,10 +229,7 @@ async function calculateMode1() {
 进口 (in): ${p_in_str} ${T_in_str} ${H_in_str} ${S_in_str}
 出口 (out): ${p_out_str} ${T_out_str} ${H_out_str}
 等熵出口 (is): ${p_out_str} ${T_is_str} ${H_is_str} ${S_in_str}
-            `;
-            // ================== v4.7 修复结束 ==================
-            
-            resultText += `
+
 --- 2. 功与效率 ---
 理论等熵功 (W_is):   ${(W_is / 1000.0).toFixed(2)} kJ/kg
 实际比功 (W_real):   ${(W_real / 1000.0).toFixed(2)} kJ/kg
@@ -186,6 +249,23 @@ async function calculateMode1() {
 反算轴功率 (P_shaft): ${Power_shaft_calc.toFixed(2)} kW
 反算电机功率 (P_motor): ${Power_motor_calc.toFixed(2)} kW
 `;
+            
+            // ================== v6.0 新增: 系统性能报告 ==================
+            resultText += `
+--- 4. 系统性能 (v6.0) ---
+(基于 过冷度 SC = ${SC_K.toFixed(1)} K)
+节流前焓 (H_throttle): ${(H_throttle / 1000.0).toFixed(2)} kJ/kg
+----------------------------------------
+单位制冷量 (q_evap): ${(q_evap / 1000.0).toFixed(2)} kJ/kg
+单位制热量 (q_cond): ${(q_cond / 1000.0).toFixed(2)} kJ/kg
+----------------------------------------
+系统制冷能力 (Q_evap): ${Q_evap_kW.toFixed(2)} kW
+系统制热能力 (Q_cond): ${Q_cond_kW.toFixed(2)} kW
+COP (制冷, 轴):      ${COP_R.toFixed(3)}
+COP (制热, 轴):      ${COP_H.toFixed(3)}
+`;
+            // ================== v6.0 新增结束 ==================
+            
             if (Math.abs(Power_shaft_calc - power_shaft_kW) > 0.1 && flow_mode !== 'rpm') {
                 resultText += `
 *** 警告:
@@ -195,11 +275,11 @@ async function calculateMode1() {
 `;
             }
 
-            // 10. 显示结果
+            // 11. 显示结果
             resultsDivM1.textContent = resultText;
             lastMode1ResultText = resultText;
             
-            // 11. 更新按钮状态
+            // 12. 更新按钮状态
             calcButtonM1.textContent = btnText;
             calcButtonM1.classList.remove(...classesStale);
             calcButtonM1.classList.add(...classesFresh);
@@ -250,7 +330,7 @@ function printReportMode1() {
             <h1>无油压缩机性能计算器 - 模式一报告</h1>
             <pre>${lastMode1ResultText}</pre>
             <footer>
-                <p>版本: v4.7</p>
+                <p>版本: v6.0</p>
                 <p>计算时间: ${new Date().toLocaleString()}</p>
             </footer>
         </body>
@@ -314,26 +394,50 @@ export function initMode1(CP) {
     // 绑定打印事件
     printButtonM1.addEventListener('click', printReportMode1);
 
-    // 绑定数据传输事件
+    // ================== v6.0 升级: 传输功能 ==================
     transferButton.addEventListener('click', () => {
         if (!lastMode1Results) {
             alert("没有可传输的数据。请先计算。");
             return;
         }
+        
+        const r = lastMode1Results;
 
         // 目标：模式 2A
-        document.getElementById('fluid_m2').value = lastMode1Results.fluid;
-        document.getElementById('p_in_m2').value = lastMode1Results.p_in_bar;
-        document.getElementById('T_in_m2').value = lastMode1Results.T_in_C;
-        document.getElementById('p_out_m2').value = lastMode1Results.p_out_bar;
-        document.getElementById('eff_isen_m2').value = (lastMode1Results.eff_isen * 100.0).toFixed(2);
-        document.getElementById('vol_eff_m2').value = (lastMode1Results.vol_eff * 100.0).toFixed(2);
-        document.getElementById('motor_eff_m2').value = (lastMode1Results.motor_eff * 100.0).toFixed(2);
+        document.getElementById('fluid_m2').value = r.fluid;
         
-        document.getElementById('rpm_m2').value = lastMode1Results.rpm;
-        document.getElementById('vol_disp_m2').value = lastMode1Results.vol_disp_cm3;
-        document.getElementById('mass_flow_m2').value = lastMode1Results.m_flow;
-        document.getElementById('vol_flow_m2').value = (lastMode1Results.V_flow_in * 3600.0).toFixed(2);
+        // 填充所有字段 (v6.0)
+        document.getElementById('p_in_m2').value = r.p_in_bar.toFixed(3);
+        document.getElementById('T_in_m2').value = r.T_in_C.toFixed(2);
+        document.getElementById('T_evap_m2a').value = r.T_evap_C.toFixed(2);
+        document.getElementById('SH_m2a').value = r.SH_K.toFixed(2);
+        
+        document.getElementById('p_out_m2').value = r.p_out_bar.toFixed(3);
+        document.getElementById('T_cond_m2a').value = r.T_cond_C.toFixed(2);
+        
+        document.getElementById('SC_m2a').value = r.SC_K.toFixed(1);
+
+        document.getElementById('eff_isen_m2').value = (r.eff_isen * 100.0).toFixed(2);
+        document.getElementById('vol_eff_m2').value = (r.vol_eff * 100.0).toFixed(2);
+        document.getElementById('motor_eff_m2').value = (r.motor_eff * 100.0).toFixed(2);
+        
+        document.getElementById('rpm_m2').value = r.rpm;
+        document.getElementById('vol_disp_m2').value = r.vol_disp_cm3;
+        document.getElementById('mass_flow_m2').value = r.m_flow.toFixed(4);
+        document.getElementById('vol_flow_m2').value = (r.V_flow_in * 3600.0).toFixed(2);
+        
+        // (v6.0) 激活对应的单选按钮
+        if (r.inlet_define === 't_sh') {
+            document.getElementById('inlet_define_t_sh_m2a').click();
+        } else {
+            document.getElementById('inlet_define_pt_m2a').click();
+        }
+        
+        if (r.outlet_define === 't_t') { // M1 的 't_t' 对应 M2A 的 't'
+            document.getElementById('outlet_define_t_m2a').click();
+        } else {
+            document.getElementById('outlet_define_p_m2a').click();
+        }
         
         // 触发 M2 的流体信息更新
         document.getElementById('fluid_m2').dispatchEvent(new Event('change'));
