@@ -1,53 +1,48 @@
 // =====================================================================
 // main.js: 应用主入口 (总指挥)
-// 版本: v5.0 (增加模式 2C)
-// 职责: 1. (v5.2 修复) 加载 UI 交互 (ui.js) - 这是修复您问题的关键
-//        2. 加载 CoolProp 物性库 (coolprop_loader.js)
-//        3. 在物性库加载成功后, 初始化所有计算模式 (Mode 1, 2A, 2B, 2C, 3, 4)
+// 版本: v7.0 (五模式重构)
+// 职责: 1. 加载 UI 交互 (ui.js)。
+//        2. 加载 CoolProp 物性库 (coolprop_loader.js)。
+//        3. 在物性库加载成功后, 初始化所有5个计算模式。
 // =====================================================================
 
 // 1. 导入所有需要的模块
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
-import { initMode1 } from './mode1_eval.js';
-import { initMode2 } from './mode2_predict.js';
-import { initMode2C } from './mode2c_air.js'; // (v5.0)
-import { initMode3 } from './mode3_mvr.js';
-import { initMode4 } from './mode4_turbo.js';
+import { initMode2 } from './mode2_predict.js'; // 将负责初始化新的模式1(热泵)和模式2(气体)
+import { initMode2C } from './mode2c_air.js';    // 将负责初始化新的模式3(空压机)
+import { initMode3 } from './mode3_mvr.js';      // 将负责初始化新的模式4(MVR 容积式)
+import { initMode4 } from './mode4_turbo.js';    // 将负责初始化新的模式5(MVR 透平式)
 
 // 2. 导入并执行 UI 交互脚本
-// (v5.2 修复) 这一行至关重要, 它会加载和执行 ui.js, 激活所有选项卡和切换框
 import './ui.js'; 
 
 // 3. 主应用逻辑: 等待 DOM 加载完毕
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 4. 定义所有需要被更新状态的元素
+    // 4. 定义所有需要被更新状态的元素 (v7.0 更新)
     const buttons = [
-        document.getElementById('calc-button-mode-1'),
-        document.getElementById('calc-button-mode-2'),  // 模式 2A
-        document.getElementById('calc-button-mode-2b'), // 模式 2B
-        document.getElementById('calc-button-mode-2c'), // (v5.0)
-        document.getElementById('calc-button-mode-3'),
-        document.getElementById('calc-button-mode-4')
+        document.getElementById('calc-button-1'), // 模式一: 热泵
+        document.getElementById('calc-button-2'), // 模式二: 气体
+        document.getElementById('calc-button-3'), // 模式三: 空压机
+        document.getElementById('calc-button-4'), // 模式四: MVR 容积式
+        document.getElementById('calc-button-5')  // 模式五: MVR 透平式
     ];
     
     const fluidInfos = [
-        { select: document.getElementById('fluid'), info: document.getElementById('fluid-info') },
-        { select: document.getElementById('fluid_m2'), info: document.getElementById('fluid-info-m2') },
-        { select: document.getElementById('fluid_m2b'), info: document.getElementById('fluid-info-m2b') },
-        // v5.0: 模式 2C (空压机) 无工质选择
-        { select: document.getElementById('fluid_m3'), info: document.getElementById('fluid-info-m3') },
-        { select: document.getElementById('fluid_m4'), info: document.getElementById('fluid-info-m4') }
+        { select: document.getElementById('fluid_m1'), info: document.getElementById('fluid-info-m1') }, // 热泵
+        { select: document.getElementById('fluid_m2'), info: document.getElementById('fluid-info-m2') }, // 气体
+        // 模式三 (空压机) 无工质选择
+        { select: document.getElementById('fluid_m4'), info: document.getElementById('fluid-info-m4') }, // MVR 容积式
+        { select: document.getElementById('fluid_m5'), info: document.getElementById('fluid-info-m5') }  // MVR 透平式
     ];
 
-    // (v4.2) 按钮的初始文本
+    // (v7.0) 按钮的初始文本
     const buttonTexts = {
-        'calc-button-mode-1': "计算效率 (模式一)",
-        'calc-button-mode-2': "计算性能 (模式 2A)",
-        'calc-button-mode-2b': "计算性能 (模式 2B)",
-        'calc-button-mode-2c': "计算性能 (模式 2C)", // (v5.0)
-        'calc-button-mode-3': "计算喷水量 (模式三)",
-        'calc-button-mode-4': "计算喷水量 (模式四)"
+        'calc-button-1': "计算性能 (热泵)",
+        'calc-button-2': "计算性能 (气体)",
+        'calc-button-3': "计算性能 (空压机)",
+        'calc-button-4': "计算喷水量 (MVR 容积式)",
+        'calc-button-5': "计算喷水量 (MVR 透平式)"
     };
     
     // 5. 立即调用 CoolProp 加载器
@@ -57,9 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("CoolProp loaded successfully.");
 
             // 6.1 初始化所有计算模块, 将 CP 实例传入
-            initMode1(CP);
-            initMode2(CP); // 模式二(v4.2)会同时初始化 2A 和 2B
-            initMode2C(CP); // (v5.0)
+            initMode2(CP);
+            initMode2C(CP);
             initMode3(CP);
             initMode4(CP);
 
