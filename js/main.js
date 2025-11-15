@@ -1,17 +1,17 @@
 // =====================================================================
 // main.js: 应用主入口 (总指挥)
-// 版本: v7.0 (五模式重构)
-// 职责: 1. 加载 UI 交互 (ui.js)。
+// 版本: v7.2 (最终修复版)
+// 职责: 1. 正确导入并调用所有重构后的模块初始化函数。
 //        2. 加载 CoolProp 物性库 (coolprop_loader.js)。
-//        3. 在物性库加载成功后, 初始化所有5个计算模式。
+//        3. 加载 UI 交互 (ui.js)。
 // =====================================================================
 
-// 1. 导入所有需要的模块
+// 1. 导入所有需要的模块 (使用正确的、与各文件匹配的函数名)
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
-import { initMode2 } from './mode2_predict.js'; // 将负责初始化新的模式1(热泵)和模式2(气体)
-import { initMode2C } from './mode2c_air.js';    // 将负责初始化新的模式3(空压机)
-import { initMode3 } from './mode3_mvr.js';      // 将负责初始化新的模式4(MVR 容积式)
-import { initMode4 } from './mode4_turbo.js';    // 将负责初始化新的模式5(MVR 透平式)
+import { initMode1_2 } from './mode2_predict.js'; // 此文件负责初始化新的模式1和模式2
+import { initMode3 } from './mode2c_air.js';      // 此文件负责初始化新的模式3
+import { initMode4 } from './mode3_mvr.js';       // 此文件负责初始化新的模式4
+import { initMode5 } from './mode4_turbo.js';     // 此文件负责初始化新的模式5
 
 // 2. 导入并执行 UI 交互脚本
 import './ui.js'; 
@@ -19,7 +19,7 @@ import './ui.js';
 // 3. 主应用逻辑: 等待 DOM 加载完毕
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 4. 定义所有需要被更新状态的元素 (v7.0 更新)
+    // 4. 定义所有需要被更新状态的元素 (使用 v7.0 的新ID)
     const buttons = [
         document.getElementById('calc-button-1'), // 模式一: 热泵
         document.getElementById('calc-button-2'), // 模式二: 气体
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { select: document.getElementById('fluid_m5'), info: document.getElementById('fluid-info-m5') }  // MVR 透平式
     ];
 
-    // (v7.0) 按钮的初始文本
+    // 按钮的初始文本
     const buttonTexts = {
         'calc-button-1': "计算性能 (热泵)",
         'calc-button-2': "计算性能 (气体)",
@@ -51,11 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6. (成功) 物性库加载成功!
             console.log("CoolProp loaded successfully.");
 
-            // 6.1 初始化所有计算模块, 将 CP 实例传入
-            initMode2(CP);
-            initMode2C(CP);
+            // 6.1 初始化所有计算模块 (使用正确的、已导入的函数名)
+            initMode1_2(CP);
             initMode3(CP);
             initMode4(CP);
+            initMode5(CP);
 
             // 6.2 更新所有计算按钮的状态
             buttons.forEach(btn => {

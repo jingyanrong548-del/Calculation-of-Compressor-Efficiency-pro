@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v7.0 (五模式重构)</title>
+    <title>无油压缩机性能计算器 v7.1 (工质与输入修复)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link rel="stylesheet" href="style.css">
@@ -15,7 +15,7 @@
         
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md">
             <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v7.0 (五模式重构)</p>
+            <p class="text-lg text-gray-600 mt-2">v7.1 (工质与输入修复)</p>
         </header>
 
         <div class="bg-white rounded-lg shadow-md">
@@ -40,7 +40,7 @@
 
             <div class="p-6 md:p-8">
                 
-                <!-- 模式一 (原 2A): 热泵预测 -->
+                <!-- 模式一: 热泵预测 -->
                 <div id="tab-content-1" class="tab-content">
                     <form id="calc-form-1" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -58,8 +58,10 @@
                                     <option value="R600a">R600a (异丁烷)</option>
                                     <option value="R717">R717 (氨)</option>
                                     <option value="R744">R744 (CO2)</option>
+                                    <option value="R22">R22</option>
+                                    <option value="R410A">R410A</option>
+                                    <option value="R142b">R142b</option>
                                     <option value="Water">Water (水)</option>
-                                    <option value="Air">Air (空气)</option>
                                 </select>
                             </div>
                             
@@ -189,7 +191,7 @@
                                 </div>
                                 <div class="input-group">
                                     <label for="vol_disp_m1" class="block text-sm font-medium text-gray-700">排量 (V_disp)</label>
-                                    <input type="number" id="vol_disp_m1" name="vol_disp_m1" value="500" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                                    <input type="number" id="vol_disp_m1" name="vol_disp_m1" value="500" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
                                     <span class="text-xs text-gray-500">单位: cm³</span>
                                 </div>
                             </div>
@@ -256,7 +258,7 @@
                     </div>
                 </div>
 
-                <!-- 模式二 (原 2B): 气体预测 -->
+                <!-- 模式二: 气体预测 -->
                 <div id="tab-content-2" class="tab-content" style="display: none;">
                     <form id="calc-form-2" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -357,7 +359,7 @@
                                 </div>
                                 <div class="input-group">
                                     <label for="vol_disp_m2" class="block text-sm font-medium text-gray-700">排量 (V_disp)</label>
-                                    <input type="number" id="vol_disp_m2" name="vol_disp_m2" value="500" step="10" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                                    <input type="number" id="vol_disp_m2" name="vol_disp_m2" value="500" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
                                     <span class="text-xs text-gray-500">单位: cm³</span>
                                 </div>
                             </div>
@@ -412,7 +414,7 @@
                     </div>
                 </div>
                 
-                <!-- 模式三 (原 2C): 空压机 -->
+                <!-- 模式三: 空压机 -->
                 <div id="tab-content-3" class="tab-content" style="display: none;">
                     <form id="calc-form-3" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -531,7 +533,7 @@
                     </div>
                 </div>
 
-                <!-- 模式四 (原 M3): MVR (容积式) -->
+                <!-- 模式四: MVR (容积式) -->
                 <div id="tab-content-4" class="tab-content" style="display: none;">
                     <form id="calc-form-4" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -638,7 +640,7 @@
                                     </div>
                                     <div class="input-group">
                                         <label for="vol_disp_m4" class="block text-sm font-medium text-gray-700">排量 (V_disp)</label>
-                                        <input type="number" id="vol_disp_m4" name="vol_disp_m4" value="10000" step="100" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                                        <input type="number" id="vol_disp_m4" name="vol_disp_m4" value="10000" step="any" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                                         <span class="text-xs text-gray-500">单位: cm³</span>
                                     </div>
                                 </div>
@@ -698,7 +700,7 @@
                     </div>
                 </div>
 
-                <!-- 模式五 (原 M4): MVR (透平式) -->
+                <!-- 模式五: MVR (透平式) -->
                 <div id="tab-content-5" class="tab-content" style="display: none;">
                     <form id="calc-form-5" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -850,17 +852,17 @@
     </div>
 
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4 max-w-4xl mx-auto px-4">
-        <p><strong>版本:</strong> v7.0 (五模式重构)</p>
+        <p><strong>版本:</strong> v7.1 (工质与输入修复)</p>
         <p><strong>编者:</strong> 荆炎荣 (Jing Yanrong)</p>
         <blockquote class="mt-2 border-l-4 border-gray-300 pl-4 text-left text-gray-500 italic">
+            <strong>v7.1 更新 (2025-11-15):</strong><br>
+            - 修复了所有排量输入框无法输入小数或个位数的问题。<br>
+            - 更新了热泵模式的工质列表，使其更符合应用场景。<br>
             <strong>v7.0 更新 (2025-11-15):</strong><br>
             - 重大结构重构：取消模式一，将 2A, 2B, 2C 提升为独立主模式，形成五个并列的功能模块。<br>
             - 简化并统一了 UI 导航逻辑。<br>
             <strong>v6.0 更新 (2025-11-15):</strong><br>
-            - 为模式一 (评估) 和 模式 2A (热泵) 增加了蒸发/冷凝温度的输入模式。<br>
-            - 增加了过冷度 (SC) 输入，并实现了系统级的制冷/制热能力和 COP 计算。<br>
-            <strong>v5.5 更新 (2025-11-15):</strong><br>
-            - 为模式三 (MVR 容积式) 增加了质量流量和体积流量输入模式。<br>
+            - 为热泵相关模式增加了蒸发/冷凝温度的输入方式及系统COP计算。<br>
         </blockquote>
     </footer>
 

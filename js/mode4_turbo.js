@@ -1,132 +1,112 @@
 // =====================================================================
-// mode4_turbo.js: 模式四 (MVR 透平式计算) 模块
-// 版本: v4.7 (修复 const 重复声明 和 P,Q 逻辑)
-// 职责: 1. (v4.6 修复) 匹配 HTML name 属性
-//        2. (v4.7 修复) 修正 'calculateMode4' 中的变量作用域和 P,Q 逻辑
+// mode4_turbo.js: 模式五 (MVR 透平式计算) 模块
+// 版本: v7.2 (最终修复版)
+// 职责: 1. 作为独立的模式五运行。
+//        2. 更新所有 DOM ID 和初始化函数名以匹配 v7.0 结构。
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
 
 // --- 模块内部变量 ---
 let CP_INSTANCE = null;
-let lastMode4ResultText = null;
+let lastMode5ResultText = null;
 
 // --- DOM 元素引用 ---
-let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4;
-let fluidSelectM4, fluidInfoDivM4;
-let allInputsM4;
+let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5;
+let fluidSelectM5, fluidInfoDivM5;
+let allInputsM5;
 
 // --- 按钮状态常量 ---
-const btnText = "计算喷水量 (模式四)";
-const btnTextStale = "重新计算 (模式四)";
-const classesFresh = ['bg-teal-600', 'hover:bg-teal-700', 'text-white'];
-const classesStale = ['bg-yellow-500', 'hover:bg-yellow-600', 'text-black'];
+const btnText5 = "计算喷水量 (MVR 透平式)";
+const btnTextStale5 = "重新计算 (MVR 透平式)";
+const classesFresh5 = ['bg-teal-600', 'hover:bg-teal-700', 'text-white'];
+const classesStale5 = ['bg-yellow-500', 'hover:bg-yellow-600', 'text-black'];
 
 /**
  * 设置按钮为“脏”状态 (Stale)
  */
-function setButtonStale4() {
-    if (!calcButtonM4) return;
-    calcButtonM4.textContent = btnTextStale;
-    calcButtonM4.classList.remove(...classesFresh);
-    calcButtonM4.classList.add(...classesStale);
-    printButtonM4.disabled = true;
-    lastMode4ResultText = null;
+function setButtonStale5() {
+    if (!calcButtonM5) return;
+    calcButtonM5.textContent = btnTextStale5;
+    calcButtonM5.classList.remove(...classesFresh5);
+    calcButtonM5.classList.add(...classesStale5);
+    printButtonM5.disabled = true;
+    lastMode5ResultText = null;
 }
 
 /**
- * (v4.7 修复版) 模式四：计算
+ * 模式五：计算
  */
-async function calculateMode4() {
+async function calculateMode5() {
     const CP = CP_INSTANCE;
     if (!CP) {
-        resultsDivM4.textContent = "错误: CoolProp 未加载。";
+        resultsDivM5.textContent = "错误: CoolProp 未加载。";
         return;
     }
 
-    calcButtonM4.disabled = true;
-    calcButtonM4.textContent = "计算中...";
-    resultsDivM4.textContent = "--- G正在计算, 请稍候... ---";
+    calcButtonM5.disabled = true;
+    calcButtonM5.textContent = "计算中...";
+    resultsDivM5.textContent = "--- 正在计算, 请稍候... ---";
 
     setTimeout(() => {
         try {
-            // (v5.1 修复) 使用 FormData 获取所有值
-            const formData = new FormData(calcFormM4);
+            const formData = new FormData(calcFormM5);
             
-            const fluid = formData.get('fluid_m4');
-            const state_define = formData.get('state_define_m4');
-            const delta_T_sat = parseFloat(formData.get('delta_T_m4'));
+            const fluid = formData.get('fluid_m5');
+            const state_define = formData.get('state_define_m5');
+            const delta_T_sat = parseFloat(formData.get('delta_T_m5'));
             
-            const flow_mode = formData.get('flow_mode_m4');
-            const mass_flow_kgs = parseFloat(formData.get('mass_flow_m4'));
-            const vol_flow_m3h = parseFloat(formData.get('vol_flow_m4'));
+            const flow_mode = formData.get('flow_mode_m5');
+            const mass_flow_kgs = parseFloat(formData.get('mass_flow_m5'));
+            const vol_flow_m3h = parseFloat(formData.get('vol_flow_m5'));
 
-            // (v5.1 修复) 关键修复: 使用 'eff_poly_m4'
-            const eff_poly = parseFloat(formData.get('eff_poly_m4')) / 100.0;
-            const T_water_in_C = parseFloat(formData.get('T_water_in_m4'));
+            const eff_poly = parseFloat(formData.get('eff_poly_m5')) / 100.0;
+            const T_water_in_C = parseFloat(formData.get('T_water_in_m5'));
 
-            // 单位换算
             const T_water_in_K = T_water_in_C + 273.15;
 
-            // ================== v4.7 修复开始 ==================
-            // 1. 确定进口状态
             let p_in_Pa, T_in_K, H_in, S_in, D_in, T_sat_in_K;
             let p_in_bar, T_in_C, q_in;
 
             if (state_define === 'pt') {
-                p_in_bar = parseFloat(formData.get('p_in_m4'));
-                T_in_C = parseFloat(formData.get('T_in_m4'));
+                p_in_bar = parseFloat(formData.get('p_in_m5'));
+                T_in_C = parseFloat(formData.get('T_in_m5'));
                 p_in_Pa = p_in_bar * 1e5;
                 T_in_K = T_in_C + 273.15;
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
 
-                // (v4.7.1 修复) 使用 P, T 计算 H, S, D
                 H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
                 S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
                 D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
 
             } else { // state_define === 'pq'
-                p_in_bar = parseFloat(formData.get('p_in_pq_m4'));
-                q_in = parseFloat(formData.get('q_in_m4'));
+                p_in_bar = parseFloat(formData.get('p_in_pq_m5'));
+                q_in = parseFloat(formData.get('q_in_m5'));
                 p_in_Pa = p_in_bar * 1e5;
                 
-                // (v4.7.1 修复) 使用 P, Q 计算 H, S, D
                 H_in = CP.PropsSI('H', 'P', p_in_Pa, 'Q', q_in, fluid);
                 S_in = CP.PropsSI('S', 'P', p_in_Pa, 'Q', q_in, fluid);
                 D_in = CP.PropsSI('D', 'P', p_in_Pa, 'Q', q_in, fluid);
                 
-                // (v4.7.1 修复) 仅为显示/后续计算 T
                 T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
                 T_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', q_in, fluid);
-                T_in_C = T_in_K - 273.15; // 在这里计算 T_in_C
+                T_in_C = T_in_K - 273.15;
             }
-            // ================== v4.7 修复结束 ==================
             
-            // 2. 确定出口状态
             const T_sat_out_K = T_sat_in_K + delta_T_sat;
             const p_out_Pa = CP.PropsSI('P', 'T', T_sat_out_K, 'Q', 1, fluid);
 
-            // 3. 理论多变压缩
             const v_in = 1.0 / D_in;
-
-            // ================== v4.8 修复 (模式四 NaN) ==================
-            // 'k' (等熵指数) 不能在饱和线上 (P,T) 计算, 会导致 Infinity
-            // 必须使用 (P,S) 或 (P,H) 来定义状态
             const k = CP.PropsSI('Cpmass', 'P', p_in_Pa, 'S', S_in, fluid) / CP.PropsSI('Cvmass', 'P', p_in_Pa, 'S', S_in, fluid);
-            // ================== v4.8 修复结束 ==================
+            const n_poly = 1.0 / (1.0 - (k - 1) / (k * eff_poly));
             
-            const n_poly = 1.0 / (1.0 - (k - 1) / (k * eff_poly)); // 多变指数
-            
-            // W_poly = (n_poly / (n_poly - 1)) * P1*v1 * [ (P2/P1)^((n-1)/n) - 1 ]
             const pr = p_out_Pa / p_in_Pa;
-            const W_poly = (n_poly / (n_poly - 1)) * p_in_Pa * v_in * (Math.pow(pr, (n_poly - 1) / n_poly) - 1); // 理论多变功 (J/kg)
+            const W_poly = (n_poly / (n_poly - 1)) * p_in_Pa * v_in * (Math.pow(pr, (n_poly - 1) / n_poly) - 1);
 
-            // 4. 实际压缩 (干)
-            const W_real_dry = W_poly / eff_poly; // 实际干功 (J/kg)
-            const H_out_dry = H_in + W_real_dry; // 干压缩出口焓
+            const W_real_dry = W_poly / eff_poly;
+            const H_out_dry = H_in + W_real_dry;
             const T_out_dry_K = CP.PropsSI('T', 'P', p_out_Pa, 'H', H_out_dry, fluid);
 
-            // 5. 流量计算
             let m_flow_in, V_flow_in_s;
             if (flow_mode === 'mass') {
                 m_flow_in = mass_flow_kgs;
@@ -136,12 +116,9 @@ async function calculateMode4() {
                 m_flow_in = V_flow_in_s * D_in;
             }
 
-            // 6. 能量平衡计算 (带喷水)
-            // 目标：T_out = T_sat_out_K (出口为饱和蒸汽)
             const H_out_target = CP.PropsSI('H', 'P', p_out_Pa, 'Q', 1, fluid);
             const h_water_in = CP.PropsSI('H', 'T', T_water_in_K, 'P', p_out_Pa, 'Water');
 
-            // m_water * (h_water_in - H_out_target) = m_in * (H_out_target - H_out_dry)
             const m_water = m_flow_in * (H_out_target - H_out_dry) / (h_water_in - H_out_target);
             
             let m_water_kgh, Power_shaft, W_real_wet;
@@ -151,22 +128,20 @@ async function calculateMode4() {
                 m_water_kgh = m_water * 3600.0;
                 const m_flow_out = m_flow_in + m_water;
                 W_real_wet = (H_out_target * m_flow_out - H_in * m_flow_in - h_water_in * m_water) / m_flow_in;
-                Power_shaft = W_real_wet * m_flow_in / 1000.0; // kW
+                Power_shaft = W_real_wet * m_flow_in / 1000.0;
                 spray_notes = `为达到出口饱和状态，需要喷水: ${(m_water_kgh).toFixed(3)} kg/h`;
             } else {
                 m_water_kgh = 0;
                 W_real_wet = W_real_dry;
-                Power_shaft = W_real_dry * m_flow_in / 1000.0; // kW
+                Power_shaft = W_real_dry * m_flow_in / 1000.0;
                 spray_notes = `计算结果为过热蒸汽 (${(T_out_dry_K - 273.15).toFixed(2)} °C)，无需喷水。`;
             }
             
-            // 7. 格式化输出
-            // const T_in_C = T_in_K - 273.15; // (v4.7 修复) 移除
             const T_sat_in_C = T_sat_in_K - 273.15;
             const T_sat_out_C = T_sat_out_K - 273.15;
 
             let resultText = `
-========= 模式四 (MVR 透平式) 计算报告 =========
+========= 模式五 (MVR 透平式) 计算报告 =========
 工质: ${fluid}
 流量模式: ${flow_mode}
 
@@ -203,35 +178,35 @@ ${spray_notes}
   - 实际总轴功 (W_wet):  ${(W_real_wet / 1000.0).toFixed(2)} kJ/kg_in
   - 压缩机轴功率 (P_shaft): ${Power_shaft.toFixed(2)} kW
 `;
-            resultsDivM4.textContent = resultText;
-            lastMode4ResultText = resultText;
+            resultsDivM5.textContent = resultText;
+            lastMode5ResultText = resultText;
             
-            calcButtonM4.textContent = btnText;
-            calcButtonM4.classList.remove(...classesStale);
-            calcButtonM4.classList.add(...classesFresh);
-            calcButtonM4.disabled = false;
-            printButtonM4.disabled = false;
+            calcButtonM5.textContent = btnText5;
+            calcButtonM5.classList.remove(...classesStale5);
+            calcButtonM5.classList.add(...classesFresh5);
+            calcButtonM5.disabled = false;
+            printButtonM5.disabled = false;
 
         } catch (err) {
-            console.error("Mode 4 calculation failed:", err);
-            resultsDivM4.textContent = `计算出错: \n${err.message}\n\n请检查输入参数是否在工质的有效范围内。`;
-            calcButtonM4.textContent = "计算失败";
-            calcButtonM4.disabled = false;
-            setButtonStale4();
+            console.error("Mode 5 calculation failed:", err);
+            resultsDivM5.textContent = `计算出错: \n${err.message}\n\n请检查输入参数是否在工质的有效范围内。`;
+            calcButtonM5.textContent = "计算失败";
+            calcButtonM5.disabled = false;
+            setButtonStale5();
         }
     }, 10);
 }
 
 /**
- * 打印模式四报告
+ * 打印模式五报告
  */
-function printReportMode4() {
-    if (!lastMode4ResultText) {
-        alert("没有可供打印的计算结果 (M4)。");
+function printReportMode5() {
+    if (!lastMode5ResultText) {
+        alert("没有可供打印的计算结果 (M5)。");
         return;
     }
     const printHtml = `
-        <html><head><title>模式四 (MVR 透平式) 计算报告</title>
+        <html><head><title>模式五 (MVR 透平式) 计算报告</title>
         <style>
             body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.6; padding: 20px; }
             h1 { color: #0f766e; border-bottom: 2px solid #0f766e; }
@@ -239,14 +214,14 @@ function printReportMode4() {
             footer { margin-top: 20px; font-size: 12px; color: #718096; text-align: center; }
         </style>
         </head><body>
-            <h1>模式四 (MVR 透平式) 计算报告</h1>
-            <pre>${lastMode4ResultText}</pre>
-            <footer><p>版本: v4.7</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <h1>模式五 (MVR 透平式) 计算报告</h1>
+            <pre>${lastMode5ResultText}</pre>
+            <footer><p>版本: v7.2</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     
     const printContainer = document.createElement('div');
-    printContainer.id = 'print-container';
+    printContainer.id = 'print-container-5';
     printContainer.innerHTML = printHtml;
     document.body.appendChild(printContainer);
     window.print();
@@ -259,47 +234,41 @@ function printReportMode4() {
 
 
 /**
- * (v4.1) 模式四：初始化函数
+ * 模式五：初始化函数
  * @param {object} CP - CoolProp 实例
  */
-export function initMode4(CP) {
-    CP_INSTANCE = CP; // 将 CP 实例存储在模块作用域
+export function initMode5(CP) {
+    CP_INSTANCE = CP;
     
-    // 获取 DOM 元素
-    calcButtonM4 = document.getElementById('calc-button-mode-4');
-    resultsDivM4 = document.getElementById('results-mode-4');
-    calcFormM4 = document.getElementById('calc-form-mode-4');
-    printButtonM4 = document.getElementById('print-button-mode-4');
-    fluidSelectM4 = document.getElementById('fluid_m4');
-    fluidInfoDivM4 = document.getElementById('fluid-info-m4');
+    calcButtonM5 = document.getElementById('calc-button-5');
+    resultsDivM5 = document.getElementById('results-5');
+    calcFormM5 = document.getElementById('calc-form-5');
+    printButtonM5 = document.getElementById('print-button-5');
+    fluidSelectM5 = document.getElementById('fluid_m5');
+    fluidInfoDivM5 = document.getElementById('fluid-info-m5');
 
-    // (v5.1 修复) 健壮性检查
-    if (!calcFormM4) {
-        console.error("Mode 4 Form (calc-form-mode-4) not found! Cannot initialize.");
+    if (!calcFormM5) {
+        console.error("Mode 5 Form (calc-form-5) not found! Cannot initialize.");
         return;
     }
-    allInputsM4 = calcFormM4.querySelectorAll('input, select');
+    allInputsM5 = calcFormM5.querySelectorAll('input, select');
 
-    // 绑定计算事件
-    calcFormM4.addEventListener('submit', (event) => {
+    calcFormM5.addEventListener('submit', (event) => {
         event.preventDefault();
-        calculateMode4();
+        calculateMode5();
     });
 
-    // 绑定“脏”状态检查
-    allInputsM4.forEach(input => {
-        input.addEventListener('input', setButtonStale4);
-        input.addEventListener('change', setButtonStale4);
+    allInputsM5.forEach(input => {
+        input.addEventListener('input', setButtonStale5);
+        input.addEventListener('change', setButtonStale5);
     });
 
-    // 绑定流体信息更新
-    fluidSelectM4.addEventListener('change', () => {
-        updateFluidInfo(fluidSelectM4, fluidInfoDivM4, CP);
-        setButtonStale4();
+    fluidSelectM5.addEventListener('change', () => {
+        updateFluidInfo(fluidSelectM5, fluidInfoDivM5, CP);
+        setButtonStale5();
     });
 
-    // 绑定打印事件
-    printButtonM4.addEventListener('click', printReportMode4);
+    printButtonM5.addEventListener('click', printReportMode5);
 
-    console.log("Mode 4 (MVR Turbo) initialized.");
+    console.log("Mode 5 (MVR Turbo) initialized.");
 }

@@ -1,9 +1,8 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (热泵预测) 和 模式二 (气体预测) 模块
-// 版本: v7.0 (五模式重构)
-// 职责: 1. 实现模式一 (原2A, 热泵) 的计算逻辑。
-//        2. 实现模式二 (原2B, 气体) 的计算逻辑。
-//        3. 更新所有 DOM ID 以匹配 v7.0 的扁平化结构。
+// 版本: v7.2 (最终修复版)
+// 职责: 1. 实现模式一 (原2A, 热泵) 和 模式二 (原2B, 气体) 的计算逻辑。
+//        2. 使用统一的初始化函数 'initMode1_2' 并更新所有 DOM ID。
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -240,7 +239,7 @@ function printReportMode1() {
         </head><body>
             <h1>模式一 (热泵预测) 计算报告</h1>
             <pre>${lastMode1ResultText}</pre>
-            <footer><p>版本: v7.0</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v7.2</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     const printContainer = document.createElement('div');
@@ -248,7 +247,7 @@ function printReportMode1() {
     printContainer.innerHTML = printHtml;
     document.body.appendChild(printContainer);
     window.print();
-    setTimeout(() => { document.body.removeChild(printContainer); }, 500);
+    setTimeout(() => { if (document.body.contains(printContainer)) document.body.removeChild(printContainer); }, 500);
 }
 
 // =====================================================================
@@ -425,7 +424,7 @@ function printReportMode2() {
         </head><body>
             <h1>模式二 (气体预测) 计算报告</h1>
             <pre>${lastMode2ResultText}</pre>
-            <footer><p>版本: v7.0</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
+            <footer><p>版本: v7.2</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
         </body></html>
     `;
     const printContainer = document.createElement('div');
@@ -433,14 +432,14 @@ function printReportMode2() {
     printContainer.innerHTML = printHtml;
     document.body.appendChild(printContainer);
     window.print();
-    setTimeout(() => { document.body.removeChild(printContainer); }, 500);
+    setTimeout(() => { if (document.body.contains(printContainer)) document.body.removeChild(printContainer); }, 500);
 }
 
 // =====================================================================
 // 初始化函数 (由 main.js 调用)
 // =====================================================================
 
-export function initMode2(CP) {
+export function initMode1_2(CP) {
     CP_INSTANCE = CP;
     
     // --- 初始化 模式一 (热泵) ---
