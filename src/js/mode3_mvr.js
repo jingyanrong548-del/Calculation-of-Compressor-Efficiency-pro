@@ -1,340 +1,218 @@
 // =====================================================================
-// mode3_mvr.js: 模式四 (MVR 容积式计算) 模块
-// 版本: v7.4 (引入动态效率模型)
-// 职责: 1. 作为独立的模式四运行。
-//        2. 新增效率选型下拉菜单的事件处理逻辑。
-//        3. 新增基于压比的动态效率模型计算逻辑。
+// mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
+// 版本: v8.0 (全宽视觉优化版)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
 
-// --- 模块内部变量 ---
-let CP_INSTANCE = null;
-let lastMode4ResultText = null;
+let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4, fluidSelectM4;
+let lastMode4Data = null;
 
-// --- DOM 元素引用 ---
-let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4;
-let fluidSelectM4, fluidInfoDivM4;
-let allInputsM4;
+// --- Helper: MVR Datasheet ---
+function generateMVRDatasheet(d) {
+    // [修改点] width: 100%; 移除 max-width: 210mm
+    return `
+    <div style="padding: 30px; font-family: sans-serif; background: #fff; width: 100%; box-sizing: border-box;">
+        <div style="border-bottom: 3px solid #7e22ce; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: end;">
+            <div>
+                <div style="font-size: 28px; font-weight: 900; color: #7e22ce; line-height: 1;">MVR DATASHEET</div>
+                <div style="font-size: 14px; color: #666; margin-top: 5px;">Mechanical Vapor Recompression (Volumetric)</div>
+            </div>
+            <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
+                Date: <strong>${d.date}</strong><br>
+                Fluid: <strong>${d.fluid}</strong>
+            </div>
+        </div>
 
-// --- 按钮状态常量 ---
-const btnText4 = "计算喷水量 (MVR 容积式)";
-const btnTextStale4 = "重新计算 (MVR 容积式)";
-const classesFresh4 = ['bg-purple-600', 'hover:bg-purple-700', 'text-white'];
-const classesStale4 = ['bg-yellow-500', 'hover:bg-yellow-600', 'text-black'];
+        <!-- KPI -->
+        <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+             <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">INJECTION WATER</div>
+                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">SHAFT POWER</div>
+                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
+            </div>
+             <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">SAT. TEMP RISE</div>
+                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${d.dt.toFixed(1)} <span style="font-size:14px">K</span></div>
+            </div>
+        </div>
 
-/**
- * 设置按钮为“脏”状态 (Stale)
- */
-function setButtonStale4() {
-    if (!calcButtonM4) return;
-    calcButtonM4.textContent = btnTextStale4;
-    calcButtonM4.classList.remove(...classesFresh4);
-    calcButtonM4.classList.add(...classesStale4);
-    printButtonM4.disabled = true;
-    lastMode4ResultText = null;
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+            <div>
+                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #7e22ce; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Process Parameters</div>
+                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
+                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp Out</td><td style="text-align: right; font-weight: 600;">${d.t_sat_out.toFixed(1)} °C</td></tr>
+                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Est.)</td><td style="text-align: right; font-weight: 600;">${d.t_out_est.toFixed(1)} °C</td></tr>
+                </table>
+            </div>
+            <div>
+                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #7e22ce; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Machine Data</div>
+                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Operating Speed</td><td style="text-align: right; font-weight: 600;">${d.rpm ? d.rpm + ' RPM' : '-'}</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Evaporation Mass Flow</td><td style="text-align: right; font-weight: 600;">${(d.m_flow * 3600).toFixed(1)} kg/h</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol*100).toFixed(1)} %</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
+            <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
+                Prepared by Yanrong Jing (荆炎荣)
+            </div>
+            <div style="margin-bottom: 8px;">
+                Oil-Free Compressor Calculator Pro v8.0
+            </div>
+            <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
+                Disclaimer: This simulation report is provided for engineering reference only. 
+                Actual performance may vary based on specific mechanical design, manufacturing tolerances, and operating conditions. 
+                The author assumes no liability for any errors, omissions, or consequences arising from the use of this data.
+            </div>
+        </div>
+    </div>
+    `;
 }
 
-/**
- * 模式四：计算
- */
-async function calculateMode4() {
-    const CP = CP_INSTANCE;
-    if (!CP) {
-        resultsDivM4.textContent = "错误: CoolProp 未加载。";
-        return;
-    }
+// --- Helper: 获取流量 (通用) ---
+function getFlowRate(formData, density_in) {
+    const mode = formData.get('flow_mode_m4');
+    let m_flow = 0; 
+    let v_flow_in = 0; 
+    let rpm = 0;
 
-    calcButtonM4.disabled = true;
+    if (mode === 'rpm') {
+        rpm = parseFloat(formData.get('rpm_m4'));
+        const disp = parseFloat(formData.get('vol_disp_m4')) / 1e6; // cm3 -> m3
+        const vol_eff = parseFloat(formData.get('vol_eff_m4')) / 100.0;
+        v_flow_in = (rpm / 60.0) * disp * vol_eff;
+        m_flow = v_flow_in * density_in;
+    } else if (mode === 'mass') {
+        // MVR 通常输入是 kg/h (蒸发量)
+        m_flow = parseFloat(formData.get('mass_flow_m4')) / 3600.0;
+        v_flow_in = m_flow / density_in;
+    } else if (mode === 'vol') {
+        // m3/h -> m3/s
+        v_flow_in = parseFloat(formData.get('vol_flow_m4')) / 3600.0;
+        m_flow = v_flow_in * density_in;
+    }
+    return { m_flow, v_flow_in, rpm };
+}
+
+// --- AI 推荐监听 ---
+function setupAiEff() {
+    const select = document.getElementById('ai_eff_m4');
+    if (!select) return;
+    select.addEventListener('change', () => {
+        const val = select.value;
+        if (val === 'roots') {
+            document.getElementById('eff_isen_m4').value = 60;
+            document.getElementById('vol_eff_m4').value = 75;
+        } else if (val === 'screw_mvr') {
+            document.getElementById('eff_isen_m4').value = 75;
+            document.getElementById('vol_eff_m4').value = 85;
+        }
+    });
+}
+
+// --- 计算核心 ---
+async function calculateMode4(CP) {
+    if (!CP) return;
     calcButtonM4.textContent = "计算中...";
-    resultsDivM4.textContent = "--- 正在计算, 请稍候... ---";
+    calcButtonM4.disabled = true;
 
     setTimeout(() => {
         try {
             const formData = new FormData(calcFormM4);
-            
             const fluid = formData.get('fluid_m4');
-            const state_define = formData.get('state_define_m4');
-            const delta_T_sat = parseFloat(formData.get('delta_T_m4'));
+            const p_in_bar = parseFloat(formData.get('p_in_m4'));
+            const t_in = parseFloat(formData.get('T_in_m4'));
+            const dt = parseFloat(formData.get('delta_T_m4'));
             
-            const flow_mode = formData.get('flow_mode_m4');
-            const rpm = parseFloat(formData.get('rpm_m4'));
-            const vol_disp_cm3 = parseFloat(formData.get('vol_disp_m4'));
-            const mass_flow_kgs = parseFloat(formData.get('mass_flow_m4'));
-            const vol_flow_m3h = parseFloat(formData.get('vol_flow_m4'));
+            const eff_is = parseFloat(formData.get('eff_isen_m4')) / 100.0;
+            const eff_vol = parseFloat(formData.get('vol_eff_m4')) / 100.0;
+            const t_water = parseFloat(formData.get('T_water_in_m4'));
+
+            const p_in = p_in_bar * 1e5;
+            const t_in_k = t_in + 273.15;
+
+            // 1. 状态点计算
+            // 饱和压力检查
+            const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
+            const t_sat_out = t_sat_in + dt;
+            const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
             
-            const T_water_in_C = parseFloat(formData.get('T_water_in_m4'));
-            const T_water_in_K = T_water_in_C + 273.15;
-            const vol_disp_m3 = vol_disp_cm3 / 1e6;
+            const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in_k, fluid);
+            const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
+            const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
 
-            let p_in_Pa, T_in_K, H_in, S_in, D_in, T_sat_in_K;
-            let p_in_bar, T_in_C, q_in; 
+            // 2. 流量计算
+            const { m_flow, v_flow_in, rpm } = getFlowRate(formData, d_in);
 
-            if (state_define === 'pt') {
-                p_in_bar = parseFloat(formData.get('p_in_m4'));
-                T_in_C = parseFloat(formData.get('T_in_m4'));
-                p_in_Pa = p_in_bar * 1e5;
-                T_in_K = T_in_C + 273.15;
-                T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
+            // 3. 压缩功
+            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
+            const w_real = (h_out_is - h_in) / eff_is;
+            const h_out_dry = h_in + w_real;
+            const power = w_real * m_flow / 1000.0;
 
-                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'T', T_in_K, fluid);
-                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'T', T_in_K, fluid);
-                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'T', T_in_K, fluid);
-
-            } else { // state_define === 'pq'
-                p_in_bar = parseFloat(formData.get('p_in_pq_m4'));
-                q_in = parseFloat(formData.get('q_in_m4'));
-                p_in_Pa = p_in_bar * 1e5;
-                
-                H_in = CP.PropsSI('H', 'P', p_in_Pa, 'Q', q_in, fluid);
-                S_in = CP.PropsSI('S', 'P', p_in_Pa, 'Q', q_in, fluid);
-                D_in = CP.PropsSI('D', 'P', p_in_Pa, 'Q', q_in, fluid);
-                
-                T_sat_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', 1, fluid);
-                T_in_K = CP.PropsSI('T', 'P', p_in_Pa, 'Q', q_in, fluid);
-                T_in_C = T_in_K - 273.15; 
-            }
+            // 4. 喷水计算
+            const h_sat_vap_out = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
+            const h_water = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
             
-            const T_sat_out_K = T_sat_in_K + delta_T_sat;
-            const p_out_Pa = CP.PropsSI('P', 'T', T_sat_out_K, 'Q', 1, fluid);
+            let m_water = 0;
+            let t_out_est = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid) - 273.15;
 
-            // [修改] 动态效率模型计算
-            let eff_isen_final = parseFloat(formData.get('eff_isen_m4')) / 100.0;
-            let vol_eff_final = parseFloat(formData.get('vol_eff_m4')) / 100.0;
-            let dynamicModelNotes = "效率模型: 静态 (手动输入)";
-            
-            const isDynamic = formData.get('enable_dynamic_eff_m4') === 'on';
-            if (isDynamic) {
-                const pr_design = parseFloat(formData.get('pr_design_m4'));
-                const clearance_ratio = parseFloat(formData.get('clearance_ratio_m4')) / 100.0;
-                const pr_actual = p_out_Pa / p_in_Pa;
-                
-                // 1. 修正等熵效率
-                const SENSITIVITY_A = 0.03;
-                const isen_correction_factor = 1 - SENSITIVITY_A * Math.pow(pr_actual - pr_design, 2);
-                const eff_isen_base = parseFloat(formData.get('eff_isen_m4')) / 100.0;
-                eff_isen_final = Math.max(0, eff_isen_base * isen_correction_factor);
-
-                // 2. 修正容积效率
-                const cpmass = CP.PropsSI('Cpmass', 'P', p_in_Pa, 'T', T_in_K, fluid);
-                const cvmass = CP.PropsSI('Cvmass', 'P', p_in_Pa, 'T', T_in_K, fluid);
-                const k = cpmass / cvmass;
-                vol_eff_final = 1 - clearance_ratio * (Math.pow(pr_actual, 1 / k) - 1);
-                vol_eff_final = Math.max(0, vol_eff_final);
-                
-                dynamicModelNotes = `效率模型: 动态 (设计压比=${pr_design.toFixed(2)}, 余隙比=${(clearance_ratio*100).toFixed(1)}%)`;
+            if (h_out_dry > h_sat_vap_out) {
+                // 需要喷水减温至饱和
+                m_water = m_flow * (h_out_dry - h_sat_vap_out) / (h_sat_vap_out - h_water);
+                t_out_est = t_sat_out - 273.15; // 喷水后出口为饱和温度
             }
 
+            lastMode4Data = {
+                date: new Date().toLocaleDateString(),
+                fluid, p_in: p_in_bar, t_in, dt, rpm, eff_is, eff_vol,
+                p_out: p_out/1e5, t_sat_out: t_sat_out - 273.15, t_out_est,
+                power, m_water, m_flow, v_flow_in
+            };
 
-            const H_out_is = CP.PropsSI('H', 'P', p_out_Pa, 'S', S_in, fluid);
-            const W_is = H_out_is - H_in;
-
-            const W_real_dry = W_is / eff_isen_final;
-            const H_out_dry = H_in + W_real_dry;
-
-            let m_flow_in, V_flow_in_s;
-            let flow_notes = "";
-
-            if (flow_mode === 'rpm') {
-                const V_flow_theo_s = (rpm / 60.0) * vol_disp_m3;
-                V_flow_in_s = V_flow_theo_s * vol_eff_final;
-                m_flow_in = V_flow_in_s * D_in;
-                flow_notes = `(基于 RPM: ${rpm}, 排量: ${vol_disp_cm3} cm³)`;
-            } else if (flow_mode === 'mass') {
-                m_flow_in = mass_flow_kgs;
-                V_flow_in_s = m_flow_in / D_in;
-                flow_notes = `(基于质量流量: ${m_flow_in.toFixed(4)} kg/s)`;
-            } else { // flow_mode === 'vol'
-                V_flow_in_s = vol_flow_m3h / 3600.0;
-                m_flow_in = V_flow_in_s * D_in;
-                flow_notes = `(基于体积流量: ${vol_flow_m3h.toFixed(2)} m³/h)`;
-            }
-
-            const H_out_target = CP.PropsSI('H', 'P', p_out_Pa, 'Q', 1, fluid);
-            const h_water_in = CP.PropsSI('H', 'T', T_water_in_K, 'P', p_out_Pa, 'Water');
-
-            let m_water = m_flow_in * (H_out_target - H_out_dry) / (h_water_in - H_out_target);
+            resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data);
             
-            let m_water_kgh, m_water_ratio, Power_shaft, W_real_wet;
-            let spray_notes = "";
-
-            if (m_water > 0) {
-                m_water_kgh = m_water * 3600.0;
-                m_water_ratio = m_water / m_flow_in;
-                const m_flow_out = m_flow_in + m_water;
-                W_real_wet = (H_out_target * m_flow_out - H_in * m_flow_in - h_water_in * m_water) / m_flow_in;
-                Power_shaft = W_real_wet * m_flow_in / 1000.0;
-                spray_notes = `为达到出口饱和状态，需要喷水: ${(m_water_kgh).toFixed(3)} kg/h`;
-            } else {
-                m_water = 0;
-                m_water_kgh = 0;
-                m_water_ratio = 0;
-                W_real_wet = W_real_dry;
-                Power_shaft = W_real_dry * m_flow_in / 1000.0;
-                const T_out_dry_K = CP.PropsSI('T', 'P', p_out_Pa, 'H', H_out_dry, fluid); 
-                spray_notes = `计算结果为过热蒸汽 (${(T_out_dry_K-273.15).toFixed(2)} °C)，无需喷水。`;
-            }
-            
-            const T_sat_in_C = T_sat_in_K - 273.15;
-            const T_sat_out_C = T_sat_out_K - 273.15;
-
-            let resultText = `
-========= 模式四 (MVR 容积式) 计算报告 =========
-工质: ${fluid}
-流量模式: ${flow_mode}
-${dynamicModelNotes}
-
---- 1. 进口状态 (P, T) ---
-进口压力 (P_in):    ${p_in_bar.toFixed(3)} bar
-进口温度 (T_in):    ${T_in_C.toFixed(2)} °C
-(进口饱和温度 (T_sat_in): ${T_sat_in_C.toFixed(2)} °C)
-  - 进口焓 (H_in):  ${(H_in / 1000.0).toFixed(2)} kJ/kg
-  - 进口熵 (S_in):  ${(S_in / 1000.0).toFixed(4)} kJ/kg.K
-  - 进口密度 (D_in):  ${D_in.toFixed(4)} kg/m³
-
---- 2. 出口状态 (目标) ---
-出口饱和温升 (ΔT_sat): ${delta_T_sat.toFixed(2)} K
-出口饱和温度 (T_sat_out): ${T_sat_out_C.toFixed(2)} °C
-出口压力 (P_out):       ${(p_out_Pa / 1e5).toFixed(3)} bar
-  - 出口饱和焓 (H_out_sat): ${(H_out_target / 1000.0).toFixed(2)} kJ/kg
-
---- 3. 压缩过程 (干) ---
-等熵效率 (Eff_is):  ${(eff_isen_final * 100.0).toFixed(1)} %
-容积效率 (Eff_vol):  ${(vol_eff_final * 100.0).toFixed(1)} %
-----------------------------------------
-  - 理论等熵功 (W_is):   ${(W_is / 1000.0).toFixed(2)} kJ/kg
-  - 实际干功 (W_dry):    ${(W_real_dry / 1000.0).toFixed(2)} kJ/kg
-  - 干出口焓 (H_dry_out): ${(H_out_dry / 1000.0).toFixed(2)} kJ/kg
-
---- 4. 流量 ${flow_notes} ---
-  - 进口蒸汽流量 (M_in): ${m_flow_in.toFixed(4)} kg/s (${(m_flow_in * 3600).toFixed(2)} kg/h)
-  - 进口体积流量 (V_in): ${V_flow_in_s.toFixed(5)} m³/s (${(V_flow_in_s * 3600).toFixed(2)} m³/h)
-
---- 5. 喷水与功率 (湿) ---
-喷入水温 (T_water): ${T_water_in_C.toFixed(2)} °C
-(喷水焓 (h_water): ${(h_water_in / 1000.0).toFixed(2)} kJ/kg)
-----------------------------------------
-${spray_notes}
-  - 实际总轴功 (W_wet):  ${(W_real_wet / 1000.0).toFixed(2)} kJ/kg_in
-  - 压缩机轴功率 (P_shaft): ${Power_shaft.toFixed(2)} kW
-`;
-            resultsDivM4.textContent = resultText;
-            lastMode4ResultText = resultText;
-            
-            calcButtonM4.textContent = btnText4;
-            calcButtonM4.classList.remove(...classesStale4);
-            calcButtonM4.classList.add(...classesFresh4);
+            calcButtonM4.textContent = "计算喷水量";
             calcButtonM4.disabled = false;
             printButtonM4.disabled = false;
+            
+            printButtonM4.onclick = () => {
+                 const win = window.open('', '_blank');
+                 win.document.write(`<html><head><title>MVR Report</title></head><body>${generateMVRDatasheet(lastMode4Data)}</body></html>`);
+                 win.document.close();
+                 setTimeout(() => win.print(), 200);
+            };
 
         } catch (err) {
-            console.error("Mode 4 calculation failed:", err);
-            resultsDivM4.textContent = `计算出错: \n${err.message}\n\n请检查输入参数是否在工质的有效范围内。`;
+            resultsDivM4.textContent = "计算错误: " + err.message;
             calcButtonM4.textContent = "计算失败";
             calcButtonM4.disabled = false;
-            setButtonStale4();
         }
     }, 10);
 }
 
-/**
- * 打印模式四报告
- */
-function printReportMode4() {
-    if (!lastMode4ResultText) {
-        alert("没有可供打印的计算结果 (M4)。");
-        return;
-    }
-    const printHtml = `
-        <html><head><title>模式四 (MVR 容积式) 计算报告</title>
-        <style>
-            body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.6; padding: 20px; }
-            h1 { color: #7e22ce; border-bottom: 2px solid #7e22ce; }
-            pre { background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 14px; white-space: pre-wrap; }
-            footer { margin-top: 20px; font-size: 12px; color: #718096; text-align: center; }
-        </style>
-        </head><body>
-            <h1>模式四 (MVR 容积式) 计算报告</h1>
-            <pre>${lastMode4ResultText}</pre>
-            <footer><p>版本: v7.4</p><p>计算时间: ${new Date().toLocaleString()}</p></footer>
-        </body></html>
-    `;
-    
-    const printContainer = document.createElement('div');
-    printContainer.id = 'print-container-4';
-    printContainer.innerHTML = printHtml;
-    document.body.appendChild(printContainer);
-    window.print();
-    setTimeout(() => {
-        if (document.body.contains(printContainer)) {
-            document.body.removeChild(printContainer);
-        }
-    }, 500);
-}
-
-/**
- * 模式四：初始化函数
- * @param {object} CP - CoolProp 实例
- */
+// 导出 init 函数给 main.js 调用
 export function initMode4(CP) {
-    CP_INSTANCE = CP;
-    
     calcButtonM4 = document.getElementById('calc-button-4');
     resultsDivM4 = document.getElementById('results-4');
     calcFormM4 = document.getElementById('calc-form-4');
     printButtonM4 = document.getElementById('print-button-4');
     fluidSelectM4 = document.getElementById('fluid_m4');
-    fluidInfoDivM4 = document.getElementById('fluid-info-m4');
-
-    if (!calcFormM4) {
-        console.error("Mode 4 Form (calc-form-4) not found! Cannot initialize.");
-        return;
+    
+    if (calcFormM4) {
+        setupAiEff();
+        calcFormM4.addEventListener('submit', (e) => { e.preventDefault(); calculateMode4(CP); });
+        fluidSelectM4.addEventListener('change', () => updateFluidInfo(fluidSelectM4, document.getElementById('fluid-info-m4'), CP));
     }
-    allInputsM4 = calcFormM4.querySelectorAll('input, select');
-
-    calcFormM4.addEventListener('submit', (event) => {
-        event.preventDefault();
-        calculateMode4();
-    });
-
-    allInputsM4.forEach(input => {
-        input.addEventListener('input', setButtonStale4);
-        input.addEventListener('change', setButtonStale4);
-    });
-
-    fluidSelectM4.addEventListener('change', () => {
-        updateFluidInfo(fluidSelectM4, fluidInfoDivM4, CP);
-        setButtonStale4();
-    });
-
-    printButtonM4.addEventListener('click', printReportMode4);
-
-    const effSelectorM4 = document.getElementById('eff_selector_m4');
-    const effIsenInputM4 = document.getElementById('eff_isen_m4');
-    const volEffInputM4 = document.getElementById('vol_eff_m4');
-    effSelectorM4.addEventListener('change', () => {
-        const selectedValue = effSelectorM4.value;
-        if (selectedValue) {
-            const [isen, vol] = selectedValue.split(',');
-            effIsenInputM4.value = isen;
-            volEffInputM4.value = vol;
-            effIsenInputM4.dispatchEvent(new Event('input'));
-            volEffInputM4.dispatchEvent(new Event('input'));
-        }
-    });
-
-    // [新增] 模式四动态效率模型UI逻辑
-    const dynamicEffCheckboxM4 = document.getElementById('enable_dynamic_eff_m4');
-    const dynamicEffInputsM4 = document.getElementById('dynamic-eff-inputs-m4');
-    const effIsenLabelM4 = document.querySelector('label[for="eff_isen_m4"]');
-    const volEffLabelM4 = document.querySelector('label[for="vol_eff_m4"]');
-    dynamicEffCheckboxM4.addEventListener('change', () => {
-        const isChecked = dynamicEffCheckboxM4.checked;
-        dynamicEffInputsM4.style.display = isChecked ? 'block' : 'none';
-        effIsenLabelM4.textContent = isChecked ? '基础等熵效率 (Eff_is)' : '等熵效率 (Eff_is)';
-        volEffLabelM4.textContent = isChecked ? '基础容积效率 (Eff_vol)' : '容积效率 (Eff_vol)';
-        setButtonStale4();
-    });
-
-    console.log("Mode 4 (MVR Volumetric) initialized.");
 }

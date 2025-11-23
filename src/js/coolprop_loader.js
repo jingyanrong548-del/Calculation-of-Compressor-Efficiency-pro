@@ -1,22 +1,14 @@
 // =====================================================================
-// coolprop_loader.js: CoolProp 物性库加载器
+// coolprop_loader.js: CoolProp 物性库加载器 (Updated)
 // =====================================================================
 
-// [修改点 1] 路径更新：指向 libs 文件夹
 import Module from './libs/coolprop.js';
 
-// 1. 异步加载函数
-/**
- * 异步加载 CoolProp WASM 模块.
- * @returns {Promise<object>} 返回 CoolProp (CP) 实例.
- */
 export async function loadCoolProp() {
     try {
         const moduleConfig = {
             locateFile: (path, prefix) => {
                 if (path.endsWith('.wasm')) {
-                    // [修改点 2] 路径更新：告诉浏览器 .wasm 文件在网站根目录
-                    // (因为我们把它放在了 public 文件夹里)
                     return 'coolprop.wasm';
                 }
                 return prefix + path;
@@ -30,13 +22,7 @@ export async function loadCoolProp() {
     }
 }
 
-// 2. 公共的流体信息更新函数 (保持原样)
-// [注意：请确保你保留了原文件下方的 fluidInfoData 对象和 updateFluidInfo 函数]
-// 如果你担心粘贴出错，只需把上面 import 和 loadCoolProp 函数这部分替换掉即可，
-// 下面的 updateFluidInfo 和 fluidInfoData 不需要改动。
-
-// --- 为了方便，你可以直接复制下面这部分覆盖整个文件，包含了所有内容 ---
-
+// 补充了 R507A 的数据
 const fluidInfoData = {
     'R134a':        { gwp: 1430, odp: 0,    safety: 'A1' },
     'R245fa':       { gwp: 1030, odp: 0,    safety: 'B1' },
@@ -61,15 +47,18 @@ const fluidInfoData = {
     'R1234yf':      { gwp: '<1', odp: 0,    safety: 'A2L' },
     'R1270':        { gwp: 2,    odp: 0,    safety: 'A3' }, 
     'R1150':        { gwp: 2,    odp: 0,    safety: 'A3' },
+    // 气体
     'Air':          { gwp: 0,    odp: 0,    safety: 'A1' },
     'Nitrogen':     { gwp: 0,    odp: 0,    safety: 'A1' },
     'Helium':       { gwp: 0,    odp: 0,    safety: 'A1' },
     'Neon':         { gwp: 0,    odp: 0,    safety: 'A1' },
     'Argon':        { gwp: 0,    odp: 0,    safety: 'A1' },
-    'Water':        { gwp: 0,    odp: 0,    safety: 'A1' },
     'Hydrogen':     { gwp: 0,    odp: 0,    safety: 'A3' },
     'Oxygen':       { gwp: 0,    odp: 0,    safety: 'A1 (Oxidizer)' },
     'Methane':      { gwp: 25,   odp: 0,    safety: 'A3' },
+    // 新增
+    'R507A':        { gwp: 3985, odp: 0,    safety: 'A1' },
+    'Water':        { gwp: 0,    odp: 0,    safety: 'A1' },
     'default':      { gwp: 'N/A', odp: 'N/A', safety: 'N/A' }
 };
 
@@ -111,7 +100,7 @@ MVR 模式推荐使用水工质。
 ----------------------------------------
 GWP (AR4/AR5): ${info.gwp}
 ODP:           ${info.odp}
-安全级别:      ${info.safety} (毒性[A/B] / 可燃性[1/2L/2/3])
+安全级别:      ${info.safety}
 ----------------------------------------
 临界温度 (Tc): ${Tcrit_K.toFixed(2)} K (${(Tcrit_K - 273.15).toFixed(2)} °C)
 临界压力 (Pc): ${(Pcrit_Pa / 1e5).toFixed(2)} bar
