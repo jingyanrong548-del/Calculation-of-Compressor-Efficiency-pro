@@ -17,7 +17,7 @@ export async function loadCoolProp() {
                 if (path.endsWith('.wasm')) {
                     // [修改点 2] 路径更新：告诉浏览器 .wasm 文件在网站根目录
                     // (因为我们把它放在了 public 文件夹里)
-                    return '/coolprop.wasm';
+                    return 'coolprop.wasm';
                 }
                 return prefix + path;
             }
