@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 原来的代码保持在下面不要动... */
+/* (v4.4 v4.6 样式表) */
+.input-group {
+    margin-bottom: 0.75rem; /* 12px */
+}
+
+/* [修改 v7.4] 减小部分输入组的下边距，让选型菜单和输入框更紧凑 */
+.input-group select + label {
+    margin-top: 0.5rem; /* 8px */
+}
+.input-group select + input {
+    margin-top: 0.25rem; /* 4px */
+}
+
+
+input[type="radio"] {
+    margin-top: -0.1rem;
+}
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 备注提示框 (Tooltip) 样式 */
+.tooltip {
+    position: relative;
+    cursor: help;
+    display: inline-block;
+    margin-left: 4px;
+    color: #4A90E2; /* blue-500 */
+    border-bottom: 1px dotted #4A90E2;
+    font-weight: bold;
+}
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 260px;
+    background-color: #262626; /* neutral-800 */
+    color: #fff;
+    text-align: left;
+    border-radius: 6px;
+    padding: 8px 12px;
+    position: absolute;
+    z-index: 10;
+    bottom: 125%; /* 位于元素上方 */
+    left: 50%;
+    margin-left: -130px; /* (width / 2) */
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* (v4.4) 激活的选项卡样式 */
+.tab-btn.active {
+    border-bottom-width: 4px;
+    border-color: #0d9488; /* teal-600 */
+    color: #0d9488;
+    font-weight: 600;
+}
+/* (v4.4) 子选项卡样式 */
+.sub-tab-btn.active {
+    background-color: #14b8a6; /* teal-500 */
+    color: #ffffff;
+}
+.sub-tab-btn:not(.active):hover {
+    background-color: #f0fdfa; /* teal-50 */
+}
+
+/* (v4.4) 隐藏 radio input 本身 */
+input[type="radio"].hidden-radio {
+    display: none;
+}
+/* (v4.4) 自定义 radio 的 label 样式 */
+.radio-label {
+    display: inline-block;
+    padding: 8px 16px;
+    border: 2px solid #cbd5e1; /* cool-gray-300 */
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    margin-right: 8px;
+}
+.radio-label:hover {
+    background-color: #f1f5f9; /* cool-gray-100 */
+}
+/* (v4.4) 选中的 radio label 样式 */
+input[type="radio"].hidden-radio:checked + .radio-label {
+    border-color: #0d9488; /* teal-600 */
+    background-color: #ccfbf1; /* teal-100 */
+    color: #0f766e; /* teal-700 */
+    font-weight: 600;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* [新增 v7.4] 动态效率模型参数区域的输入框样式微调 */
+#dynamic-eff-inputs-m1 input,
+#dynamic-eff-inputs-m2 input,
+#dynamic-eff-inputs-m3 input,
+#dynamic-eff-inputs-m4 input,
+#dynamic-eff-inputs-m5 input {
+    background-color: #f8fafc; /* cool-gray-50 */
+    border-color: #94a3b8; /* cool-gray-400 */
+}
