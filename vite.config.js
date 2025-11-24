@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite'
 
 export default defineConfig({
-  // 部署配置：设置为 './' 可以确保在任何路径下（包括 GitHub Pages）都能正常加载
-  base: './', 
+  // 这里填你的仓库名，注意前后都要有斜杠
+  base: '/Calculation-of-Compressor-Efficiency-pro/', 
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

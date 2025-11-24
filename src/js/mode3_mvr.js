@@ -1,6 +1,6 @@
 // =====================================================================
 // mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
-// 版本: v8.0 (全宽视觉优化版)
+// 版本: v8.0 (双语版 & COP计算)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -8,61 +8,71 @@ import { updateFluidInfo } from './coolprop_loader.js';
 let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4, fluidSelectM4;
 let lastMode4Data = null;
 
-// --- Helper: MVR Datasheet ---
+// --- Helper: 生成 MVR 技术规格书 (Bilingual) ---
 function generateMVRDatasheet(d) {
-    // [修改点] width: 100%; 移除 max-width: 210mm
+    // 样式配色 (Purple Theme)
+    const themeColor = "#7e22ce"; 
+    const bgColor = "#faf5ff";
+    const borderColor = "#e9d5ff";
+
     return `
-    <div style="padding: 30px; font-family: sans-serif; background: #fff; width: 100%; box-sizing: border-box;">
-        <div style="border-bottom: 3px solid #7e22ce; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: end;">
+    <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
+        <!-- Header -->
+        <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
-                <div style="font-size: 28px; font-weight: 900; color: #7e22ce; line-height: 1;">MVR DATASHEET</div>
-                <div style="font-size: 14px; color: #666; margin-top: 5px;">Mechanical Vapor Recompression (Volumetric)</div>
+                <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">MVR DATASHEET</div>
+                <div style="font-size: 14px; color: #666; margin-top: 5px;">Mechanical Vapor Recompression (Volumetric) 机械蒸汽再压缩</div>
             </div>
             <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
                 Date: <strong>${d.date}</strong><br>
-                Fluid: <strong>${d.fluid}</strong>
+                Fluid (工质): <strong>${d.fluid}</strong>
             </div>
         </div>
 
-        <!-- KPI -->
-        <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <!-- KPI Dashboard -->
+        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
              <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">INJECTION WATER</div>
-                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Injection Water 喷水量</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${(d.m_water * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">SHAFT POWER</div>
-                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Shaft Power 轴功率</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
             </div>
              <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">SAT. TEMP RISE</div>
-                <div style="font-size: 24px; font-weight: 800; color: #7e22ce;">${d.dt.toFixed(1)} <span style="font-size:14px">K</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">COP 性能系数</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.cop.toFixed(2)}</div>
             </div>
         </div>
 
+        <!-- Data Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+            <!-- Left Column -->
             <div>
-                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #7e22ce; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Process Parameters</div>
+                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Process Parameters 工艺参数</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
-                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp Out</td><td style="text-align: right; font-weight: 600;">${d.t_sat_out.toFixed(1)} °C</td></tr>
-                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Est.)</td><td style="text-align: right; font-weight: 600;">${d.t_out_est.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp 吸气温度</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
+                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Rise 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
+                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Out 出口饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_out.toFixed(1)} °C</td></tr>
                 </table>
             </div>
+            
+            <!-- Right Column -->
             <div>
-                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #7e22ce; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Machine Data</div>
+                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff; padding-top:5px; padding-bottom:5px;">Machine Data 机器数据</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Operating Speed</td><td style="text-align: right; font-weight: 600;">${d.rpm ? d.rpm + ' RPM' : '-'}</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Evaporation Mass Flow</td><td style="text-align: right; font-weight: 600;">${(d.m_flow * 3600).toFixed(1)} kg/h</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol*100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Operating Speed 转速</td><td style="text-align: right; font-weight: 600;">${d.rpm ? d.rpm + ' RPM' : '-'}</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Evaporation Flow 蒸发量</td><td style="text-align: right; font-weight: 600;">${(d.m_flow * 3600).toFixed(1)} kg/h</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff. 容积效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol*100).toFixed(1)} %</td></tr>
                 </table>
             </div>
         </div>
 
+        <!-- Footer -->
         <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
             <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
                 Prepared by Yanrong Jing (荆炎荣)
@@ -161,7 +171,16 @@ async function calculateMode4(CP) {
             const h_out_dry = h_in + w_real;
             const power = w_real * m_flow / 1000.0;
 
-            // 4. 喷水计算
+            // 4. COP 计算 (新增)
+            // 计算吸气侧的汽化潜热: h_gas - h_liquid @ P_in
+            // 注意：MVR 回收的是潜热
+            const h_gas_sat = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
+            const h_liq_sat = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
+            const latent_heat = h_gas_sat - h_liq_sat; 
+            const q_latent = m_flow * latent_heat / 1000.0; // kW
+            const cop = q_latent / power;
+
+            // 5. 喷水计算
             const h_sat_vap_out = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
             const h_water = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
             
@@ -169,16 +188,15 @@ async function calculateMode4(CP) {
             let t_out_est = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid) - 273.15;
 
             if (h_out_dry > h_sat_vap_out) {
-                // 需要喷水减温至饱和
                 m_water = m_flow * (h_out_dry - h_sat_vap_out) / (h_sat_vap_out - h_water);
-                t_out_est = t_sat_out - 273.15; // 喷水后出口为饱和温度
+                t_out_est = t_sat_out - 273.15;
             }
 
             lastMode4Data = {
                 date: new Date().toLocaleDateString(),
                 fluid, p_in: p_in_bar, t_in, dt, rpm, eff_is, eff_vol,
                 p_out: p_out/1e5, t_sat_out: t_sat_out - 273.15, t_out_est,
-                power, m_water, m_flow, v_flow_in
+                power, m_water, m_flow, v_flow_in, cop
             };
 
             resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data);

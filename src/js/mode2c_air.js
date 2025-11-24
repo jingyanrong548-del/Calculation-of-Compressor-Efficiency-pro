@@ -1,20 +1,25 @@
 // =====================================================================
-// mode2c_air.js: 模式三 (空压机)
-// 版本: v8.0 (全宽视觉优化版)
+// mode2c_air.js: 模式三 (空压机) 核心逻辑
+// 版本: v8.0 (双语版 & 负荷计算)
 // =====================================================================
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3;
 let lastMode3Data = null;
 
-// --- Helper: 生成空压机技术规格书 ---
+// --- Helper: 生成空压机技术规格书 (Bilingual) ---
 function generateAirDatasheet(d) {
-    // [修改点] width: 100%; 移除 max-width: 210mm
+    // 样式配色 (Cyan Theme)
+    const themeColor = "#0891b2"; 
+    const bgColor = "#ecfeff";
+    const borderColor = "#cffafe";
+
     return `
-    <div style="padding: 30px; font-family: sans-serif; background: #fff; width: 100%; box-sizing: border-box;">
-        <div style="border-bottom: 3px solid #0891b2; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: end;">
+    <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
+        <!-- Header -->
+        <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
-                <div style="font-size: 28px; font-weight: 900; color: #0891b2; line-height: 1;">AIR COMPRESSOR DATASHEET</div>
-                <div style="font-size: 14px; color: #666; margin-top: 5px;">Thermodynamic Simulation (Humid Air)</div>
+                <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">AIR COMPRESSOR DATASHEET</div>
+                <div style="font-size: 14px; color: #666; margin-top: 5px;">Thermodynamic Simulation (Humid Air) 湿空气模拟</div>
             </div>
             <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
                 Date: <strong>${d.date}</strong><br>
@@ -23,57 +28,67 @@ function generateAirDatasheet(d) {
         </div>
         
         <!-- KPI Dashboard -->
-        <div style="background: #ecfeff; border: 1px solid #cffafe; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Shaft Power</div>
-                <div style="font-size: 24px; font-weight: 800; color: #0891b2;">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Shaft Power 轴功率</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Discharge Temp</div>
-                <div style="font-size: 24px; font-weight: 800; color: #0891b2;">${d.t_out.toFixed(1)} <span style="font-size:14px">°C</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Discharge Temp 排气温度</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.t_out.toFixed(1)} <span style="font-size:14px">°C</span></div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Free Air Delivery (FAD)</div>
-                <div style="font-size: 24px; font-weight: 800; color: #0891b2;">${(d.v_flow * 3600).toFixed(1)} <span style="font-size:14px">m³/h</span></div>
+                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">FAD 排气量</div>
+                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${(d.v_flow * 3600).toFixed(1)} <span style="font-size:14px">m³/h</span></div>
             </div>
         </div>
 
+        <!-- Data Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
             <!-- Left Column -->
             <div>
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #0891b2; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Inlet Conditions</div>
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Inlet Conditions 进口工况</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Ambient Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Ambient Temp (DB)</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(2)} °C</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Relative Humidity</td><td style="text-align: right; font-weight: 600;">${d.rh_in.toFixed(1)} %</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Humidity Ratio</td><td style="text-align: right; font-weight: 600;">${(d.w_in * 1000).toFixed(2)} g/kg</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Ambient Pressure 环境压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Ambient Temp (DB) 环境温度</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(2)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Relative Humidity 相对湿度</td><td style="text-align: right; font-weight: 600;">${d.rh_in.toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Humidity Ratio 含湿量</td><td style="text-align: right; font-weight: 600;">${(d.w_in * 1000).toFixed(2)} g/kg</td></tr>
                 </table>
 
-                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid #0891b2; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Machine Efficiency</div>
+                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Machine Efficiency 机器效率</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_is * 100).toFixed(1)} %</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff.</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol * 100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is * 100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff. 容积效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol * 100).toFixed(1)} %</td></tr>
                 </table>
             </div>
 
             <!-- Right Column -->
             <div>
-                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid #0891b2; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Performance Data</div>
+                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Performance Data 性能数据</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Pressure Ratio</td><td style="text-align: right; font-weight: 600;">${d.pr.toFixed(2)}</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Mass Flow (Dry Air)</td><td style="text-align: right; font-weight: 600;">${(d.m_da * 3600).toFixed(1)} kg/h</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power</td><td style="text-align: right; font-weight: 600;">${d.spec_power.toFixed(2)} kW/(m³/min)</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Pressure Ratio 压比</td><td style="text-align: right; font-weight: 600;">${d.pr.toFixed(2)}</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Mass Flow (Dry) 干空气质量流量</td><td style="text-align: right; font-weight: 600;">${(d.m_da * 3600).toFixed(1)} kg/h</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power 比功率</td><td style="text-align: right; font-weight: 600;">${d.spec_power.toFixed(2)} kW/(m³/min)</td></tr>
+                    
+                    ${d.q_jacket > 0 ? `
+                    <tr style="border-bottom: 1px solid #eee; color:${themeColor};"><td style="padding: 8px 0; font-weight:600;">Jacket Heat Load 夹套热负荷</td><td style="text-align: right; font-weight: 600;">${d.q_jacket.toFixed(2)} kW</td></tr>
+                    ` : ''}
+                    
+                    ${d.q_aftercool > 0 ? `
+                    <tr style="border-bottom: 1px solid #eee; color:${themeColor};"><td style="padding: 8px 0; font-weight:600;">Aftercooler Load 后冷负荷</td><td style="text-align: right; font-weight: 600;">${d.q_aftercool.toFixed(2)} kW</td></tr>
+                    ` : ''}
                 </table>
 
-                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid #0891b2; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Cooling System</div>
+                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Cooling System 冷却系统</div>
                 <div style="font-size: 13px; padding: 5px; color: #555;">
                     <strong>Method:</strong> ${d.cooling_desc}<br>
-                    ${d.cooling_detail ? `<span style="color: #0891b2; font-weight: 600;">${d.cooling_detail}</span>` : ''}
+                    ${d.cooling_detail ? `<span style="color: ${themeColor}; font-weight: 600;">${d.cooling_detail}</span>` : ''}
                 </div>
             </div>
         </div>
         
+        <!-- Footer -->
         <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
             <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
                 Prepared by Yanrong Jing (荆炎荣)
@@ -194,28 +209,42 @@ async function calculateMode3(CP) {
             let cooling_desc = "Adiabatic (None)";
             let cooling_detail = "";
             let t_out_k = 0;
+            let q_jacket = 0; // 夹套热负荷
 
             if (cooling_type === 'jacket') {
                 const jacket_percent = parseFloat(formData.get('jacket_heat_percent_m3') || 15) / 100.0;
-                const q_removed = work_real * jacket_percent;
-                h_out_real = h_in + work_real - q_removed;
+                const q_removed_per_kg = work_real * jacket_percent;
+                h_out_real = h_in + work_real - q_removed_per_kg;
                 
                 t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
-                cooling_desc = "Jacket Water Cooling";
-                cooling_detail = `Heat Removal: ${(q_removed * m_da / 1000).toFixed(2)} kW`;
+                q_jacket = q_removed_per_kg * m_da / 1000.0; // kW
+
+                cooling_desc = "Jacket Water Cooling 夹套水冷";
+                cooling_detail = `Heat Removal: ${q_jacket.toFixed(2)} kW (${(jacket_percent*100).toFixed(0)}%)`;
             
             } else if (cooling_type === 'injection') {
                 const t_inject = parseFloat(formData.get('T_inject_m3') || 25);
                 const heat_removal_ratio = 0.35; 
-                const q_removed = work_real * heat_removal_ratio;
-                h_out_real = h_in + work_real - q_removed;
+                const q_removed_per_kg = work_real * heat_removal_ratio;
+                h_out_real = h_in + work_real - q_removed_per_kg;
                 t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
 
-                cooling_desc = "Liquid Injection";
+                cooling_desc = "Liquid Injection 喷液冷却";
                 cooling_detail = `Injection Temp: ${t_inject.toFixed(1)}°C`;
             
             } else {
                 t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
+                cooling_desc = "Adiabatic 绝热压缩";
+            }
+
+            // 后冷负荷计算 (Mode 3)
+            let q_aftercool = 0;
+            if (formData.get('enable_cooler_calc_m3') === 'on') {
+                const t_target = parseFloat(formData.get('target_temp_m3')) + 273.15;
+                // 估算后冷负荷: H_out_real - H(target, saturated)
+                // 注意: HAPropsSI 如果温度低于露点，H 包含冷凝水焓值，这里做简化计算
+                const h_target = CP.HAPropsSI('H', 'T', t_target, 'P', p_out_pa, 'R', 1.0);
+                q_aftercool = (h_out_real - h_target) * m_da / 1000.0;
             }
 
             const power_shaft = (work_real * m_da) / 1000.0; 
@@ -229,7 +258,8 @@ async function calculateMode3(CP) {
                 m_da, v_flow: v_flow_in,
                 eff_is, eff_vol, pr: p_out/p_in,
                 power: power_shaft, spec_power,
-                cooling_desc, cooling_detail
+                cooling_desc, cooling_detail,
+                q_jacket, q_aftercool
             };
 
             resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data);
@@ -240,7 +270,7 @@ async function calculateMode3(CP) {
 
             printButtonM3.onclick = () => {
                 const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>Air Comp Report</title></head><body>${generateAirDatasheet(lastMode3Data)}</body></html>`);
+                win.document.write(`<html><head><title>Air Comp Report</title></head><body style="margin:0; background:#fff;">${generateAirDatasheet(lastMode3Data)}</body></html>`);
                 win.document.close();
                 setTimeout(() => win.print(), 200);
             };

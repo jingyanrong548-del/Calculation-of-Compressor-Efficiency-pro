@@ -1,6 +1,6 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑 (全模式通用)
-// 版本: v7.6 (Tab管理 & 动态表单控制)
+// 版本: v8.0 (逻辑清理 & 适配双语版)
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -127,5 +127,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setupMode3CoolingToggle();
+
+    // -----------------------------------------------------------------
+    // 4. 后冷却器 (Cooler) 复选框切换 (仅适用于 M2, M3)
+    // -----------------------------------------------------------------
+    function setupCoolerToggle(checkboxId, inputsDivId) {
+        const checkbox = document.getElementById(checkboxId);
+        const inputsDiv = document.getElementById(inputsDivId);
+        
+        if (!checkbox || !inputsDiv) {
+            return;
+        }
+
+        const toggle = () => {
+            const isChecked = checkbox.checked;
+            inputsDiv.style.display = isChecked ? 'block' : 'none';
+            setInputsRequired(inputsDiv, isChecked);
+        };
+
+        checkbox.addEventListener('change', toggle);
+        toggle(); // 初始调用以设置正确状态
+    }
+    
+    // [修改] 移除了 setupCoolerToggle('enable_cooler_calc_m1', ...);
+    setupCoolerToggle('enable_cooler_calc_m2', 'cooler-inputs-m2'); // 气体
+    setupCoolerToggle('enable_cooler_calc_m3', 'cooler-inputs-m3'); // 空压机
 
 });
