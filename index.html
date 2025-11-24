@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.0 (双语旗舰版)</title>
+    <title>无油压缩机性能计算器 v8.2 (可视化旗舰版)</title>
     <link rel="stylesheet" href="/src/css/style.css">
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -12,7 +12,7 @@
         
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md no-print">
             <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v8.0 (Bilingual Edition / 中英双语版)</p>
+            <p class="text-lg text-gray-600 mt-2">v8.2 (P-h Diagram & Excel Export)</p>
         </header>
 
         <div class="bg-white rounded-lg shadow-md no-print">
@@ -63,9 +63,8 @@
                             </div>
                             
                             <hr class="my-4">
-                            <!-- 效率模型 -->
                             <div class="input-group bg-blue-50 p-2 rounded border border-blue-200">
-                                <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 效率预设 (Efficiency Presets)</label>
+                                <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 效率预设</label>
                                 <select id="ai_eff_m1" class="block w-full text-sm border-blue-300 rounded text-blue-700 mb-2">
                                     <option value="">-- 选择压缩机类型 --</option>
                                     <option value="scroll">无油涡旋 (Isen: 70%, PR: 3.0)</option>
@@ -73,10 +72,9 @@
                                     <option value="screw">无油螺杆 (Isen: 78%, PR: 3.0)</option>
                                     <option value="centrifugal">离心式 (Isen: 82%, PR: 2.5)</option>
                                 </select>
-                                
                                 <div class="flex items-center mt-2">
                                     <input id="enable_dynamic_eff_m1" name="enable_dynamic_eff_m1" type="checkbox" class="h-4 w-4 text-green-600 rounded" checked>
-                                    <label for="enable_dynamic_eff_m1" class="ml-2 text-xs font-bold text-gray-700">启用动态效率修正 (Dynamic Correction)</label>
+                                    <label for="enable_dynamic_eff_m1" class="ml-2 text-xs font-bold text-gray-700">启用动态效率修正</label>
                                 </div>
                                 <div id="dynamic-eff-inputs-m1" class="grid grid-cols-2 gap-x-2 mt-2">
                                     <div class="input-group"><label class="text-xs">设计压比 (PR_des)</label><input type="number" id="pr_design_m1" name="pr_design_m1" value="3.0" step="0.1" class="w-full text-sm border-gray-300 rounded"></div>
@@ -100,7 +98,6 @@
                                     <label><input type="radio" name="flow_mode_m1" value="vol"> 体积流量</label>
                                 </div>
                             </div>
-                            
                             <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group"><label class="text-sm">转速 (RPM)</label><input type="number" name="rpm_m1" value="3000" class="w-full border-gray-300 rounded px-2 py-1"></div>
                                 <div class="input-group"><label class="text-sm">排量 (cm³)</label><input type="number" name="vol_disp_m1" value="500" class="w-full border-gray-300 rounded px-2 py-1"></div>
@@ -108,16 +105,22 @@
                             <div id="flow-inputs-mass-m1" class="hidden"><label class="text-sm">质量流量 (kg/s)</label><input type="number" name="mass_flow_m1" value="1.0" class="w-full border-gray-300 rounded px-2 py-1"></div>
                             <div id="flow-inputs-vol-m1" class="hidden"><label class="text-sm">吸气体积流量 (m³/h)</label><input type="number" name="vol_flow_m1" value="100" class="w-full border-gray-300 rounded px-2 py-1"></div>
 
-                            <!-- [修改] 删除了后冷却计算复选框 -->
-
                             <div class="mt-8"><button type="submit" id="calc-button-1" class="w-full bg-green-600 text-white font-bold py-3 rounded hover:bg-green-700">计算热泵性能</button></div>
                         </div>
                     </form>
+                    
                     <div class="mt-8">
                         <div id="results-1" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 (Results) ---</div>
-                        <div class="mt-4 text-center">
-                            <button type="button" id="print-button-1" class="w-full md:w-1/2 bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
+                        <!-- [新增] 图表容器 -->
+                        <div id="chart-m1" class="chart-container hidden"></div>
+                        
+                        <!-- [修改] 操作按钮区：打印 + 导出 -->
+                        <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
+                            <button type="button" id="print-button-1" class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
                                 🖨️ 打印技术规格书
+                            </button>
+                            <button type="button" id="export-button-1" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2" disabled>
+                                📊 导出 Excel
                             </button>
                         </div>
                     </div>
@@ -147,7 +150,7 @@
                             </div>
                             <div class="input-group"><label class="text-sm">出口压力 (bar)</label><input type="number" name="p_out_m2" value="8.0" class="w-full border-gray-300 rounded px-2 py-1"></div>
                             
-                            <!-- AI 推荐 & 动态效率 -->
+                            <!-- AI 推荐 -->
                             <div class="input-group bg-blue-50 p-2 rounded border border-blue-200 mt-2">
                                 <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 效率预设</label>
                                 <select id="ai_eff_m2" class="block w-full text-sm border-blue-300 rounded text-blue-700 mb-2">
@@ -156,7 +159,6 @@
                                     <option value="screw_oil_free">干式螺杆 (Isen: 75%, PR: 3.5)</option>
                                     <option value="process_screw">工艺螺杆 (Isen: 78%, PR: 4.0)</option>
                                 </select>
-
                                 <div class="flex items-center mt-2">
                                     <input id="enable_dynamic_eff_m2" name="enable_dynamic_eff_m2" type="checkbox" class="h-4 w-4 text-cyan-600 rounded" checked>
                                     <label for="enable_dynamic_eff_m2" class="ml-2 text-xs font-bold text-gray-700">启用动态效率修正</label>
@@ -165,7 +167,6 @@
                                     <div class="input-group"><label class="text-xs">设计压比 (PR_des)</label><input type="number" id="pr_design_m2" name="pr_design_m2" value="3.5" step="0.1" class="w-full text-sm border-gray-300 rounded"></div>
                                 </div>
                             </div>
-
                             <div class="grid grid-cols-2 gap-x-4 mt-2">
                                 <div class="input-group"><label class="text-sm">基础等熵效率 (%)</label><input type="number" id="eff_isen_m2" name="eff_isen_m2" value="75" class="w-full border-gray-300 rounded px-2 py-1"></div>
                                 <div class="input-group"><label class="text-sm">基础容积效率 (%)</label><input type="number" id="vol_eff_m2" name="vol_eff_m2" value="85" class="w-full border-gray-300 rounded px-2 py-1"></div>
@@ -187,7 +188,6 @@
                              <div id="flow-inputs-mass-m2" class="hidden"><label class="text-sm">质量流量 (kg/s)</label><input type="number" name="mass_flow_m2" value="1.0" class="w-full border-gray-300 rounded px-2 py-1"></div>
                              <div id="flow-inputs-vol-m2" class="hidden"><label class="text-sm">吸气体积流量 (m³/h)</label><input type="number" name="vol_flow_m2" value="100" class="w-full border-gray-300 rounded px-2 py-1"></div>
 
-                             <!-- 后冷却器 -->
                              <div class="mt-4 pt-2 border-t">
                                 <div class="flex items-center">
                                     <input id="enable_cooler_calc_m2" name="enable_cooler_calc_m2" type="checkbox" class="h-4 w-4 text-cyan-600">
@@ -204,9 +204,15 @@
                     </form>
                     <div class="mt-8">
                         <div id="results-2" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 (Results) ---</div>
-                        <div class="mt-4 text-center">
-                            <button type="button" id="print-button-2" class="w-full md:w-1/2 bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
+                        <!-- [新增] 图表容器 -->
+                        <div id="chart-m2" class="chart-container hidden"></div>
+                        <!-- 按钮组 -->
+                        <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
+                            <button type="button" id="print-button-2" class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
                                 🖨️ 打印技术规格书
+                            </button>
+                            <button type="button" id="export-button-2" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2" disabled>
+                                📊 导出 Excel
                             </button>
                         </div>
                     </div>
@@ -225,7 +231,6 @@
                                 <div class="input-group"><label class="text-sm">湿度 RH (%)</label><input type="number" name="RH_in_m3" value="60" class="w-full border-gray-300 rounded px-2 py-1"></div>
                                 <div class="input-group"><label class="text-sm">P_out (bar)</label><input type="number" name="p_out_m3" value="8.0" class="w-full border-gray-300 rounded px-2 py-1"></div>
                             </div>
-
                              <!-- AI 推荐 -->
                              <div class="input-group bg-blue-50 p-2 rounded border border-blue-200 mt-2">
                                 <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 推荐</label>
@@ -243,7 +248,6 @@
                         </div>
                         <div>
                              <h2 class="text-2xl font-semibold text-cyan-700 mb-4 border-b pb-2">2. 流量与冷却 (Flow & Cooling)</h2>
-                             <!-- 流量模式 -->
                              <div class="mb-3">
                                 <div class="flex space-x-4 text-sm">
                                     <label><input type="radio" name="flow_mode_m3" value="rpm" checked> 转速/排量</label>
@@ -274,8 +278,6 @@
                                      <input type="number" name="T_inject_m3" value="25" class="w-full border-gray-300 rounded px-2 py-1">
                                  </div>
                              </div>
-
-                             <!-- Cooler -->
                              <div class="mt-4 pt-2 border-t">
                                 <div class="flex items-center">
                                     <input id="enable_cooler_calc_m3" name="enable_cooler_calc_m3" type="checkbox" class="h-4 w-4 text-cyan-600">
@@ -286,15 +288,18 @@
                                     <input type="number" name="target_temp_m3" value="40" class="w-full text-sm border-gray-300 rounded">
                                 </div>
                             </div>
-
                              <div class="mt-6"><button type="submit" id="calc-button-3" class="w-full bg-cyan-600 text-white font-bold py-3 rounded hover:bg-cyan-700">计算空压机</button></div>
                         </div>
                      </form>
                      <div class="mt-8">
                         <div id="results-3" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 ---</div>
-                        <div class="mt-4 text-center">
-                            <button type="button" id="print-button-3" class="w-full md:w-1/2 bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
+                        <!-- 按钮组 -->
+                        <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
+                            <button type="button" id="print-button-3" class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
                                 🖨️ 打印技术规格书
+                            </button>
+                            <button type="button" id="export-button-3" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2" disabled>
+                                📊 导出 Excel
                             </button>
                         </div>
                     </div>
@@ -331,7 +336,7 @@
                                  <div class="input-group"><label class="text-sm">容积效率 (%)</label><input type="number" id="vol_eff_m4" name="vol_eff_m4" value="80" class="w-full border-gray-300 rounded px-2 py-1"></div>
                              </div>
                              
-                             <!-- 流量模式 (3种) -->
+                             <!-- 流量模式 -->
                              <div class="mt-3 mb-2">
                                 <div class="flex space-x-2 text-xs">
                                     <label><input type="radio" name="flow_mode_m4" value="rpm" checked> RPM/排量</label>
@@ -347,17 +352,21 @@
                              <div id="flow-inputs-vol-m4" class="hidden"><label class="text-sm">体积流量 (m³/h)</label><input type="number" name="vol_flow_m4" value="2000" class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                              <div class="input-group mt-2"><label class="text-sm">喷水温度 (°C)</label><input type="number" name="T_water_in_m4" value="30" class="w-full border-gray-300 rounded px-2 py-1"></div>
-
                              <input type="hidden" name="enable_dynamic_eff_m4" value="off">
-
                              <div class="mt-6"><button type="submit" id="calc-button-4" class="w-full bg-purple-600 text-white font-bold py-3 rounded hover:bg-purple-700">计算喷水量</button></div>
                         </div>
                     </form>
                     <div class="mt-8">
                         <div id="results-4" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 ---</div>
-                        <div class="mt-4 text-center">
-                            <button type="button" id="print-button-4" class="w-full md:w-1/2 bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
+                        <!-- [新增] 图表容器 -->
+                        <div id="chart-m4" class="chart-container hidden"></div>
+                        <!-- 按钮组 -->
+                        <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
+                            <button type="button" id="print-button-4" class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
                                 🖨️ 打印技术规格书
+                            </button>
+                            <button type="button" id="export-button-4" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2" disabled>
+                                📊 导出 Excel
                             </button>
                         </div>
                     </div>
@@ -386,7 +395,6 @@
                              <div id="flow-inputs-mass-m5"><label class="text-sm">蒸发量 (kg/h)</label><input type="number" name="mass_flow_m5" value="5000" class="w-full border-gray-300 rounded px-2 py-1"></div>
                              <div id="flow-inputs-vol-m5" class="hidden"><label class="text-sm">吸气体积流量 (m³/h)</label><input type="number" name="vol_flow_m5" value="8000" class="w-full border-gray-300 rounded px-2 py-1"></div>
                             
-                             <!-- AI 推荐 -->
                              <div class="input-group bg-blue-50 p-2 rounded border border-blue-200 mt-2">
                                 <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 推荐</label>
                                 <select id="ai_eff_m5" class="block w-full text-sm border-blue-300 rounded text-blue-700">
@@ -398,17 +406,21 @@
                             </div>
                              <div class="input-group mt-2"><label class="text-sm">多变效率 Polytropic Eff. (%)</label><input type="number" id="eff_poly_m5" name="eff_poly_m5" value="80" class="w-full border-gray-300 rounded px-2 py-1"></div>
                              <div class="input-group mt-2"><label class="text-sm">喷水温度 (°C)</label><input type="number" name="T_water_in_m5" value="30" class="w-full border-gray-300 rounded px-2 py-1"></div>
-
                              <input type="hidden" name="enable_dynamic_eff_m5" value="off">
-
                              <div class="mt-8"><button type="submit" id="calc-button-5" class="w-full bg-teal-600 text-white font-bold py-3 rounded hover:bg-teal-700">计算透平 MVR</button></div>
                         </div>
                     </form>
                     <div class="mt-8">
                         <div id="results-5" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 ---</div>
-                        <div class="mt-4 text-center">
-                            <button type="button" id="print-button-5" class="w-full md:w-1/2 bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
+                        <!-- [新增] 图表容器 -->
+                        <div id="chart-m5" class="chart-container hidden"></div>
+                        <!-- 按钮组 -->
+                        <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
+                            <button type="button" id="print-button-5" class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2" disabled>
                                 🖨️ 打印技术规格书
+                            </button>
+                            <button type="button" id="export-button-5" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2" disabled>
+                                📊 导出 Excel
                             </button>
                         </div>
                     </div>
@@ -417,10 +429,10 @@
             </div>
         </div>
     </div>
-    
     <script type="module" src="/src/js/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // 简易复选框联动
             const toggleDiv = (chkId, divId) => {
                 const chk = document.getElementById(chkId);
                 const div = document.getElementById(divId);
@@ -430,6 +442,7 @@
                     fn();
                 }
             };
+            // 动态效率 & Cooler
             toggleDiv('enable_dynamic_eff_m1', 'dynamic-eff-inputs-m1');
             toggleDiv('enable_dynamic_eff_m2', 'dynamic-eff-inputs-m2');
             toggleDiv('enable_cooler_calc_m2', 'cooler-inputs-m2');

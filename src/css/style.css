@@ -2,73 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 通用样式 */
+/* =========================================
+   1. 通用布局与输入框样式
+   ========================================= */
 .input-group {
-    margin-bottom: 0.75rem;
-}
-.input-group select + label {
-    margin-top: 0.5rem;
-}
-.input-group select + input {
-    margin-top: 0.25rem;
+    margin-bottom: 0.75rem; /* 12px */
 }
 
-/* Tooltip */
+.input-group select + label {
+    margin-top: 0.5rem; /* 8px */
+}
+.input-group select + input {
+    margin-top: 0.25rem; /* 4px */
+}
+
+/* 修正 Radio Button 对齐 */
+input[type="radio"] {
+    margin-top: -0.1rem;
+}
+
+/* 禁用按钮样式 */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* =========================================
+   2. Tooltip (提示框) 样式
+   ========================================= */
 .tooltip {
     position: relative;
     cursor: help;
     display: inline-block;
     margin-left: 4px;
-    color: #4A90E2;
+    color: #4A90E2; /* blue-500 */
     border-bottom: 1px dotted #4A90E2;
+    font-weight: bold;
 }
 .tooltip .tooltiptext {
     visibility: hidden;
     width: 260px;
-    background-color: #262626;
+    background-color: #262626; /* neutral-800 */
     color: #fff;
     text-align: left;
     border-radius: 6px;
     padding: 8px 12px;
     position: absolute;
     z-index: 10;
-    bottom: 125%;
+    bottom: 125%; /* 位于元素上方 */
     left: 50%;
-    margin-left: -130px;
+    margin-left: -130px; /* (width / 2) */
     opacity: 0;
     transition: opacity 0.3s;
+    font-weight: normal;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    pointer-events: none;
 }
 .tooltip:hover .tooltiptext {
     visibility: visible;
     opacity: 1;
 }
 
-/* Tab Styles */
+/* =========================================
+   3. Tab (选项卡) 样式
+   ========================================= */
 .tab-btn.active {
     border-bottom-width: 4px;
-    border-color: #0d9488;
+    border-color: #0d9488; /* teal-600 */
     color: #0d9488;
     font-weight: 600;
+    background-color: #f0fdfa; /* teal-50 */
 }
 
-/* 打印样式：如果用户直接在主页按 Ctrl+P，隐藏无关元素 */
+/* =========================================
+   4. [新增] 图表容器样式
+   ========================================= */
+.chart-container {
+    width: 100%;
+    height: 500px; /* ECharts 需要明确的高度 */
+    margin-top: 2rem;
+    background-color: #fff;
+    border: 1px solid #e5e7eb; /* gray-200 */
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* 通用隐藏类 (用于 JS 控制显隐) */
+.hidden {
+    display: none !important;
+}
+
+/* =========================================
+   5. Print (打印) 样式适配
+   ========================================= */
 @media print {
     body {
         background: white;
         color: black;
     }
-    .no-print, nav, button, footer {
+    
+    /* 隐藏不需要打印的界面元素 */
+    .no-print, nav, footer, button, .input-group {
         display: none !important;
     }
-    /* 强制展开所有 Tab 内容以便打印 (如果需要) */
-    .tab-content {
-        display: block !important;
-        page-break-after: always;
+
+    /* 确保内容区域可见且无阴影 */
+    .bg-white, .shadow-md {
+        box-shadow: none !important;
+        border: none !important;
     }
-    /* 隐藏输入框边框，使其看起来像文本 */
-    input, select {
+
+    /* 确保结果区域和图表可见 */
+    #results-1, #results-2, #results-3, #results-4, #results-5,
+    .chart-container {
+        display: block !important;
+        break-inside: avoid; /* 防止被分页切断 */
+    }
+
+    /* 隐藏输入表单容器，只留结果 */
+    form {
+        display: none !important;
+    }
+
+    /* 调整图表在打印时的尺寸 */
+    .chart-container {
         border: none;
-        background: transparent;
-        appearance: none;
+        height: 400px; /* 打印时稍微缩小高度以适应页面 */
+        margin-top: 10px;
     }
 }

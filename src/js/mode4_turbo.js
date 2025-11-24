@@ -1,16 +1,16 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.0 (双语版 & COP计算)
+// 版本: v8.3 (集成状态点表格)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
+import { drawPhDiagram, exportToExcel } from './utils.js';
 
-let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5, fluidSelectM5;
+let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5, exportButtonM5, chartDivM5, fluidSelectM5;
 let lastMode5Data = null;
 
-// --- Helper: MVR 透平 Datasheet 生成器 (Bilingual) ---
+// --- Helper: MVR 透平 Datasheet 生成器 ---
 function generateTurboDatasheet(d) {
-    // 样式配色 (Teal Theme)
     const themeColor = "#0f766e"; 
     const bgColor = "#f0fdfa";
     const borderColor = "#ccfbf1";
@@ -74,13 +74,12 @@ function generateTurboDatasheet(d) {
             </div>
         </div>
 
-        <!-- Footer -->
         <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
             <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.0
+                Oil-Free Compressor Calculator Pro v8.3
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
@@ -92,25 +91,21 @@ function generateTurboDatasheet(d) {
     `;
 }
 
-// --- Helper: 获取流量 ---
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m5');
     let m_flow = 0;
     let v_flow_in = 0;
 
     if (mode === 'mass') {
-        // kg/h -> kg/s
         m_flow = parseFloat(formData.get('mass_flow_m5')) / 3600.0;
         v_flow_in = m_flow / density_in;
     } else if (mode === 'vol') {
-        // m3/h -> m3/s
         v_flow_in = parseFloat(formData.get('vol_flow_m5')) / 3600.0;
         m_flow = v_flow_in * density_in;
     }
     return { m_flow, v_flow_in };
 }
 
-// --- AI 推荐 ---
 function setupAiEff() {
     const select = document.getElementById('ai_eff_m5');
     if (!select) return;
@@ -122,7 +117,6 @@ function setupAiEff() {
     });
 }
 
-// --- 计算核心 ---
 async function calculateMode5(CP) {
     if (!CP) return;
     calcButtonM5.textContent = "计算中...";
@@ -146,7 +140,7 @@ async function calculateMode5(CP) {
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
 
-            // 2. 状态点
+            // 2. 吸气点 (Point 1)
             const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
@@ -154,48 +148,65 @@ async function calculateMode5(CP) {
             // 3. 流量
             const { m_flow, v_flow_in } = getFlowRate(formData, d_in);
 
-            // 4. 压缩功 (Polytropic Approximation)
-            // W_poly = (n/n-1) * P1V1 * [(P2/P1)^((n-1)/n) - 1]
-            // 这里使用简化等熵功折算：W_shaft = (H_isen_out - H_in) / Eff_poly
-            // 注意：这在工业上常用于估算离心机轴功率
+            // 4. 压缩功 (Point 2: Dry)
             const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
             const w_poly_approx = (h_out_is - h_in); 
             const w_real = w_poly_approx / eff_poly; 
             const h_out_dry = h_in + w_real;
             
+            const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
+            const s_out_dry = CP.PropsSI('S', 'P', p_out, 'H', h_out_dry, fluid);
+            
             const power = w_real * m_flow / 1000.0;
             
-            // 5. COP 计算 (新增)
+            // 5. COP 计算
             const h_gas_sat = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
             const h_liq_sat = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
             const latent_heat = h_gas_sat - h_liq_sat; 
             const q_latent = m_flow * latent_heat / 1000.0; // kW
             const cop = q_latent / power;
 
-            // 6. 喷水
+            // 6. 喷水计算
             const h_sat_vap_out = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
             const h_water = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
             let m_water = 0;
-            let t_out_calc = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid) - 273.15;
+            let t_out_est = t_out_dry - 273.15;
+
+            // 构造状态点数组
+            const points = [
+                { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                { name: '2', desc: 'Discharge (干排气)', p: p_out, t: t_out_dry, h: h_out_dry, s: s_out_dry }
+            ];
 
             if (h_out_dry > h_sat_vap_out) {
                 m_water = m_flow * (h_out_dry - h_sat_vap_out) / (h_sat_vap_out - h_water);
-                // 喷水后温度即为饱和温度
-                t_out_calc = t_sat_out - 273.15;
+                t_out_est = t_sat_out - 273.15;
+                
+                // Point 3: 喷水后饱和态
+                const t_mix = t_sat_out;
+                const h_mix = h_sat_vap_out;
+                const s_mix = CP.PropsSI('S', 'P', p_out, 'Q', 1, fluid);
+                points.push({ name: '3', desc: 'After Injection (喷水后)', p: p_out, t: t_mix, h: h_mix, s: s_mix });
             }
 
             lastMode5Data = {
                 date: new Date().toLocaleDateString(),
                 fluid, p_in: p_in_bar, t_in, m_flow, v_flow_in, dt, eff_poly,
                 p_out: p_out/1e5, power, m_water, cop,
-                t_out: t_out_calc
+                t_out: t_out_est
             };
 
             resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data);
             
+            // 绘制图表 + 表格
+            chartDivM5.classList.remove('hidden');
+            const cycleData = { points: points };
+            drawPhDiagram(CP, fluid, cycleData, 'chart-m5');
+
             calcButtonM5.textContent = "计算透平 MVR";
             calcButtonM5.disabled = false;
             printButtonM5.disabled = false;
+            exportButtonM5.disabled = false;
             
             printButtonM5.onclick = () => {
                  const win = window.open('', '_blank');
@@ -203,6 +214,7 @@ async function calculateMode5(CP) {
                  win.document.close();
                  setTimeout(() => win.print(), 200);
             };
+            exportButtonM5.onclick = () => exportToExcel(lastMode5Data, "MVR_Turbo_Calc");
 
         } catch (err) {
             resultsDivM5.textContent = err.message;
@@ -212,11 +224,14 @@ async function calculateMode5(CP) {
     }, 10);
 }
 
+// 导出 init 函数
 export function initMode5(CP) {
     calcButtonM5 = document.getElementById('calc-button-5');
     resultsDivM5 = document.getElementById('results-5');
     calcFormM5 = document.getElementById('calc-form-5');
     printButtonM5 = document.getElementById('print-button-5');
+    exportButtonM5 = document.getElementById('export-button-5');
+    chartDivM5 = document.getElementById('chart-m5');
     fluidSelectM5 = document.getElementById('fluid_m5');
     
     if (calcFormM5) {

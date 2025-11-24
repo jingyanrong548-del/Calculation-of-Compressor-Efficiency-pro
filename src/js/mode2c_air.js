@@ -1,14 +1,16 @@
 // =====================================================================
 // mode2c_air.js: 模式三 (空压机) 核心逻辑
-// 版本: v8.0 (双语版 & 负荷计算)
+// 版本: v8.2 (Excel 导出版)
 // =====================================================================
 
-let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3;
+// [新增] 引入导出工具
+import { exportToExcel } from './utils.js';
+
+let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3;
 let lastMode3Data = null;
 
 // --- Helper: 生成空压机技术规格书 (Bilingual) ---
 function generateAirDatasheet(d) {
-    // 样式配色 (Cyan Theme)
     const themeColor = "#0891b2"; 
     const bgColor = "#ecfeff";
     const borderColor = "#cffafe";
@@ -94,7 +96,7 @@ function generateAirDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.0
+                Oil-Free Compressor Calculator Pro v8.2
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
@@ -209,7 +211,7 @@ async function calculateMode3(CP) {
             let cooling_desc = "Adiabatic (None)";
             let cooling_detail = "";
             let t_out_k = 0;
-            let q_jacket = 0; // 夹套热负荷
+            let q_jacket = 0; 
 
             if (cooling_type === 'jacket') {
                 const jacket_percent = parseFloat(formData.get('jacket_heat_percent_m3') || 15) / 100.0;
@@ -217,7 +219,7 @@ async function calculateMode3(CP) {
                 h_out_real = h_in + work_real - q_removed_per_kg;
                 
                 t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
-                q_jacket = q_removed_per_kg * m_da / 1000.0; // kW
+                q_jacket = q_removed_per_kg * m_da / 1000.0; 
 
                 cooling_desc = "Jacket Water Cooling 夹套水冷";
                 cooling_detail = `Heat Removal: ${q_jacket.toFixed(2)} kW (${(jacket_percent*100).toFixed(0)}%)`;
@@ -237,12 +239,10 @@ async function calculateMode3(CP) {
                 cooling_desc = "Adiabatic 绝热压缩";
             }
 
-            // 后冷负荷计算 (Mode 3)
+            // 后冷负荷
             let q_aftercool = 0;
             if (formData.get('enable_cooler_calc_m3') === 'on') {
                 const t_target = parseFloat(formData.get('target_temp_m3')) + 273.15;
-                // 估算后冷负荷: H_out_real - H(target, saturated)
-                // 注意: HAPropsSI 如果温度低于露点，H 包含冷凝水焓值，这里做简化计算
                 const h_target = CP.HAPropsSI('H', 'T', t_target, 'P', p_out_pa, 'R', 1.0);
                 q_aftercool = (h_out_real - h_target) * m_da / 1000.0;
             }
@@ -267,6 +267,7 @@ async function calculateMode3(CP) {
             calcButtonM3.textContent = "计算空压机";
             calcButtonM3.disabled = false;
             printButtonM3.disabled = false;
+            exportButtonM3.disabled = false; // [新增] 启用导出按钮
 
             printButtonM3.onclick = () => {
                 const win = window.open('', '_blank');
@@ -274,6 +275,8 @@ async function calculateMode3(CP) {
                 win.document.close();
                 setTimeout(() => win.print(), 200);
             };
+            // [新增] 导出事件
+            exportButtonM3.onclick = () => exportToExcel(lastMode3Data, "AirComp_Calc");
 
         } catch (err) {
             resultsDivM3.textContent = "Error: " + err.message;
@@ -288,6 +291,7 @@ export function initMode3(CP) {
     resultsDivM3 = document.getElementById('results-3');
     calcFormM3 = document.getElementById('calc-form-3');
     printButtonM3 = document.getElementById('print-button-3');
+    exportButtonM3 = document.getElementById('export-button-3');
     
     if (calcFormM3) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });

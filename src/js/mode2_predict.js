@@ -1,15 +1,16 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷热泵) & 模式二 (气体)
-// 版本: v8.1 (修复 CP 作用域错误)
+// 版本: v8.3 (集成状态点表格)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
+import { drawPhDiagram, exportToExcel } from './utils.js';
 
 let lastMode1Data = null;
 let lastMode2Data = null;
 
-let calcButtonM1, resultsDivM1, calcFormM1, printButtonM1;
-let calcButtonM2, resultsDivM2, calcFormM2, printButtonM2;
+let calcButtonM1, resultsDivM1, calcFormM1, printButtonM1, exportButtonM1, chartDivM1;
+let calcButtonM2, resultsDivM2, calcFormM2, printButtonM2, exportButtonM2, chartDivM2;
 
 // --- Helper: 获取流量 ---
 function getFlowRate(formData, modeSuffix, density_in) {
@@ -135,7 +136,7 @@ function generateDatasheetHTML(d, title) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.0
+                Oil-Free Compressor Calculator Pro v8.3
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
@@ -147,7 +148,7 @@ function generateDatasheetHTML(d, title) {
     `;
 }
 
-// --- AI 推荐 (保持) ---
+// --- AI 推荐 ---
 function setupAiEff(selectId, isenId, volId, prId) {
     const sel = document.getElementById(selectId);
     if (!sel) return;
@@ -170,10 +171,10 @@ function setupAiEff(selectId, isenId, volId, prId) {
     });
 }
 
-// --- 模式 1 计算 (制冷热泵) - 修复 CP 传递 ---
+// --- 模式 1 计算 (制冷热泵) ---
 async function calculateMode1(CP) {
     if (!CP) {
-        resultsDivM1.textContent = "Calculation Error: CP is not defined (Module not loaded)";
+        resultsDivM1.textContent = "Calculation Error: CP is not defined";
         return;
     }
     calcButtonM1.disabled = true;
@@ -184,7 +185,6 @@ async function calculateMode1(CP) {
             const fd = new FormData(calcFormM1);
             const fluid = fd.get('fluid_m1');
             
-            // 1. 获取参数
             const t_evap = parseFloat(fd.get('T_evap_m1'));
             const sh = parseFloat(fd.get('SH_m1'));
             const t_cond = parseFloat(fd.get('T_cond_m1'));
@@ -194,12 +194,10 @@ async function calculateMode1(CP) {
             let eff_vol = parseFloat(fd.get('vol_eff_m1'))/100;
             const mot_eff = parseFloat(fd.get('motor_eff_m1'))/100;
 
-            // 2. 压力计算 (使用传入的 CP)
             const p_in = CP.PropsSI('P','T', t_evap+273.15, 'Q', 1, fluid);
             const p_out = CP.PropsSI('P','T', t_cond+273.15, 'Q', 1, fluid);
             const pr_actual = p_out / p_in;
 
-            // 3. 动态效率修正
             let eff_note = "Static (Fixed)";
             if (fd.get('enable_dynamic_eff_m1') === 'on') {
                 const pr_des = parseFloat(fd.get('pr_design_m1'));
@@ -208,13 +206,13 @@ async function calculateMode1(CP) {
                 eff_note = `Dynamic (PR=${pr_actual.toFixed(2)})`;
             }
 
-            // 4. 状态点 (使用传入的 CP)
+            // --- 1. 吸气点 (Suction) ---
             const t_in_k = t_evap + sh + 273.15;
-            const d_in = CP.PropsSI('D','P', p_in, 'T', t_in_k, fluid);
             const h_in = CP.PropsSI('H','P', p_in, 'T', t_in_k, fluid);
             const s_in = CP.PropsSI('S','P', p_in, 'T', t_in_k, fluid);
+            const d_in = CP.PropsSI('D','P', p_in, 'T', t_in_k, fluid);
 
-            // 5. 流量计算
+            // 流量
             const mode = fd.get('flow_mode_m1');
             let m_flow = 0, v_flow_in = 0;
             if (mode === 'rpm') {
@@ -228,26 +226,35 @@ async function calculateMode1(CP) {
                 v_flow_in = res.v_flow_in;
             }
 
-            // 6. 压缩功 (使用传入的 CP)
+            // --- 2. 排气点 (Discharge) ---
             const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
             const h_out = h_in + w_real;
-            const t_out = CP.PropsSI('T','P', p_out, 'H', h_out, fluid) - 273.15;
-            const t_out_s = CP.PropsSI('T','P', p_out, 'S', s_in, fluid) - 273.15;
+            const t_out_k = CP.PropsSI('T','P', p_out, 'H', h_out, fluid);
+            const s_out = CP.PropsSI('S','P', p_out, 'H', h_out, fluid);
 
-            // 7. 负荷计算
-            const h_liq = CP.PropsSI('H','P', p_out, 'T', t_cond+273.15-sc, fluid);
-            
-            const q_evap = (h_in - h_liq) * m_flow / 1000.0; // kW
-            const q_cond = (h_out - h_liq) * m_flow / 1000.0; // kW
-            const power_shaft = (w_real * m_flow) / 1000.0; // kW
+            // --- 3. 冷凝出口 (Condenser Out) ---
+            const t_liq_k = t_cond + 273.15 - sc;
+            const h_liq = CP.PropsSI('H','P', p_out, 'T', t_liq_k, fluid);
+            const s_liq = CP.PropsSI('S','P', p_out, 'T', t_liq_k, fluid);
+
+            // --- 4. 蒸发进口 (Evaporator In) ---
+            // 膨胀阀等焓过程
+            const h_4 = h_liq;
+            const p_4 = p_in;
+            const t_4_k = CP.PropsSI('T','P', p_4, 'H', h_4, fluid);
+            const s_4 = CP.PropsSI('S','P', p_4, 'H', h_4, fluid);
+
+            const q_evap = (h_in - h_liq) * m_flow / 1000.0; 
+            const q_cond = (h_out - h_liq) * m_flow / 1000.0; 
+            const power_shaft = (w_real * m_flow) / 1000.0; 
             
             const cop_c = q_evap / power_shaft;
             const cop_h = q_cond / power_shaft;
 
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in/1e5, t_in: t_evap+sh, p_out: p_out/1e5, t_out, t_out_s,
+                p_in: p_in/1e5, t_in: t_in_k-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
                 t_evap, sh, t_cond, sc,
                 m_flow, v_flow: v_flow_in, power: power_shaft,
                 q_evap, q_cond, cop_c, cop_h,
@@ -256,9 +263,21 @@ async function calculateMode1(CP) {
 
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "HEAT PUMP / REFRIGERATION DATASHEET");
             
-            calcButtonM1.textContent = "计算热泵性能";
+            // 构建绘图数据
+            chartDivM1.classList.remove('hidden');
+            const cyclePoints = {
+                points: [
+                    { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                    { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out_k, h: h_out, s: s_out },
+                    { name: '3', desc: 'Cond. Out (冷凝出口)', p: p_out, t: t_liq_k, h: h_liq, s: s_liq },
+                    { name: '4', desc: 'Evap. In (蒸发入口)', p: p_4, t: t_4_k, h: h_4, s: s_4 }
+                ]
+            };
+            drawPhDiagram(CP, fluid, cyclePoints, 'chart-m1');
+
             calcButtonM1.disabled = false;
             printButtonM1.disabled = false;
+            exportButtonM1.disabled = false;
             
             printButtonM1.onclick = () => {
                 const win = window.open('', '_blank');
@@ -266,6 +285,7 @@ async function calculateMode1(CP) {
                 win.document.close();
                 setTimeout(() => win.print(), 200);
             };
+            exportButtonM1.onclick = () => exportToExcel(lastMode1Data, "HeatPump_Calc");
 
         } catch (e) {
             resultsDivM1.innerHTML = `<div style="color:red; padding:10px;">Calculation Error: ${e.message}</div>`;
@@ -275,7 +295,7 @@ async function calculateMode1(CP) {
     }, 10);
 }
 
-// --- 模式 2 计算 (气体) - 修复 CP 传递 ---
+// --- 模式 2 计算 (气体) ---
 async function calculateMode2(CP) {
     if (!CP) return;
     calcButtonM2.disabled = true;
@@ -288,45 +308,37 @@ async function calculateMode2(CP) {
             const p_in = parseFloat(fd.get('p_in_m2')) * 1e5;
             const t_in = parseFloat(fd.get('T_in_m2')) + 273.15;
             const p_out = parseFloat(fd.get('p_out_m2')) * 1e5;
-            
             let eff_isen = parseFloat(fd.get('eff_isen_m2'))/100;
-            let eff_vol = parseFloat(fd.get('vol_eff_m2'))/100;
-            const pr_actual = p_out / p_in;
-
-            let eff_note = "Static";
-            if (fd.get('enable_dynamic_eff_m2') === 'on') {
-                const pr_des = parseFloat(fd.get('pr_design_m2'));
-                const factor = 1 - 0.03 * Math.pow(pr_actual - pr_des, 2);
-                eff_isen = eff_isen * Math.max(0.5, factor);
-                eff_note = `Dynamic (PR=${pr_actual.toFixed(2)})`;
-            }
-
-            const d_in = CP.PropsSI('D','P', p_in, 'T', t_in, fluid);
+            
+            // 1. 吸气点
             const h_in = CP.PropsSI('H','P', p_in, 'T', t_in, fluid);
             const s_in = CP.PropsSI('S','P', p_in, 'T', t_in, fluid);
+            const d_in = CP.PropsSI('D','P', p_in, 'T', t_in, fluid);
 
+            // 2. 排气点
+            const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
+            const w_real = (h_out_is - h_in) / eff_isen;
+            const h_out = h_in + w_real;
+            const t_out = CP.PropsSI('T','P', p_out, 'H', h_out, fluid);
+            const s_out = CP.PropsSI('S','P', p_out, 'H', h_out, fluid);
+
+            // 流量
             const mode = fd.get('flow_mode_m2');
             let m_flow = 0, v_flow_in = 0;
+            const vol_eff = parseFloat(fd.get('vol_eff_m2'))/100;
             if (mode === 'rpm') {
                 const rpm = parseFloat(fd.get('rpm_m2'));
                 const disp = parseFloat(fd.get('vol_disp_m2')) / 1e6;
-                v_flow_in = (rpm / 60.0) * disp * eff_vol;
+                v_flow_in = (rpm / 60.0) * disp * vol_eff;
                 m_flow = v_flow_in * d_in;
             } else {
                 const res = getFlowRate(fd, 'm2', d_in);
                 m_flow = res.m_flow;
                 v_flow_in = res.v_flow_in;
             }
-
-            const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
-            const w_real = (h_out_is - h_in) / eff_isen;
-            const h_out = h_in + w_real;
-            const t_out = CP.PropsSI('T','P', p_out, 'H', h_out, fluid) - 273.15;
-            const t_out_s = CP.PropsSI('T','P', p_out, 'S', s_in, fluid) - 273.15;
-
             const power = w_real * m_flow / 1000;
 
-            // 后冷却负荷计算 (Mode 2)
+            // 后冷
             let q_aftercool = 0;
             if (fd.get('enable_cooler_calc_m2') === 'on') {
                 const t_target = parseFloat(fd.get('target_temp_m2')) + 273.15;
@@ -336,49 +348,63 @@ async function calculateMode2(CP) {
 
             lastMode2Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out, t_out_s,
-                m_flow, v_flow: v_flow_in, power, pr: pr_actual,
+                p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out: t_out-273.15,
+                m_flow, v_flow: v_flow_in, power, pr: p_out/p_in,
                 q_aftercool,
-                eff_note, eff_isen, eff_vol
+                eff_note: "Standard", eff_isen, eff_vol: vol_eff
             };
-
             resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR DATASHEET");
+
+            // 绘图数据 (1->2)
+            const points = [
+                { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in, h: h_in, s: s_in },
+                { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out, h: h_out, s: s_out }
+            ];
             
-            calcButtonM2.textContent = "计算气体压缩";
+            chartDivM2.classList.remove('hidden');
+            drawPhDiagram(CP, fluid, { points }, 'chart-m2');
+
             calcButtonM2.disabled = false;
             printButtonM2.disabled = false;
-
+            exportButtonM2.disabled = false;
+            
             printButtonM2.onclick = () => {
                 const win = window.open('', '_blank');
                 win.document.write(`<html><head><title>Report</title></head><body style="margin:0; background:#fff;">${generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR DATASHEET")}</body></html>`);
                 win.document.close();
                 setTimeout(() => win.print(), 200);
             };
+            exportButtonM2.onclick = () => exportToExcel(lastMode2Data, "GasComp_Calc");
 
-        } catch (e) {
-            resultsDivM2.innerHTML = `<div style="color:red">Error: ${e.message}</div>`;
-            calcButtonM2.textContent = "计算失败";
+        } catch(e) {
+            resultsDivM2.textContent = e.message;
             calcButtonM2.disabled = false;
         }
     }, 10);
 }
 
 export function initMode1_2(CP) {
-    // [修改] 不再使用全局 CP_INSTANCE，直接透传 CP
+    // [修复] 移除 CP_INSTANCE 全局变量，改用闭包或直接传递
     
     calcButtonM1 = document.getElementById('calc-button-1');
     resultsDivM1 = document.getElementById('results-1');
     calcFormM1 = document.getElementById('calc-form-1');
     printButtonM1 = document.getElementById('print-button-1');
+    exportButtonM1 = document.getElementById('export-button-1');
+    chartDivM1 = document.getElementById('chart-m1'); // 获取图表容器
+
     if (calcFormM1) {
         setupAiEff('ai_eff_m1', 'eff_isen_m1', 'vol_eff_m1', 'pr_design_m1');
         calcFormM1.addEventListener('submit', (e) => { e.preventDefault(); calculateMode1(CP); });
     }
-
+    
     calcButtonM2 = document.getElementById('calc-button-2');
     resultsDivM2 = document.getElementById('results-2');
     calcFormM2 = document.getElementById('calc-form-2');
     printButtonM2 = document.getElementById('print-button-2');
+    exportButtonM2 = document.getElementById('export-button-2');
+    chartDivM2 = document.getElementById('chart-m2');
+
     if (calcFormM2) {
         setupAiEff('ai_eff_m2', 'eff_isen_m2', 'vol_eff_m2', 'pr_design_m2');
         calcFormM2.addEventListener('submit', (e) => { e.preventDefault(); calculateMode2(CP); });
