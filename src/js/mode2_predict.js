@@ -1,11 +1,13 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷热泵) & 模式二 (气体)
-// 版本: v8.3 (集成状态点表格)
+// 版本: v8.4 (修复变量作用域导致的卡死问题)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
 import { drawPhDiagram, exportToExcel } from './utils.js';
 
+// 全局变量声明
+let CP_INSTANCE = null;
 let lastMode1Data = null;
 let lastMode2Data = null;
 
@@ -136,7 +138,7 @@ function generateDatasheetHTML(d, title) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.3
+                Oil-Free Compressor Calculator Pro v8.4
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
@@ -148,7 +150,7 @@ function generateDatasheetHTML(d, title) {
     `;
 }
 
-// --- AI 推荐 ---
+// --- AI 推荐 (保持) ---
 function setupAiEff(selectId, isenId, volId, prId) {
     const sel = document.getElementById(selectId);
     if (!sel) return;
@@ -174,7 +176,7 @@ function setupAiEff(selectId, isenId, volId, prId) {
 // --- 模式 1 计算 (制冷热泵) ---
 async function calculateMode1(CP) {
     if (!CP) {
-        resultsDivM1.textContent = "Calculation Error: CP is not defined";
+        resultsDivM1.textContent = "Calculation Error: CP is not defined (Module not loaded)";
         return;
     }
     calcButtonM1.disabled = true;
@@ -206,7 +208,7 @@ async function calculateMode1(CP) {
                 eff_note = `Dynamic (PR=${pr_actual.toFixed(2)})`;
             }
 
-            // --- 1. 吸气点 (Suction) ---
+            // 1. 吸气点 (Suction)
             const t_in_k = t_evap + sh + 273.15;
             const h_in = CP.PropsSI('H','P', p_in, 'T', t_in_k, fluid);
             const s_in = CP.PropsSI('S','P', p_in, 'T', t_in_k, fluid);
@@ -226,20 +228,19 @@ async function calculateMode1(CP) {
                 v_flow_in = res.v_flow_in;
             }
 
-            // --- 2. 排气点 (Discharge) ---
+            // 2. 排气点 (Discharge)
             const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
             const h_out = h_in + w_real;
             const t_out_k = CP.PropsSI('T','P', p_out, 'H', h_out, fluid);
             const s_out = CP.PropsSI('S','P', p_out, 'H', h_out, fluid);
 
-            // --- 3. 冷凝出口 (Condenser Out) ---
+            // 3. 冷凝出口 (Condenser Out)
             const t_liq_k = t_cond + 273.15 - sc;
             const h_liq = CP.PropsSI('H','P', p_out, 'T', t_liq_k, fluid);
             const s_liq = CP.PropsSI('S','P', p_out, 'T', t_liq_k, fluid);
 
-            // --- 4. 蒸发进口 (Evaporator In) ---
-            // 膨胀阀等焓过程
+            // 4. 蒸发进口 (Evaporator In)
             const h_4 = h_liq;
             const p_4 = p_in;
             const t_4_k = CP.PropsSI('T','P', p_4, 'H', h_4, fluid);
@@ -263,18 +264,21 @@ async function calculateMode1(CP) {
 
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "HEAT PUMP / REFRIGERATION DATASHEET");
             
-            // 构建绘图数据
-            chartDivM1.classList.remove('hidden');
-            const cyclePoints = {
-                points: [
-                    { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in_k, h: h_in, s: s_in },
-                    { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out_k, h: h_out, s: s_out },
-                    { name: '3', desc: 'Cond. Out (冷凝出口)', p: p_out, t: t_liq_k, h: h_liq, s: s_liq },
-                    { name: '4', desc: 'Evap. In (蒸发入口)', p: p_4, t: t_4_k, h: h_4, s: s_4 }
-                ]
-            };
-            drawPhDiagram(CP, fluid, cyclePoints, 'chart-m1');
+            // 绘制压焓图
+            if (chartDivM1) {
+                chartDivM1.classList.remove('hidden');
+                const cyclePoints = {
+                    points: [
+                        { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                        { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out_k, h: h_out, s: s_out },
+                        { name: '3', desc: 'Cond. Out (冷凝出口)', p: p_out, t: t_liq_k, h: h_liq, s: s_liq },
+                        { name: '4', desc: 'Evap. In (蒸发入口)', p: p_4, t: t_4_k, h: h_4, s: s_4 }
+                    ]
+                };
+                drawPhDiagram(CP, fluid, cyclePoints, 'chart-m1');
+            }
 
+            calcButtonM1.textContent = "计算热泵性能";
             calcButtonM1.disabled = false;
             printButtonM1.disabled = false;
             exportButtonM1.disabled = false;
@@ -310,12 +314,12 @@ async function calculateMode2(CP) {
             const p_out = parseFloat(fd.get('p_out_m2')) * 1e5;
             let eff_isen = parseFloat(fd.get('eff_isen_m2'))/100;
             
-            // 1. 吸气点
+            // 1. 吸气
             const h_in = CP.PropsSI('H','P', p_in, 'T', t_in, fluid);
             const s_in = CP.PropsSI('S','P', p_in, 'T', t_in, fluid);
             const d_in = CP.PropsSI('D','P', p_in, 'T', t_in, fluid);
 
-            // 2. 排气点
+            // 2. 排气
             const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
             const h_out = h_in + w_real;
@@ -355,15 +359,17 @@ async function calculateMode2(CP) {
             };
             resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR DATASHEET");
 
-            // 绘图数据 (1->2)
-            const points = [
-                { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in, h: h_in, s: s_in },
-                { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out, h: h_out, s: s_out }
-            ];
-            
-            chartDivM2.classList.remove('hidden');
-            drawPhDiagram(CP, fluid, { points }, 'chart-m2');
+            // 绘图
+            if (chartDivM2) {
+                chartDivM2.classList.remove('hidden');
+                const points = [
+                    { name: '1', desc: 'Suction (吸气)', p: p_in, t: t_in, h: h_in, s: s_in },
+                    { name: '2', desc: 'Discharge (排气)', p: p_out, t: t_out, h: h_out, s: s_out }
+                ];
+                drawPhDiagram(CP, fluid, { points }, 'chart-m2');
+            }
 
+            calcButtonM2.textContent = "计算气体压缩";
             calcButtonM2.disabled = false;
             printButtonM2.disabled = false;
             exportButtonM2.disabled = false;
@@ -384,14 +390,13 @@ async function calculateMode2(CP) {
 }
 
 export function initMode1_2(CP) {
-    // [修复] 移除 CP_INSTANCE 全局变量，改用闭包或直接传递
-    
+    // [核心修复] 移除 let 关键字，直接对文件头部的全局变量赋值
     calcButtonM1 = document.getElementById('calc-button-1');
     resultsDivM1 = document.getElementById('results-1');
     calcFormM1 = document.getElementById('calc-form-1');
     printButtonM1 = document.getElementById('print-button-1');
     exportButtonM1 = document.getElementById('export-button-1');
-    chartDivM1 = document.getElementById('chart-m1'); // 获取图表容器
+    chartDivM1 = document.getElementById('chart-m1'); 
 
     if (calcFormM1) {
         setupAiEff('ai_eff_m1', 'eff_isen_m1', 'vol_eff_m1', 'pr_design_m1');
