@@ -1,6 +1,6 @@
 // =====================================================================
-// ui.js: UI 界面交互逻辑 (全模式通用)
-// 版本: v8.0 (逻辑清理 & 适配双语版)
+// ui.js: UI 界面交互逻辑 (全模式通用 & 流量控制中心)
+// 版本: v8.13 (Fix: Flow Inputs Visibility & CO2 Support)
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,60 +36,68 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -----------------------------------------------------------------
-    // 2. 流量模式切换器 (RPM / Mass / Vol)
+    // 2. 流量模式切换器 (RPM / Mass / Vol) - 核心修复
     // -----------------------------------------------------------------
-    // 此函数会自动查找 HTML 中 id 为 flow-inputs-rpm-mX, flow-inputs-mass-mX 等的容器
-    // 并根据 name="flow_mode_mX" 的 radio 状态进行显隐切换
     function setupFlowToggle(modeSuffix) {
+        // 查找该模式下的所有单选按钮
         const radios = document.querySelectorAll(`input[name="flow_mode_${modeSuffix}"]`);
         if (!radios.length) return;
 
+        // 查找对应的输入容器
         const divRpm = document.getElementById(`flow-inputs-rpm-${modeSuffix}`);
         const divMass = document.getElementById(`flow-inputs-mass-${modeSuffix}`);
         const divVol = document.getElementById(`flow-inputs-vol-${modeSuffix}`);
 
         const toggle = () => {
-            // 获取当前被选中的值
+            // 获取当前选中的值
             const checked = document.querySelector(`input[name="flow_mode_${modeSuffix}"]:checked`);
             if (!checked) return;
             
             const val = checked.value;
 
-            // 切换 Grid/Block 显示
-            // RPM 容器通常包含两个输入框(转速+排量)，所以用 Grid 布局更佳
-            if (divRpm) {
-                divRpm.style.display = (val === 'rpm') ? 'grid' : 'none';
-                setInputsRequired(divRpm, val === 'rpm');
-            }
-            if (divMass) {
-                divMass.style.display = (val === 'mass') ? 'block' : 'none';
-                setInputsRequired(divMass, val === 'mass');
-            }
-            if (divVol) {
-                divVol.style.display = (val === 'vol') ? 'block' : 'none';
-                setInputsRequired(divVol, val === 'vol');
-            }
+            // 通用显示/隐藏函数 (使用 classList 操作 hidden)
+            const setVisible = (div, isVisible) => {
+                if (!div) return;
+                if (isVisible) {
+                    div.classList.remove('hidden');
+                    // 针对 RPM 这种 Grid 布局的特殊处理
+                    if (div.id.includes('rpm')) {
+                        div.style.display = 'grid'; 
+                    } else {
+                        div.style.display = 'block';
+                    }
+                    setInputsRequired(div, true);
+                } else {
+                    div.classList.add('hidden');
+                    div.style.display = 'none';
+                    setInputsRequired(div, false);
+                }
+            };
+
+            setVisible(divRpm, val === 'rpm');
+            setVisible(divMass, val === 'mass');
+            setVisible(divVol, val === 'vol');
         };
 
         // 绑定事件
         radios.forEach(r => r.addEventListener('change', toggle));
         
-        // 初始化一次状态
+        // [Fix] 立即初始化一次状态
         toggle();
     }
 
-    // 辅助函数：设置输入框的 required 属性，防止隐藏的输入框阻碍表单提交
+    // 辅助函数：设置必填状态
     function setInputsRequired(container, isRequired) {
         const inputs = container.querySelectorAll('input');
         inputs.forEach(input => {
             input.required = isRequired;
-            // 可选：禁用隐藏的输入框以避免回车提交意外数据
-            input.disabled = !isRequired;
+            input.disabled = !isRequired; // 禁用隐藏的输入框以防止提交干扰
         });
     }
 
-    // 对 5 个模式分别应用流量切换逻辑
-    ['m1', 'm2', 'm3', 'm4', 'm5'].forEach(suffix => {
+    // [Fix] 包含 m1_co2 的完整列表
+    const allModes = ['m1', 'm1_co2', 'm2', 'm3', 'm4', 'm5'];
+    allModes.forEach(suffix => {
         setupFlowToggle(suffix);
     });
 
@@ -107,17 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const toggle = () => {
             const checked = document.querySelector('input[name="cooling_type_m3"]:checked');
             if (!checked) return;
-            
             const val = checked.value;
 
             if (divJacket) {
                 const show = (val === 'jacket');
                 divJacket.style.display = show ? 'block' : 'none';
+                if(!show) divJacket.classList.add('hidden'); else divJacket.classList.remove('hidden');
                 setInputsRequired(divJacket, show);
             }
             if (divInjection) {
                 const show = (val === 'injection');
                 divInjection.style.display = show ? 'block' : 'none';
+                if(!show) divInjection.classList.add('hidden'); else divInjection.classList.remove('hidden');
                 setInputsRequired(divInjection, show);
             }
         };
@@ -125,32 +134,29 @@ document.addEventListener('DOMContentLoaded', () => {
         radios.forEach(r => r.addEventListener('change', toggle));
         toggle();
     }
-
     setupMode3CoolingToggle();
 
     // -----------------------------------------------------------------
-    // 4. 后冷却器 (Cooler) 复选框切换 (仅适用于 M2, M3)
+    // 4. 后冷却器 (Cooler) 复选框切换
     // -----------------------------------------------------------------
     function setupCoolerToggle(checkboxId, inputsDivId) {
         const checkbox = document.getElementById(checkboxId);
         const inputsDiv = document.getElementById(inputsDivId);
         
-        if (!checkbox || !inputsDiv) {
-            return;
-        }
+        if (!checkbox || !inputsDiv) return;
 
         const toggle = () => {
             const isChecked = checkbox.checked;
             inputsDiv.style.display = isChecked ? 'block' : 'none';
+            if(!isChecked) inputsDiv.classList.add('hidden'); else inputsDiv.classList.remove('hidden');
             setInputsRequired(inputsDiv, isChecked);
         };
 
         checkbox.addEventListener('change', toggle);
-        toggle(); // 初始调用以设置正确状态
+        toggle();
     }
     
-    // [修改] 移除了 setupCoolerToggle('enable_cooler_calc_m1', ...);
-    setupCoolerToggle('enable_cooler_calc_m2', 'cooler-inputs-m2'); // 气体
-    setupCoolerToggle('enable_cooler_calc_m3', 'cooler-inputs-m3'); // 空压机
+    setupCoolerToggle('enable_cooler_calc_m2', 'cooler-inputs-m2');
+    setupCoolerToggle('enable_cooler_calc_m3', 'cooler-inputs-m3');
 
 });

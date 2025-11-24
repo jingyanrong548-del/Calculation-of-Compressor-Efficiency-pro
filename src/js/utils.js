@@ -1,13 +1,13 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表)
-// 版本: v8.3 (新增状态点数据表)
+// 版本: v8.11 (Bilingual Excel & State Table)
 // =====================================================================
 
 import * as echarts from 'echarts';
 import * as XLSX from 'xlsx';
 
 /**
- * 导出数据到 Excel
+ * 导出数据到 Excel (双语版)
  * @param {Object} data - 数据对象
  * @param {string} filename - 文件名
  */
@@ -21,9 +21,12 @@ export function exportToExcel(data, filename) {
     
     // Header
     rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
-    rows.push(["Date", data.date || new Date().toLocaleDateString(), ""]);
-    rows.push(["Fluid", data.fluid || "-", ""]);
-    if(data.ai_model) rows.push(["Model", data.ai_model, ""]);
+    rows.push(["Date 日期", data.date || new Date().toLocaleDateString(), ""]);
+    rows.push(["Fluid 工质", data.fluid || "-", ""]);
+    if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
+    if(data.is_transcritical !== undefined) {
+        rows.push(["Cycle Type 循环类型", data.is_transcritical ? "Transcritical (跨临界)" : "Subcritical (亚临界)", ""]);
+    }
     rows.push(["", "", ""]); 
 
     // Helper
@@ -34,32 +37,69 @@ export function exportToExcel(data, filename) {
         }
     };
 
-    // 自动遍历第一层属性 (简单处理)
-    // 实际项目中，建议根据 data 结构显式添加，或者保留之前硬编码的顺序以保证美观
-    // 这里为了通用性，保留之前的逻辑或根据传入 data 动态生成
-    // 假设调用方传入的是扁平化或包含特定 key 的对象
+    // --- Inputs & Conditions ---
+    rows.push(["--- OPERATING CONDITIONS 运行工况 ---", "", ""]);
+    addRow("Suction Pressure 吸气压力", data.p_in, "bar");
+    addRow("Suction Temp 吸气温度", data.t_in, "°C");
     
-    // --- Inputs ---
-    rows.push(["--- INPUTS ---", "", ""]);
-    if(data.p_in) addRow("Suction Pressure", data.p_in, "bar");
-    if(data.t_in) addRow("Suction Temp", data.t_in, "°C");
-    if(data.p_out) addRow("Discharge Pressure", data.p_out, "bar");
-    if(data.rpm) addRow("Speed", data.rpm, "RPM");
+    if (data.t_gc_out !== undefined) {
+        // CO2 模式
+        addRow("Gas Cooler Exit Temp 气冷出口温度", data.t_gc_out, "°C");
+        addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
+    } else {
+        // 常规模式
+        addRow("Discharge Pressure 排气压力", data.p_out, "bar");
+        if(data.t_cond) addRow("Condensing Temp 冷凝温度", data.t_cond, "°C");
+    }
     
+    if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
+    
+    // --- Efficiency ---
+    rows.push(["", "", ""]);
+    rows.push(["--- EFFICIENCY & MODEL 效率模型 ---", "", ""]);
+    if(data.eff_isen) addRow("Isentropic Eff. 等熵效率", data.eff_isen * 100, "%");
+    if(data.eff_vol) addRow("Volumetric Eff. 容积效率", data.eff_vol * 100, "%");
+    if(data.eff_note) addRow("Model Note 模型备注", data.eff_note, "");
+
+    // --- Thermal Management (CO2) ---
+    if (data.cooling_info) {
+        rows.push(["", "", ""]);
+        rows.push(["--- THERMAL MANAGEMENT 热管理 ---", "", ""]);
+        
+        let stratName = data.cooling_info.type.toUpperCase();
+        if (stratName === 'SURFACE') stratName += " (表面冷却)";
+        if (stratName === 'INJECTION') stratName += " (喷液冷却)";
+        if (stratName === 'ADIABATIC') stratName += " (绝热)";
+        
+        addRow("Cooling Strategy 冷却策略", stratName, "");
+        addRow("Raw Discharge Temp 原始排温", data.cooling_info.t_raw, "°C");
+        
+        if (data.cooling_info.q_loss > 0) {
+            addRow("Heat Loss (Surface) 表面散热", data.cooling_info.q_loss, "kW");
+        }
+        if (data.cooling_info.m_inj > 0) {
+            addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
+        }
+    }
+
     // --- Results ---
     rows.push(["", "", ""]);
-    rows.push(["--- RESULTS ---", "", ""]);
-    if(data.power) addRow("Shaft Power", data.power, "kW");
-    if(data.m_flow) addRow("Mass Flow", data.m_flow * 3600, "kg/h");
-    if(data.t_out) addRow("Discharge Temp", data.t_out, "°C");
-    if(data.q_evap) addRow("Cooling Capacity", data.q_evap, "kW");
-    if(data.q_cond) addRow("Heating Capacity", data.q_cond, "kW");
-    if(data.cop_c) addRow("COP (Cooling)", data.cop_c, "-");
-    if(data.cop_h) addRow("COP (Heating)", data.cop_h, "-");
+    rows.push(["--- PERFORMANCE RESULTS 性能数据 ---", "", ""]);
+    if(data.power) addRow("Shaft Power 轴功率", data.power, "kW");
+    if(data.m_flow) addRow("Mass Flow (Suction) 吸气质量流量", data.m_flow * 3600, "kg/h");
+    if(data.t_out) addRow("Actual Discharge Temp 实际排温", data.t_out, "°C");
+    
+    if(data.q_evap) addRow("Cooling Capacity 制冷量", data.q_evap, "kW");
+    
+    const heatLabel = (data.fluid === 'R744' || data.is_transcritical) ? "Gas Cooler Load 气冷负荷" : "Heating Capacity 制热量";
+    if(data.q_cond) addRow(heatLabel, data.q_cond, "kW");
+    
+    if(data.cop_c) addRow("COP (Cooling) 制冷系数", data.cop_c, "-");
+    if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
     
     // Create Sheet
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; // 调整列宽以适应中文
 
     // Create Book
     const wb = XLSX.utils.book_new();
@@ -70,30 +110,26 @@ export function exportToExcel(data, filename) {
 }
 
 /**
- * [核心新增] 在图表下方渲染状态点数据表
+ * 在图表下方渲染状态点数据表 (双语表头)
  * @param {string} domId - 图表容器 ID
- * @param {Array} points - 状态点数组 [{name:'1', desc:'Suction', p:Pa, t:K, h:J/kg, s:J/kgK}, ...]
+ * @param {Array} points - 状态点数组
  */
 export function renderStateTable(domId, points) {
     const chartDiv = document.getElementById(domId);
     if (!chartDiv) return;
 
-    // 1. 查找或创建表格容器
-    // 避免重复添加：先检查 chartDiv 的下一个兄弟元素是不是我们的表格容器
     let tableDiv = chartDiv.nextElementSibling;
     if (!tableDiv || !tableDiv.classList.contains('state-table-container')) {
         tableDiv = document.createElement('div');
-        tableDiv.className = 'state-table-container mt-6 mb-8'; // Tailwind margin
+        tableDiv.className = 'state-table-container mt-6 mb-8'; 
         chartDiv.parentNode.insertBefore(tableDiv, chartDiv.nextSibling);
     }
 
-    // 2. 生成表格 HTML
-    // 使用 Tailwind CSS 样式
     const rowsHtml = points.map(pt => `
         <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
             <td class="py-3 px-4 font-bold text-teal-700 text-center bg-gray-50">${pt.name}</td>
             <td class="py-3 px-4 text-xs text-gray-600 font-medium">${pt.desc}</td>
-            <td class="py-3 px-4 text-right font-mono text-sm text-gray-800">${(pt.p / 1e5).toFixed(3)}</td>
+            <td class="py-3 px-4 text-right font-mono text-sm text-gray-800">${(pt.p / 1e5).toFixed(2)}</td>
             <td class="py-3 px-4 text-right font-mono text-sm font-bold text-blue-600">${(pt.t - 273.15).toFixed(2)}</td>
             <td class="py-3 px-4 text-right font-mono text-xs text-gray-500">${(pt.h / 1000).toFixed(1)}</td>
             <td class="py-3 px-4 text-right font-mono text-xs text-gray-500">${(pt.s / 1000).toFixed(3)}</td>
@@ -102,18 +138,19 @@ export function renderStateTable(domId, points) {
 
     tableDiv.innerHTML = `
         <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
-            <div class="bg-gray-100 px-4 py-2 border-b border-gray-200">
+            <div class="bg-gray-100 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
                 <h3 class="text-sm font-bold text-gray-700">Cycle State Points (循环状态点)</h3>
+                <span class="text-xs text-gray-500">Auto-generated</span>
             </div>
             <table class="min-w-full">
                 <thead class="bg-white text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                     <tr>
-                        <th class="py-2 px-4 text-center w-16">Point</th>
-                        <th class="py-2 px-4 text-left">Location (位置)</th>
-                        <th class="py-2 px-4 text-right">Pres. (bar)</th>
-                        <th class="py-2 px-4 text-right">Temp. (°C)</th>
-                        <th class="py-2 px-4 text-right">Enthalpy (kJ/kg)</th>
-                        <th class="py-2 px-4 text-right">Entropy (kJ/kg·K)</th>
+                        <th class="py-2 px-4 text-center w-16">Pt 点</th>
+                        <th class="py-2 px-4 text-left">Location 位置</th>
+                        <th class="py-2 px-4 text-right">Pres. 压力 (bar)</th>
+                        <th class="py-2 px-4 text-right">Temp. 温度 (°C)</th>
+                        <th class="py-2 px-4 text-right">H 焓 (kJ/kg)</th>
+                        <th class="py-2 px-4 text-right">S 熵 (kJ/kg·K)</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -125,20 +162,14 @@ export function renderStateTable(domId, points) {
 }
 
 /**
- * 绘制压焓图 (P-h Diagram) 并调用表格渲染
- * @param {Object} CP - CoolProp 实例
- * @param {string} fluid - 工质名称
- * @param {Object} cycleData - 包含 points 的数据对象
- * @param {string} domId - 图表容器 ID
+ * 绘制压焓图 (P-h Diagram)
+ * 兼容 CO2 亚临界与跨临界
  */
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
     if (!dom) return;
 
-    // 确保容器可见
     dom.classList.remove('hidden');
-    
-    // 初始化图表
     let chart = echarts.getInstanceByDom(dom);
     if (!chart) {
         chart = echarts.init(dom);
@@ -146,59 +177,73 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     chart.showLoading();
 
     try {
-        // 1. 计算饱和曲线 (Dome)
+        // 1. 获取临界参数
         const T_crit = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
-        const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid);
+        const P_crit = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
+        const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid); 
         
-        // 稍微缩减范围以防计算报错
+        // 绘图范围设定
         const T_start = T_min + 5; 
-        const T_end = T_crit - 2.0; 
-        const steps = 60;
+        const T_end = T_crit - 0.5; 
+        const steps = 100;
         const stepSize = (T_end - T_start) / steps;
 
         const lineLiquid = [];
         const lineVapor = [];
+        let H_crit = 0;
 
+        // 2. 绘制饱和穹顶
         for (let i = 0; i <= steps; i++) {
             const T = T_start + i * stepSize;
             try {
                 const P_liq = CP.PropsSI('P', 'T', T, 'Q', 0, fluid);
                 const H_liq = CP.PropsSI('H', 'T', T, 'Q', 0, fluid);
+                lineLiquid.push([H_liq / 1000.0, P_liq / 1e5]);
+
                 const P_vap = CP.PropsSI('P', 'T', T, 'Q', 1, fluid);
                 const H_vap = CP.PropsSI('H', 'T', T, 'Q', 1, fluid);
-                
-                // ECharts [x, y] -> [H(kJ/kg), P(bar)]
-                lineLiquid.push([H_liq / 1000.0, P_liq / 1e5]);
                 lineVapor.push([H_vap / 1000.0, P_vap / 1e5]);
-            } catch (e) { /* ignore calculation errors near crit point */ }
+            } catch (e) { /* ignore */ }
         }
 
-        // 2. 处理循环点 (Cycle Lines)
+        // 计算临界点坐标
+        try {
+            H_crit = CP.PropsSI('H', 'T', T_crit, 'P', P_crit, fluid) / 1000.0;
+        } catch(e) {
+            if(lineLiquid.length > 0) {
+                const lastL = lineLiquid[lineLiquid.length-1];
+                const lastV = lineVapor[lineVapor.length-1];
+                H_crit = (lastL[0] + lastV[0]) / 2;
+            }
+        }
+        const critPointData = [[H_crit, P_crit / 1e5]];
+
+        // 3. 处理循环点
         const cycleSeriesData = [];
         if (cycleData && cycleData.points) {
             cycleData.points.forEach(pt => {
                 cycleSeriesData.push({
                     name: pt.name,
                     value: [pt.h / 1000.0, pt.p / 1e5],
-                    // 额外数据供 Tooltip 使用
                     labelInfo: {
                         t: (pt.t - 273.15).toFixed(2),
                         desc: pt.desc
                     }
                 });
             });
-            // 闭合循环
+            // 闭合
             if (cycleSeriesData.length > 0) {
                 cycleSeriesData.push(cycleSeriesData[0]);
             }
         }
 
-        // 3. ECharts Option
+        // 4. ECharts Option
         const option = {
             title: { 
-                text: `Pressure-Enthalpy Diagram: ${fluid}`, 
+                text: `P-h Diagram: ${fluid}`, 
+                subtext: `Critical Point: ${(T_crit-273.15).toFixed(1)}°C / ${(P_crit/1e5).toFixed(1)} bar`,
                 left: 'center', 
-                top: 10,
+                top: 5,
                 textStyle: { fontSize: 14, color: '#333' }
             },
             tooltip: {
@@ -206,32 +251,33 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                 formatter: (params) => {
                     if (params.seriesName === 'Cycle') {
                         const info = params.data.labelInfo;
-                        let s = `<b>Point ${params.name}</b><br/>`;
+                        let s = `<b>Pt ${params.name}</b><br/>`;
                         if(info && info.desc) s += `<span style="font-size:10px; color:#ccc">${info.desc}</span><br/>`;
-                        s += `P: ${params.value[1].toFixed(3)} bar<br/>`;
+                        s += `P: ${params.value[1].toFixed(2)} bar<br/>`;
                         s += `H: ${params.value[0].toFixed(1)} kJ/kg<br/>`;
                         if (info) s += `T: ${info.t} °C`;
                         return s;
+                    } else if (params.seriesName === 'Critical Point') {
+                         return `<b>Critical Point 临界点</b><br/>P: ${params.value[1].toFixed(2)} bar<br/>H: ${params.value[0].toFixed(1)} kJ/kg`;
                     }
                     return params.seriesName;
                 }
             },
-            grid: { top: 60, right: 50, bottom: 50, left: 60 },
+            grid: { top: 70, right: 50, bottom: 50, left: 60 },
             xAxis: { 
                 name: 'Enthalpy (kJ/kg)', 
                 nameLocation: 'middle',
                 nameGap: 30,
                 type: 'value', 
                 scale: true, 
-                splitLine: { show: false },
-                axisLabel: { formatter: '{value}' }
+                splitLine: { show: false }
             },
             yAxis: { 
                 name: 'Pressure (bar)', 
                 type: 'log', 
                 logBase: 10, 
                 scale: true,
-                axisLabel: { formatter: (value) => Number(value).toString() } // 简化的对数标签
+                axisLabel: { formatter: (value) => Number(value).toString() }
             },
             series: [
                 { 
@@ -240,7 +286,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     showSymbol: false, 
                     data: lineLiquid, 
                     lineStyle: { color: '#0000ff', width: 1.5 },
-                    silent: true // 不触发 tooltip
+                    silent: true 
                 },
                 { 
                     name: 'Sat. Vapor', 
@@ -251,11 +297,20 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     silent: true
                 },
                 {
+                    name: 'Critical Point',
+                    type: 'scatter',
+                    data: critPointData,
+                    symbol: 'triangle',
+                    symbolSize: 10,
+                    itemStyle: { color: '#000' }
+                },
+                {
                     name: 'Cycle',
                     type: 'line',
                     data: cycleSeriesData,
                     symbol: 'circle',
                     symbolSize: 8,
+                    smooth: false,
                     label: { 
                         show: true, 
                         formatter: '{@name}', 
@@ -265,7 +320,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                         color: '#000',
                         distance: 5
                     },
-                    lineStyle: { color: '#059669', width: 2.5 },
+                    lineStyle: { color: '#059669', width: 2.5, type: 'solid' },
                     itemStyle: { color: '#059669', borderColor: '#fff', borderWidth: 1 }
                 }
             ]
@@ -273,11 +328,8 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
 
         chart.hideLoading();
         chart.setOption(option);
-        
-        // 响应式
         window.addEventListener('resize', () => chart.resize());
 
-        // [关键] 调用表格渲染函数
         if (cycleData && cycleData.points) {
             renderStateTable(domId, cycleData.points);
         }
