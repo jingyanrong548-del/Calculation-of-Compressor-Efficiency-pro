@@ -1,9 +1,10 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表)
-// 版本: v8.12 (Fixed Syntax Error in drawPhDiagram)
+// 版本: v8.25 (Fix: Excel Export Robustness)
 // =====================================================================
 
 import * as echarts from 'echarts';
+// 必须确保项目已安装 xlsx: npm install xlsx
 import * as XLSX from 'xlsx';
 
 /**
@@ -12,107 +13,109 @@ import * as XLSX from 'xlsx';
  * @param {string} filename - 文件名
  */
 export function exportToExcel(data, filename) {
+    console.log("[Utils] Starting Excel export...", data);
+
+    // 1. 检查数据是否存在
     if (!data) {
-        alert("无数据可导出 (No data to export)");
+        alert("无数据可导出 (No data). 请先点击计算按钮生成结果。");
         return;
     }
 
-    const rows = [];
-    
-    // Header
-    rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
-    rows.push(["Date 日期", data.date || new Date().toLocaleDateString(), ""]);
-    rows.push(["Fluid 工质", data.fluid || "-", ""]);
-    if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
-    if(data.is_transcritical !== undefined) {
-        rows.push(["Cycle Type 循环类型", data.is_transcritical ? "Transcritical (跨临界)" : "Subcritical (亚临界)", ""]);
+    // 2. 检查依赖库是否加载
+    if (!XLSX || !XLSX.utils) {
+        alert("错误: 缺少 'xlsx' 库。\n请在 VS Code 终端运行: npm install xlsx\n然后重启开发服务器。");
+        console.error("XLSX library not found.");
+        return;
     }
-    rows.push(["", "", ""]); 
 
-    // Helper
-    const addRow = (key, val, unit="") => {
-        if (val !== undefined && val !== null) {
-            const formattedVal = typeof val === 'number' ? val.toFixed(4) : val;
-            rows.push([key, formattedVal, unit]);
+    try {
+        const rows = [];
+        
+        // --- 构建表头 ---
+        rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
+        rows.push(["Date 日期", data.date || new Date().toLocaleDateString(), ""]);
+        rows.push(["Fluid 工质", data.fluid || "-", ""]);
+        if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
+        if(data.cycle_type) rows.push(["Cycle Type 循环类型", data.cycle_type, ""]);
+        rows.push(["", "", ""]); 
+
+        // --- 辅助函数：添加行 ---
+        const addRow = (key, val, unit="") => {
+            if (val !== undefined && val !== null && val !== "") {
+                // 尝试转为数字以避免 Excel 里的绿色小三角警告
+                const num = parseFloat(val);
+                const displayVal = isNaN(num) ? val : Number(num.toFixed(4));
+                rows.push([key, displayVal, unit]);
+            }
+        };
+
+        // --- 1. 运行工况 ---
+        rows.push(["--- OPERATING CONDITIONS 运行工况 ---", "", ""]);
+        addRow("Suction Pressure 吸气压力", data.p_in, "bar");
+        addRow("Suction Temp 吸气温度", data.t_in, "°C");
+        
+        if (data.t_gc_out !== undefined) {
+            // CO2 模式
+            addRow("Gas Cooler Exit Temp 气冷出口", data.t_gc_out, "°C");
+            if (data.p_out) addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
+        } else {
+            // 常规模式
+            if (data.p_out) addRow("Discharge Pressure 排气压力", data.p_out, "bar");
+            if (data.t_cond) addRow("Condensing Temp 冷凝温度", data.t_cond, "°C");
         }
-    };
+        
+        if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
+        if(data.m_flow) addRow("Mass Flow 质量流量", data.m_flow * 3600, "kg/h");
 
-    // --- Inputs & Conditions ---
-    rows.push(["--- OPERATING CONDITIONS 运行工况 ---", "", ""]);
-    addRow("Suction Pressure 吸气压力", data.p_in, "bar");
-    addRow("Suction Temp 吸气温度", data.t_in, "°C");
-    
-    if (data.t_gc_out !== undefined) {
-        // CO2 模式
-        addRow("Gas Cooler Exit Temp 气冷出口温度", data.t_gc_out, "°C");
-        addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
-    } else {
-        // 常规模式
-        addRow("Discharge Pressure 排气压力", data.p_out, "bar");
-        if(data.t_cond) addRow("Condensing Temp 冷凝温度", data.t_cond, "°C");
-    }
-    
-    if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
-    
-    // --- Efficiency ---
-    rows.push(["", "", ""]);
-    rows.push(["--- EFFICIENCY & MODEL 效率模型 ---", "", ""]);
-    if(data.eff_isen) addRow("Isentropic Eff. 等熵效率", data.eff_isen * 100, "%");
-    if(data.eff_vol) addRow("Volumetric Eff. 容积效率", data.eff_vol * 100, "%");
-    if(data.eff_note) addRow("Model Note 模型备注", data.eff_note, "");
-
-    // --- Thermal Management (CO2) ---
-    if (data.cooling_info) {
+        // --- 2. 效率与性能 ---
         rows.push(["", "", ""]);
-        rows.push(["--- THERMAL MANAGEMENT 热管理 ---", "", ""]);
+        rows.push(["--- PERFORMANCE 性能数据 ---", "", ""]);
+        if(data.power) addRow("Shaft Power 轴功率", data.power, "kW");
+        if(data.q_evap) addRow("Cooling Capacity 制冷量", data.q_evap, "kW");
+        if(data.q_cond) addRow("Heating/GC Load 制热/气冷负荷", data.q_cond, "kW");
         
-        let stratName = data.cooling_info.type.toUpperCase();
-        if (stratName === 'SURFACE') stratName += " (表面冷却)";
-        if (stratName === 'INJECTION') stratName += " (喷液冷却)";
-        if (stratName === 'ADIABATIC') stratName += " (绝热)";
-        
-        addRow("Cooling Strategy 冷却策略", stratName, "");
-        addRow("Raw Discharge Temp 原始排温", data.cooling_info.t_raw, "°C");
-        
-        if (data.cooling_info.q_loss > 0) {
-            addRow("Heat Loss (Surface) 表面散热", data.cooling_info.q_loss, "kW");
+        if(data.cop_c) addRow("COP (Cooling) 制冷系数", data.cop_c, "-");
+        if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
+        if(data.cop && !data.cop_c) addRow("COP 性能系数", data.cop, "-");
+
+        // --- 3. 热管理 (如果存在) ---
+        if (data.cooling_info) {
+            rows.push(["", "", ""]);
+            rows.push(["--- THERMAL MANAGEMENT 热管理 ---", "", ""]);
+            
+            let typeStr = data.cooling_info.type;
+            if (typeStr === 'surface') typeStr = "Surface Cooling (表面冷却)";
+            else if (typeStr === 'injection') typeStr = "Liquid Injection (喷液冷却)";
+            else if (typeStr === 'adiabatic') typeStr = "Adiabatic (绝热)";
+            
+            addRow("Cooling Strategy 策略", typeStr, "");
+            
+            if(data.cooling_info.q_loss > 0) addRow("Heat Removed 移除热量", data.cooling_info.q_loss, "kW");
+            if(data.cooling_info.m_inj > 0) addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
+            if(data.cooling_info.t_raw) addRow("Adiabatic Discharge T 绝热排温", data.cooling_info.t_raw, "°C");
         }
-        if (data.cooling_info.m_inj > 0) {
-            addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
-        }
+
+        // --- 生成文件 ---
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        // 设置列宽
+        ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; 
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Datasheet");
+        
+        const finalName = `${filename}_${new Date().getTime()}.xlsx`;
+        XLSX.writeFile(wb, finalName);
+        
+        console.log(`[Utils] Export success: ${finalName}`);
+
+    } catch (err) {
+        console.error("[Utils] Export Error:", err);
+        alert("导出 Excel 失败:\n" + err.message);
     }
-
-    // --- Results ---
-    rows.push(["", "", ""]);
-    rows.push(["--- PERFORMANCE RESULTS 性能数据 ---", "", ""]);
-    if(data.power) addRow("Shaft Power 轴功率", data.power, "kW");
-    if(data.m_flow) addRow("Mass Flow (Suction) 吸气质量流量", data.m_flow * 3600, "kg/h");
-    if(data.t_out) addRow("Actual Discharge Temp 实际排温", data.t_out, "°C");
-    
-    if(data.q_evap) addRow("Cooling Capacity 制冷量", data.q_evap, "kW");
-    
-    const heatLabel = (data.fluid === 'R744' || data.is_transcritical) ? "Gas Cooler Load 气冷负荷" : "Heating Capacity 制热量";
-    if(data.q_cond) addRow(heatLabel, data.q_cond, "kW");
-    
-    if(data.cop_c) addRow("COP (Cooling) 制冷系数", data.cop_c, "-");
-    if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
-    
-    // Create Sheet
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; // 调整列宽以适应中文
-
-    // Create Book
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Datasheet");
-    
-    // Download
-    XLSX.writeFile(wb, `${filename}_${new Date().getTime()}.xlsx`);
 }
 
 /**
- * 在图表下方渲染状态点数据表 (双语表头)
- * @param {string} domId - 图表容器 ID
- * @param {Array} points - 状态点数组
+ * 在图表下方渲染状态点数据表
  */
 export function renderStateTable(domId, points) {
     const chartDiv = document.getElementById(domId);
@@ -163,7 +166,6 @@ export function renderStateTable(domId, points) {
 
 /**
  * 绘制压焓图 (P-h Diagram)
- * 兼容 CO2 亚临界与跨临界
  */
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
@@ -263,8 +265,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     return params.seriesName;
                 }
             },
-            // [关键修复] 之前这里缺少了 }, 导致构建失败
-            grid: { top: 70, right: 50, bottom: 50, left: 60 },
+            grid: { top: 70, right: 50, bottom: 50, left: 60 }, // 确保这里有闭合括号
             xAxis: { 
                 name: 'Enthalpy (kJ/kg)', 
                 nameLocation: 'middle',
@@ -331,6 +332,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         chart.setOption(option);
         window.addEventListener('resize', () => chart.resize());
 
+        // 更新表格
         if (cycleData && cycleData.points) {
             renderStateTable(domId, cycleData.points);
         }

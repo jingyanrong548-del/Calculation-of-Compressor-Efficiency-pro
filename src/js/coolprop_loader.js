@@ -1,37 +1,44 @@
 // =====================================================================
-// coolprop_loader.js: 动态修补版加载器 (配合 Vite 插件使用)
+// coolprop_loader.js: 动态修补版加载器 (适配 GitHub Pages 子目录)
 // =====================================================================
 
-// 1. 这里直接使用标准 Import
-// 注意：虽然物理文件 coolprop.js 没有 export，但 vite.config.js 里的插件
-// 会在构建时自动注入 "export default Module;"，所以这里不会报错。
+// 1. 标准 Import (配合 vite.config.js 插件使用)
 import Module from './libs/coolprop.js';
 
 export async function loadCoolProp() {
-    console.log("正在初始化 CoolProp (ESM Mode + Vite Plugin Fix)...");
+    console.log("正在初始化 CoolProp (ESM Mode)...");
 
     try {
         const moduleConfig = {
-            // 2. 关键配置：重写 locateFile
-            // 官方源码中的 import.meta.url 可能会去 src/js/libs/ 下找 wasm。
-            // 我们通过这个钩子，强制浏览器去根目录 public/ 下找 /coolprop.wasm。
+            // 2. 关键修复：动态定位 WASM 文件
+            // 解决 GitHub Pages 子目录部署时找不到 .wasm 的问题
             locateFile: (path, prefix) => {
                 if (path.endsWith('.wasm')) {
-                    return '/coolprop.wasm';
+                    // 获取 Vite 配置中的 base 路径
+                    // 本地开发时通常是 '/'
+                    // GitHub Pages 上通常是 '/仓库名/'
+                    const baseUrl = import.meta.env.BASE_URL;
+                    
+                    // 拼接完整路径 (防止双斜杠 //)
+                    // 最终结果类似: "/Calculation-of-Compressor-Efficiency-pro/coolprop.wasm"
+                    const wasmPath = `${baseUrl}coolprop.wasm`.replace('//', '/');
+                    
+                    console.log(`[WASM Path] Loading from: ${wasmPath}`);
+                    return wasmPath;
                 }
                 return prefix + path;
             }
         };
 
         // 3. 初始化模块
-        // Module 是一个函数，调用它会返回一个 Promise，resolve 后得到核心实例 CP
         const CP = await Module(moduleConfig);
         console.log("CoolProp WASM 初始化成功!");
         return CP;
 
     } catch (err) {
         console.error("CoolProp 初始化崩溃:", err);
-        throw new Error(`WASM 加载失败: ${err.message}. (请检查 vite.config.js 是否配置了插件)`);
+        const basePath = import.meta.env.BASE_URL;
+        throw new Error(`WASM 加载失败。尝试访问路径: ${basePath}coolprop.wasm。请检查网络面板 (F12 -> Network)。`);
     }
 }
 
@@ -132,6 +139,23 @@ ODP:           ${info.odp}
         
     } catch (err) {
         console.warn(`Update Fluid Info Failed for ${fluid}:`, err);
-        infoElement.textContent = `Fluid: ${fluid} (Info N/A)`;
+        if (err.message.includes("sublimation") && fluid === 'R744') {
+             const Tcrit_K = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
+             const Pcrit_Pa = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
+             
+             infoElement.innerHTML = `
+<b>${fluid} 关键参数:</b>
+----------------------------------------
+GWP (AR4/AR5): ${info.gwp}
+ODP:           ${info.odp}
+安全级别:      ${info.safety}
+----------------------------------------
+临界温度 (Tc): ${Tcrit_K.toFixed(2)} K (${(Tcrit_K - 273.15).toFixed(2)} °C)
+临界压力 (Pc): ${(Pcrit_Pa / 1e5).toFixed(2)} bar
+标准沸点 (Tb): N/A (在1atm下升华)
+            `.trim();
+        } else {
+            infoElement.textContent = `--- 无法加载 ${fluid} 的物性。 ---\n${err.message}`;
+        }
     }
 }
