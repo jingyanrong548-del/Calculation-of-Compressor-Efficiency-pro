@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化)
-// 版本: v8.26 (Feature: AutoSaveManager)
+// 版本: v8.32 (Feature: CO2 Optimization Chart)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -8,7 +8,7 @@ import * as echarts from 'echarts';
 import * as XLSX from 'xlsx';
 
 /**
- * 数据持久化管理器 (v8.26 New Feature)
+ * 数据持久化管理器
  * 负责将用户输入保存到 LocalStorage，并在刷新后恢复
  */
 export class AutoSaveManager {
@@ -17,21 +17,15 @@ export class AutoSaveManager {
 
     static init() {
         console.log("[AutoSave] Initializing...");
-        
-        // 1. 恢复上次激活的 Tab
         this.restoreTab();
-
-        // 2. 恢复表单数据
         this.load();
 
-        // 3. 绑定保存事件 (防抖)
         const forms = document.querySelectorAll('form');
         forms.forEach(form => {
             form.addEventListener('input', this.debounce(() => this.save(), 500));
             form.addEventListener('change', this.debounce(() => this.save(), 500));
         });
 
-        // 4. 绑定 Tab 切换事件以保存状态
         const tabs = document.querySelectorAll('.tab-btn');
         tabs.forEach((btn, index) => {
             btn.addEventListener('click', () => {
@@ -43,11 +37,9 @@ export class AutoSaveManager {
     static save() {
         try {
             const data = {};
-            // 遍历所有输入控件
             const inputs = document.querySelectorAll('input, select');
             inputs.forEach(el => {
-                if (!el.name) return; // 忽略无 name 的控件
-
+                if (!el.name) return;
                 if (el.type === 'radio') {
                     if (el.checked) data[el.name] = el.value;
                 } else if (el.type === 'checkbox') {
@@ -57,7 +49,6 @@ export class AutoSaveManager {
                 }
             });
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-            // console.log("[AutoSave] Data saved."); // Debug usage
         } catch (e) {
             console.warn("[AutoSave] Save failed:", e);
         }
@@ -67,36 +58,27 @@ export class AutoSaveManager {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY);
             if (!raw) return;
-            
             const data = JSON.parse(raw);
             console.log("[AutoSave] Data found, restoring...");
 
             const inputs = document.querySelectorAll('input, select');
             inputs.forEach(el => {
-                // Radio 处理
                 if (el.type === 'radio') {
                     if (data[el.name] === el.value) {
                         el.checked = true;
-                        // 触发 change 事件以更新 UI (如显隐逻辑)
                         el.dispatchEvent(new Event('change', { bubbles: true }));
                     }
-                } 
-                // Checkbox 处理 (优先使用 ID，因为 name 可能重复)
-                else if (el.type === 'checkbox') {
+                } else if (el.type === 'checkbox') {
                     const key = el.id || el.name;
                     if (data[key] !== undefined) {
                         el.checked = data[key];
                         el.dispatchEvent(new Event('change', { bubbles: true }));
                     }
-                } 
-                // 常规 Input/Select 处理
-                else if (el.name && data[el.name] !== undefined) {
+                } else if (el.name && data[el.name] !== undefined) {
                     el.value = data[el.name];
-                    // 触发 input 事件以更新可能关联的计算或验证
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             });
-
         } catch (e) {
             console.error("[AutoSave] Load failed:", e);
         }
@@ -108,7 +90,6 @@ export class AutoSaveManager {
             const btn = document.getElementById(`tab-btn-${parseInt(index) + 1}`);
             if (btn) btn.click();
         } else {
-            // 默认点击第一个
             const btn = document.getElementById('tab-btn-1');
             if(btn) btn.click();
         }
@@ -125,9 +106,7 @@ export class AutoSaveManager {
 
 
 /**
- * 导出数据到 Excel (双语版)
- * @param {Object} data - 数据对象
- * @param {string} filename - 文件名
+ * 导出数据到 Excel
  */
 export function exportToExcel(data, filename) {
     console.log("[Utils] Starting Excel export...", data);
@@ -145,16 +124,20 @@ export function exportToExcel(data, filename) {
 
     try {
         const rows = [];
-        
-        // --- 构建表头 ---
         rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
         rows.push(["Date 日期", data.date || new Date().toLocaleDateString(), ""]);
         rows.push(["Fluid 工质", data.fluid || "-", ""]);
         if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
         if(data.cycle_type) rows.push(["Cycle Type 循环类型", data.cycle_type, ""]);
+        
+        // 如果有优化建议
+        if (data.opt_p_val) {
+             rows.push(["Optimal Pressure (Calc)", data.opt_p_val.toFixed(2), "bar"]);
+             rows.push(["Max Possible COP", data.opt_cop_val.toFixed(3), "-"]);
+        }
+        
         rows.push(["", "", ""]); 
 
-        // --- 辅助函数：添加行 ---
         const addRow = (key, val, unit="") => {
             if (val !== undefined && val !== null && val !== "") {
                 const num = parseFloat(val);
@@ -163,17 +146,14 @@ export function exportToExcel(data, filename) {
             }
         };
 
-        // --- 1. 运行工况 ---
         rows.push(["--- OPERATING CONDITIONS 运行工况 ---", "", ""]);
         addRow("Suction Pressure 吸气压力", data.p_in, "bar");
         addRow("Suction Temp 吸气温度", data.t_in, "°C");
         
         if (data.t_gc_out !== undefined) {
-            // CO2 模式
             addRow("Gas Cooler Exit Temp 气冷出口", data.t_gc_out, "°C");
             if (data.p_out) addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
         } else {
-            // 常规模式
             if (data.p_out) addRow("Discharge Pressure 排气压力", data.p_out, "bar");
             if (data.t_cond) addRow("Condensing Temp 冷凝温度", data.t_cond, "°C");
         }
@@ -181,11 +161,9 @@ export function exportToExcel(data, filename) {
         if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
         if(data.m_flow) addRow("Mass Flow 质量流量", data.m_flow * 3600, "kg/h");
         
-        // 新增：多级压缩参数
         if(data.stages) addRow("Stages 级数", data.stages, "");
         if(data.intercool) addRow("Intercooling 级间冷却", data.intercool ? "Yes" : "No", "");
 
-        // --- 2. 效率与性能 ---
         rows.push(["", "", ""]);
         rows.push(["--- PERFORMANCE 性能数据 ---", "", ""]);
         if(data.power) addRow("Shaft Power 轴功率", data.power, "kW");
@@ -196,24 +174,19 @@ export function exportToExcel(data, filename) {
         if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
         if(data.cop && !data.cop_c) addRow("COP 性能系数", data.cop, "-");
 
-        // --- 3. 热管理 (如果存在) ---
         if (data.cooling_info) {
             rows.push(["", "", ""]);
             rows.push(["--- THERMAL MANAGEMENT 热管理 ---", "", ""]);
-            
             let typeStr = data.cooling_info.type;
             if (typeStr === 'surface') typeStr = "Surface Cooling (表面冷却)";
             else if (typeStr === 'injection') typeStr = "Liquid Injection (喷液冷却)";
             else if (typeStr === 'adiabatic') typeStr = "Adiabatic (绝热)";
-            
             addRow("Cooling Strategy 策略", typeStr, "");
-            
             if(data.cooling_info.q_loss > 0) addRow("Heat Removed 移除热量", data.cooling_info.q_loss, "kW");
             if(data.cooling_info.m_inj > 0) addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
             if(data.cooling_info.t_raw) addRow("Raw Discharge T 原始排温", data.cooling_info.t_raw, "°C");
         }
 
-        // --- 生成文件 ---
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; 
 
@@ -231,7 +204,7 @@ export function exportToExcel(data, filename) {
 }
 
 /**
- * 在图表下方渲染状态点数据表
+ * 渲染状态点表格
  */
 export function renderStateTable(domId, points) {
     const chartDiv = document.getElementById(domId);
@@ -288,19 +261,20 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     if (!dom) return;
 
     dom.classList.remove('hidden');
-    let chart = echarts.getInstanceByDom(dom);
-    if (!chart) {
-        chart = echarts.init(dom);
+    // 如果之前有实例，先销毁或重用。为了防止图表类型切换冲突，建议 clear 或销毁
+    const existingChart = echarts.getInstanceByDom(dom);
+    if (existingChart) {
+        existingChart.clear(); // 清除之前的图表内容（例如可能是优化曲线）
     }
+
+    let chart = existingChart || echarts.init(dom);
     chart.showLoading();
 
     try {
-        // 1. 获取临界参数
         const T_crit = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
         const P_crit = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
         const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid); 
         
-        // 绘图范围设定
         const T_start = T_min + 5; 
         const T_end = T_crit - 0.5; 
         const steps = 100;
@@ -310,7 +284,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         const lineVapor = [];
         let H_crit = 0;
 
-        // 2. 绘制饱和穹顶
         for (let i = 0; i <= steps; i++) {
             const T = T_start + i * stepSize;
             try {
@@ -321,10 +294,9 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                 const P_vap = CP.PropsSI('P', 'T', T, 'Q', 1, fluid);
                 const H_vap = CP.PropsSI('H', 'T', T, 'Q', 1, fluid);
                 lineVapor.push([H_vap / 1000.0, P_vap / 1e5]);
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         }
 
-        // 计算临界点坐标
         try {
             H_crit = CP.PropsSI('H', 'T', T_crit, 'P', P_crit, fluid) / 1000.0;
         } catch(e) {
@@ -336,7 +308,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         }
         const critPointData = [[H_crit, P_crit / 1e5]];
 
-        // 3. 处理循环点
         const cycleSeriesData = [];
         if (cycleData && cycleData.points) {
             cycleData.points.forEach(pt => {
@@ -349,13 +320,11 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     }
                 });
             });
-            // 闭合
             if (cycleSeriesData.length > 0) {
                 cycleSeriesData.push(cycleSeriesData[0]);
             }
         }
 
-        // 4. ECharts Option
         const option = {
             title: { 
                 text: `P-h Diagram: ${fluid}`, 
@@ -448,13 +417,126 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         chart.setOption(option);
         window.addEventListener('resize', () => chart.resize());
 
-        // 更新表格
         if (cycleData && cycleData.points) {
             renderStateTable(domId, cycleData.points);
         }
 
     } catch (err) {
         console.error("Draw Chart Error:", err);
+        chart.hideLoading();
+        dom.innerHTML = `<div class="p-4 text-center text-red-500">Error drawing chart: ${err.message}</div>`;
+    }
+}
+
+/**
+ * [New in v8.32] 绘制 CO2 跨临界 COP 优化曲线
+ * @param {string} domId - 图表容器 ID
+ * @param {Array} optimizationData - [{p: bar, cop: number}, ...]
+ * @param {number} currentP - 当前用户选定的高压侧压力 (bar)
+ */
+export function drawOptimizationCurve(domId, optimizationData, currentP) {
+    const dom = document.getElementById(domId);
+    if (!dom) return;
+
+    dom.classList.remove('hidden');
+    const existingChart = echarts.getInstanceByDom(dom);
+    if (existingChart) {
+        existingChart.clear(); // 清除之前的图表 (如 P-h 图)
+    }
+
+    let chart = existingChart || echarts.init(dom);
+    chart.showLoading();
+
+    try {
+        // 1. 准备数据
+        const xData = optimizationData.map(d => d.p);
+        const yData = optimizationData.map(d => d.cop);
+        
+        // 找到最大 COP 点
+        let maxCOP = -1;
+        let optP = 0;
+        optimizationData.forEach(d => {
+            if (d.cop > maxCOP) {
+                maxCOP = d.cop;
+                optP = d.p;
+            }
+        });
+
+        // 2. 构建 Option
+        const option = {
+            title: {
+                text: 'CO₂ Transcritical Optimization',
+                subtext: `Optimal P: ${optP.toFixed(1)} bar (COP: ${maxCOP.toFixed(3)})`,
+                left: 'center',
+                textStyle: { color: '#c2410c', fontWeight: 'bold' } // Orange color
+            },
+            tooltip: {
+                trigger: 'axis',
+                formatter: (params) => {
+                    const p = params[0].value[0];
+                    const cop = params[0].value[1];
+                    return `<b>Pressure: ${p.toFixed(1)} bar</b><br/>COP: ${cop.toFixed(3)}`;
+                }
+            },
+            grid: { top: 80, right: 50, bottom: 50, left: 60 },
+            xAxis: {
+                type: 'value',
+                name: 'Gas Cooler Pressure (bar)',
+                nameLocation: 'middle',
+                nameGap: 30,
+                min: (value) => Math.floor(value.min - 5),
+                max: (value) => Math.ceil(value.max + 5)
+            },
+            yAxis: {
+                type: 'value',
+                name: 'COP (Cooling)',
+                scale: true
+            },
+            series: [
+                {
+                    name: 'COP Curve',
+                    type: 'line',
+                    smooth: true,
+                    data: optimizationData.map(d => [d.p, d.cop]),
+                    lineStyle: { color: '#ea580c', width: 3 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(234, 88, 12, 0.3)' },
+                            { offset: 1, color: 'rgba(234, 88, 12, 0.05)' }
+                        ])
+                    },
+                    markPoint: {
+                        data: [
+                            { type: 'max', name: 'Max COP', itemStyle: { color: '#ea580c' } }
+                        ]
+                    },
+                    markLine: {
+                        symbol: 'none',
+                        data: [
+                            { 
+                                xAxis: currentP, 
+                                label: { formatter: 'Current P', position: 'end' },
+                                lineStyle: { color: '#333', type: 'dashed' } 
+                            }
+                        ]
+                    }
+                }
+            ]
+        };
+
+        chart.hideLoading();
+        chart.setOption(option);
+        
+        // 隐藏下方的状态表 (因为优化曲线不需要显示状态点表格)
+        let tableDiv = dom.nextElementSibling;
+        if (tableDiv && tableDiv.classList.contains('state-table-container')) {
+            tableDiv.style.display = 'none';
+        }
+
+        window.addEventListener('resize', () => chart.resize());
+
+    } catch (err) {
+        console.error("Draw Opt Curve Error:", err);
         chart.hideLoading();
         dom.innerHTML = `<div class="p-4 text-center text-red-500">Error drawing chart: ${err.message}</div>`;
     }
