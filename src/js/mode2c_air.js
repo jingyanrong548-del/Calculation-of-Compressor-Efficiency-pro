@@ -3,7 +3,6 @@
 // 版本: v8.2 (Excel 导出版)
 // =====================================================================
 
-// [新增] 引入导出工具
 import { exportToExcel } from './utils.js';
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3;
@@ -17,7 +16,6 @@ function generateAirDatasheet(d) {
 
     return `
     <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
-        <!-- Header -->
         <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
                 <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">AIR COMPRESSOR DATASHEET</div>
@@ -29,7 +27,6 @@ function generateAirDatasheet(d) {
             </div>
         </div>
         
-        <!-- KPI Dashboard -->
         <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
             <div style="text-align: center;">
                 <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Shaft Power 轴功率</div>
@@ -45,9 +42,7 @@ function generateAirDatasheet(d) {
             </div>
         </div>
 
-        <!-- Data Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-            <!-- Left Column -->
             <div>
                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Inlet Conditions 进口工况</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
@@ -64,7 +59,6 @@ function generateAirDatasheet(d) {
                 </table>
             </div>
 
-            <!-- Right Column -->
             <div>
                  <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Performance Data 性能数据</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
@@ -90,7 +84,6 @@ function generateAirDatasheet(d) {
             </div>
         </div>
         
-        <!-- Footer -->
         <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
             <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
                 Prepared by Yanrong Jing (荆炎荣)
@@ -174,11 +167,13 @@ function setupAiEffRecommendation() {
 // --- 计算核心 ---
 async function calculateMode3(CP) {
     if (!CP) {
-        resultsDivM3.textContent = "CoolProp 未加载";
+        if(resultsDivM3) resultsDivM3.textContent = "CoolProp 未加载";
         return;
     }
-    calcButtonM3.textContent = "计算中...";
-    calcButtonM3.disabled = true;
+    if(calcButtonM3) {
+        calcButtonM3.textContent = "计算中...";
+        calcButtonM3.disabled = true;
+    }
 
     setTimeout(() => {
         try {
@@ -267,7 +262,7 @@ async function calculateMode3(CP) {
             calcButtonM3.textContent = "计算空压机";
             calcButtonM3.disabled = false;
             printButtonM3.disabled = false;
-            exportButtonM3.disabled = false; // [新增] 启用导出按钮
+            exportButtonM3.disabled = false;
 
             printButtonM3.onclick = () => {
                 const win = window.open('', '_blank');
@@ -275,7 +270,6 @@ async function calculateMode3(CP) {
                 win.document.close();
                 setTimeout(() => win.print(), 200);
             };
-            // [新增] 导出事件
             exportButtonM3.onclick = () => exportToExcel(lastMode3Data, "AirComp_Calc");
 
         } catch (err) {

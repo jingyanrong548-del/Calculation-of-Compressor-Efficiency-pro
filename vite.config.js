@@ -1,17 +1,36 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // 这里的名字要和您的 GitHub 仓库名完全一致
-  base: '/Calculation-of-Compressor-Efficiency-pro/', 
-  build: {
-    // 下面这个配置可以消除那个 1000kB 的黄色警告（通过分包）
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          echarts: ['echarts'], // 把 echarts 单独打包
-          xlsx: ['xlsx']        // 把 xlsx 单独打包
+  base: './',
+
+  plugins: [
+    {
+      name: 'coolprop-auto-export',
+      transform(code, id) {
+        // 1. 拦截 coolprop.js
+        if (id.includes('coolprop.js')) {
+          console.log('✅ [Vite Plugin] 已捕获 coolprop.js，正在注入 export 语句...');
+          
+          // 2. 核心修改：在代码末尾强行加上 export default Module;
+          // 这样浏览器就能正常 import 它了，且无需修改源文件
+          return code + ';\nexport default Module;';
         }
       }
     }
+  ],
+
+  optimizeDeps: {
+    // 3. 关键：必须排除 coolprop.js，强迫 Vite 每次都通过我们的插件处理它
+    exclude: ['./src/js/libs/coolprop.js'],
+  },
+
+  build: {
+    assetsInlineLimit: 0,
+    target: 'esnext'
+  },
+
+  esbuild: {
+    loader: 'js',     
+    jsxInject: ``,    
   }
 });

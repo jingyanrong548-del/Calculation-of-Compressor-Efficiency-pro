@@ -1,162 +1,224 @@
 // =====================================================================
-// ui.js: UI 界面交互逻辑 (全模式通用 & 流量控制中心)
-// 版本: v8.13 (Fix: Flow Inputs Visibility & CO2 Support)
+// ui.js: UI 界面交互逻辑 (v8.24: CO2 Dual Mode & Thermal UI)
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("UI: Initializing Interface Logic...");
 
     // -----------------------------------------------------------------
-    // 1. 主选项卡 (Tab) 切换逻辑
+    // 1. 主选项卡 (Tab) 切换逻辑 (Main Tabs 1-5)
     // -----------------------------------------------------------------
-    const tabs = [
-        { btn: document.getElementById('tab-btn-1'), content: document.getElementById('tab-content-1') },
-        { btn: document.getElementById('tab-btn-2'), content: document.getElementById('tab-content-2') },
-        { btn: document.getElementById('tab-btn-3'), content: document.getElementById('tab-content-3') },
-        { btn: document.getElementById('tab-btn-4'), content: document.getElementById('tab-content-4') },
-        { btn: document.getElementById('tab-btn-5'), content: document.getElementById('tab-content-5') }
-    ];
+    const tabIds = [1, 2, 3, 4, 5];
+    
+    const tabs = tabIds.map(id => ({
+        id: id,
+        btn: document.getElementById(`tab-btn-${id}`),
+        content: document.getElementById(`tab-content-${id}`)
+    })).filter(t => t.btn && t.content);
+
+    if (tabs.length === 0) console.error("UI Critical Error: No tabs found!");
 
     tabs.forEach(tab => {
-        if (tab.btn && tab.content) {
-            tab.btn.addEventListener('click', () => {
-                // Deactivate all
-                tabs.forEach(t => {
-                    if (t.btn && t.content) {
-                        t.btn.classList.remove('active');
-                        t.content.style.display = 'none';
-                        t.content.classList.remove('active');
-                    }
-                });
-                // Activate clicked
-                tab.btn.classList.add('active');
-                tab.content.style.display = 'block';
-                tab.content.classList.add('active');
+        tab.btn.addEventListener('click', () => {
+            // 重置所有
+            tabs.forEach(t => {
+                t.btn.classList.remove('active', 'text-teal-600', 'border-teal-600', 'bg-teal-50');
+                t.btn.classList.add('text-gray-600');
+                t.content.style.display = 'none';
             });
-        }
+            // 激活当前
+            tab.btn.classList.remove('text-gray-600');
+            tab.btn.classList.add('active', 'text-teal-600', 'border-teal-600', 'bg-teal-50');
+            tab.content.style.display = 'block';
+            
+            // 触发 Resize 以修复图表显示
+            window.dispatchEvent(new Event('resize'));
+        });
     });
 
     // -----------------------------------------------------------------
-    // 2. 流量模式切换器 (RPM / Mass / Vol) - 核心修复
+    // 2. 模式 1 子选项卡切换 (常规制冷 vs CO2循环)
+    // -----------------------------------------------------------------
+    const btnStd = document.getElementById('sub-tab-std');
+    const btnCo2 = document.getElementById('sub-tab-co2');
+    const panelStd = document.getElementById('panel-m1-std');
+    const panelCo2 = document.getElementById('panel-m1-co2');
+
+    if (btnStd && btnCo2 && panelStd && panelCo2) {
+        const switchMode1Tab = (isCo2) => {
+            if (isCo2) {
+                btnStd.classList.remove('active', 'bg-green-600', 'text-white', 'border-green-600');
+                btnCo2.classList.add('active', 'bg-gray-800', 'text-white', 'border-gray-800');
+                panelStd.classList.add('hidden'); 
+                panelCo2.classList.remove('hidden');
+            } else {
+                btnCo2.classList.remove('active', 'bg-gray-800', 'text-white', 'border-gray-800');
+                btnStd.classList.add('active', 'bg-green-600', 'text-white', 'border-green-600');
+                panelCo2.classList.add('hidden');
+                panelStd.classList.remove('hidden');
+            }
+        };
+        btnStd.addEventListener('click', () => switchMode1Tab(false));
+        btnCo2.addEventListener('click', () => switchMode1Tab(true));
+    }
+
+    // -----------------------------------------------------------------
+    // [新增] 3. Mode 1 CO2 循环类型切换 (跨临界 vs 亚临界)
+    // -----------------------------------------------------------------
+    function setupCo2CycleToggle() {
+        const radios = document.querySelectorAll('input[name="cycle_type_m1_co2"]');
+        const divTrans = document.getElementById('inputs-transcritical-m1-co2');
+        const divSub = document.getElementById('inputs-subcritical-m1-co2');
+
+        if (!radios.length || !divTrans || !divSub) return;
+
+        const update = () => {
+            const val = document.querySelector('input[name="cycle_type_m1_co2"]:checked').value;
+            
+            if (val === 'transcritical') {
+                divTrans.classList.remove('hidden');
+                divSub.classList.add('hidden');
+                // 启用/禁用输入框以防干扰
+                divTrans.querySelectorAll('input').forEach(i => i.disabled = false);
+                divSub.querySelectorAll('input').forEach(i => i.disabled = true);
+            } else {
+                divTrans.classList.add('hidden');
+                divSub.classList.remove('hidden');
+                divTrans.querySelectorAll('input').forEach(i => i.disabled = true);
+                divSub.querySelectorAll('input').forEach(i => i.disabled = false);
+            }
+        };
+
+        radios.forEach(r => r.addEventListener('change', update));
+        update(); // Init
+    }
+    setupCo2CycleToggle();
+
+    // -----------------------------------------------------------------
+    // 4. 流量输入框切换逻辑 (通用)
     // -----------------------------------------------------------------
     function setupFlowToggle(modeSuffix) {
-        // 查找该模式下的所有单选按钮
-        const radios = document.querySelectorAll(`input[name="flow_mode_${modeSuffix}"]`);
+        const radioName = `flow_mode_${modeSuffix}`;
+        const radios = document.querySelectorAll(`input[name="${radioName}"]`);
+        
         if (!radios.length) return;
 
-        // 查找对应的输入容器
-        const divRpm = document.getElementById(`flow-inputs-rpm-${modeSuffix}`);
-        const divMass = document.getElementById(`flow-inputs-mass-${modeSuffix}`);
-        const divVol = document.getElementById(`flow-inputs-vol-${modeSuffix}`);
-
-        const toggle = () => {
-            // 获取当前选中的值
-            const checked = document.querySelector(`input[name="flow_mode_${modeSuffix}"]:checked`);
-            if (!checked) return;
+        const updateVisibility = () => {
+            const checkedRadio = document.querySelector(`input[name="${radioName}"]:checked`);
+            if (!checkedRadio) return;
             
-            const val = checked.value;
+            const val = checkedRadio.value;
+            const divRpm = document.getElementById(`flow-inputs-rpm-${modeSuffix}`);
+            const divMass = document.getElementById(`flow-inputs-mass-${modeSuffix}`);
+            const divVol = document.getElementById(`flow-inputs-vol-${modeSuffix}`);
 
-            // 通用显示/隐藏函数 (使用 classList 操作 hidden)
-            const setVisible = (div, isVisible) => {
-                if (!div) return;
-                if (isVisible) {
-                    div.classList.remove('hidden');
-                    // 针对 RPM 这种 Grid 布局的特殊处理
-                    if (div.id.includes('rpm')) {
-                        div.style.display = 'grid'; 
-                    } else {
-                        div.style.display = 'block';
-                    }
-                    setInputsRequired(div, true);
+            const setDisplay = (el, show, displayType = 'block') => {
+                if (!el) return;
+                if (show) {
+                    el.classList.remove('hidden');
+                    el.style.display = displayType;
+                    el.querySelectorAll('input').forEach(i => i.disabled = false);
                 } else {
-                    div.classList.add('hidden');
-                    div.style.display = 'none';
-                    setInputsRequired(div, false);
+                    el.classList.add('hidden');
+                    el.style.display = 'none';
+                    el.querySelectorAll('input').forEach(i => i.disabled = true);
                 }
             };
 
-            setVisible(divRpm, val === 'rpm');
-            setVisible(divMass, val === 'mass');
-            setVisible(divVol, val === 'vol');
+            setDisplay(divRpm, val === 'rpm', 'grid');
+            setDisplay(divMass, val === 'mass');
+            setDisplay(divVol, val === 'vol');
         };
 
-        // 绑定事件
-        radios.forEach(r => r.addEventListener('change', toggle));
-        
-        // [Fix] 立即初始化一次状态
-        toggle();
+        radios.forEach(r => r.addEventListener('change', updateVisibility));
+        updateVisibility(); 
     }
 
-    // 辅助函数：设置必填状态
-    function setInputsRequired(container, isRequired) {
-        const inputs = container.querySelectorAll('input');
-        inputs.forEach(input => {
-            input.required = isRequired;
-            input.disabled = !isRequired; // 禁用隐藏的输入框以防止提交干扰
-        });
-    }
-
-    // [Fix] 包含 m1_co2 的完整列表
-    const allModes = ['m1', 'm1_co2', 'm2', 'm3', 'm4', 'm5'];
-    allModes.forEach(suffix => {
-        setupFlowToggle(suffix);
-    });
-
+    ['m1', 'm1_co2', 'm2', 'm3', 'm4', 'm5'].forEach(setupFlowToggle);
 
     // -----------------------------------------------------------------
-    // 3. 模式三 (空压机) 冷却方式切换
+    // 5. 通用显隐工具 (Radio & Checkbox)
     // -----------------------------------------------------------------
-    function setupMode3CoolingToggle() {
-        const radios = document.querySelectorAll('input[name="cooling_type_m3"]');
-        const divJacket = document.getElementById('jacket-inputs-m3');
-        const divInjection = document.getElementById('injection-inputs-m3');
+    function setupRadioToggle(name, targetValue, targetDivId) {
+        const radios = document.querySelectorAll(`input[name="${name}"]`);
+        const targetDiv = document.getElementById(targetDivId);
+        if (!radios.length || !targetDiv) return;
 
-        if (!radios.length) return;
-
-        const toggle = () => {
-            const checked = document.querySelector('input[name="cooling_type_m3"]:checked');
+        const update = () => {
+            const checked = document.querySelector(`input[name="${name}"]:checked`);
             if (!checked) return;
-            const val = checked.value;
-
-            if (divJacket) {
-                const show = (val === 'jacket');
-                divJacket.style.display = show ? 'block' : 'none';
-                if(!show) divJacket.classList.add('hidden'); else divJacket.classList.remove('hidden');
-                setInputsRequired(divJacket, show);
-            }
-            if (divInjection) {
-                const show = (val === 'injection');
-                divInjection.style.display = show ? 'block' : 'none';
-                if(!show) divInjection.classList.add('hidden'); else divInjection.classList.remove('hidden');
-                setInputsRequired(divInjection, show);
+            const shouldShow = (checked.value === targetValue);
+            if (shouldShow) {
+                targetDiv.classList.remove('hidden');
+                targetDiv.style.display = 'block';
+                targetDiv.querySelectorAll('input').forEach(i => i.disabled = false);
+            } else {
+                targetDiv.classList.add('hidden');
+                targetDiv.style.display = 'none';
+                targetDiv.querySelectorAll('input').forEach(i => i.disabled = true);
             }
         };
-
-        radios.forEach(r => r.addEventListener('change', toggle));
-        toggle();
+        radios.forEach(r => r.addEventListener('change', update));
+        update();
     }
-    setupMode3CoolingToggle();
 
-    // -----------------------------------------------------------------
-    // 4. 后冷却器 (Cooler) 复选框切换
-    // -----------------------------------------------------------------
-    function setupCoolerToggle(checkboxId, inputsDivId) {
-        const checkbox = document.getElementById(checkboxId);
-        const inputsDiv = document.getElementById(inputsDivId);
-        
-        if (!checkbox || !inputsDiv) return;
+    function setupCheckboxToggle(chkId, divId) {
+        const chk = document.getElementById(chkId);
+        const div = document.getElementById(divId);
+        if (!chk || !div) return;
 
-        const toggle = () => {
-            const isChecked = checkbox.checked;
-            inputsDiv.style.display = isChecked ? 'block' : 'none';
-            if(!isChecked) inputsDiv.classList.add('hidden'); else inputsDiv.classList.remove('hidden');
-            setInputsRequired(inputsDiv, isChecked);
+        const update = () => {
+            const shouldShow = chk.checked;
+            if (shouldShow) {
+                div.classList.remove('hidden');
+                div.style.display = 'block';
+                div.querySelectorAll('input').forEach(i => i.disabled = false);
+            } else {
+                div.classList.add('hidden');
+                div.style.display = 'none';
+                div.querySelectorAll('input').forEach(i => i.disabled = true);
+            }
         };
-
-        checkbox.addEventListener('change', toggle);
-        toggle();
+        chk.addEventListener('change', update);
+        update();
     }
-    
-    setupCoolerToggle('enable_cooler_calc_m2', 'cooler-inputs-m2');
-    setupCoolerToggle('enable_cooler_calc_m3', 'cooler-inputs-m3');
 
+    // -----------------------------------------------------------------
+    // 6. 绑定业务逻辑联动
+    // -----------------------------------------------------------------
+
+    // Mode 2 Gas: 冷却方式切换
+    setupRadioToggle('cooling_mode_m2', 'target_t', 'cooling-inputs-m2');
+    setupCheckboxToggle('enable_cooler_calc_m2', 'cooler-inputs-m2');
+
+    // Mode 3 Air: 冷却方式切换
+    const m3Radios = document.querySelectorAll('input[name="cooling_type_m3"]');
+    if(m3Radios.length) {
+        const updateM3 = () => {
+            const val = document.querySelector('input[name="cooling_type_m3"]:checked').value;
+            const jacketDiv = document.getElementById('jacket-inputs-m3');
+            const injDiv = document.getElementById('injection-inputs-m3');
+            if(jacketDiv) {
+                jacketDiv.style.display = (val === 'jacket') ? 'block' : 'none';
+                jacketDiv.querySelectorAll('input').forEach(i => i.disabled = (val !== 'jacket'));
+            }
+            if(injDiv) {
+                injDiv.style.display = (val === 'injection') ? 'block' : 'none';
+                injDiv.querySelectorAll('input').forEach(i => i.disabled = (val !== 'injection'));
+            }
+        };
+        m3Radios.forEach(r => r.addEventListener('change', updateM3));
+        updateM3();
+    }
+    setupCheckboxToggle('enable_cooler_calc_m3', 'cooler-inputs-m3');
+
+    // Mode 4 & 5 Desuperheating
+    setupCheckboxToggle('enable_desuperheat_m4', 'desuperheat-inputs-m4');
+    setupCheckboxToggle('enable_desuperheat_m5', 'desuperheat-inputs-m5');
+
+    // Mode 1 Helper Toggles
+    setupCheckboxToggle('enable_dynamic_eff_m1', 'dynamic-eff-inputs-m1');
+    setupCheckboxToggle('enable_dynamic_eff_m2', 'dynamic-eff-inputs-m2');
+
+    console.log("UI: Initialization Complete.");
 });

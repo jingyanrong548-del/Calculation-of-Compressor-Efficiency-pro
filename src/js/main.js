@@ -1,99 +1,91 @@
+console.log("🚀 Main.js is attempting to load...");
+alert("Main.js start!"); // 强制弹窗
 import '../css/style.css';
 // =====================================================================
-// main.js: 应用主入口 (总指挥)
-// 版本: v7.6 (修复 CP_INSTANCE 作用域问题)
-// 职责: 1. 正确导入并调用所有重构后的模块初始化函数。
-//        2. 加载 CoolProp 物性库 (coolprop_loader.js)。
-//        3. 加载 UI 交互 (ui.js)。
+// main.js: Application Entry Point (Error Handling Added)
 // =====================================================================
 
-// 1. 导入所有需要的模块 (使用正确的、与各文件匹配的函数名)
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
-import { initMode1_2 } from './mode2_predict.js'; // 此文件负责初始化新的模式1和模式2
-import { initMode3 } from './mode2c_air.js';      // 此文件负责初始化新的模式3
-import { initMode4 } from './mode3_mvr.js';       // 此文件负责初始化新的模式4
-import { initMode5 } from './mode4_turbo.js';     // 此文件负责初始化新的模式5
+import { initMode1_2 } from './mode2_predict.js';
+import { initMode3 } from './mode2c_air.js';
+import { initMode4 } from './mode3_mvr.js';
+import { initMode5 } from './mode4_turbo.js';
+import './ui.js'; // Load UI interactions
 
-// 2. 导入并执行 UI 交互脚本
-import './ui.js'; 
-
-// 3. 主应用逻辑: 等待 DOM 加载完毕
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 4. 定义所有需要被更新状态的元素 (使用 v7.0 的新ID)
     const buttons = [
-        document.getElementById('calc-button-1'), // 模式一: 热泵
-        document.getElementById('calc-button-2'), // 模式二: 气体
-        document.getElementById('calc-button-3'), // 模式三: 空压机
-        document.getElementById('calc-button-4'), // 模式四: MVR 容积式
-        document.getElementById('calc-button-5')  // 模式五: MVR 透平式
+        document.getElementById('calc-button-1'), 
+        document.getElementById('calc-button-1-co2'), 
+        document.getElementById('calc-button-2'), 
+        document.getElementById('calc-button-3'), 
+        document.getElementById('calc-button-4'), 
+        document.getElementById('calc-button-5')
     ];
     
     const fluidInfos = [
-        { select: document.getElementById('fluid_m1'), info: document.getElementById('fluid-info-m1') }, // 热泵
-        { select: document.getElementById('fluid_m2'), info: document.getElementById('fluid-info-m2') }, // 气体
-        // 模式三 (空压机) 无工质选择
-        { select: document.getElementById('fluid_m4'), info: document.getElementById('fluid-info-m4') }, // MVR 容积式
-        { select: document.getElementById('fluid_m5'), info: document.getElementById('fluid-info-m5') }  // MVR 透平式
+        { select: document.getElementById('fluid_m1'), info: document.getElementById('fluid-info-m1') },
+        { select: document.getElementById('fluid_m2'), info: document.getElementById('fluid-info-m2') },
+        { select: document.getElementById('fluid_m4'), info: document.getElementById('fluid-info-m4') },
+        { select: document.getElementById('fluid_m5'), info: document.getElementById('fluid-info-m5') }
     ];
 
-    // 按钮的初始文本
-    const buttonTexts = {
-        'calc-button-1': "计算性能 (热泵)",
-        'calc-button-2': "计算性能 (气体)",
-        'calc-button-3': "计算性能 (空压机)",
-        'calc-button-4': "计算喷水量 (MVR 容积式)",
-        'calc-button-5': "计算喷水量 (MVR 透平式)"
-    };
-    
-    // 5. 立即调用 CoolProp 加载器
+    // Lock buttons initially
+    buttons.forEach(btn => {
+        if(btn) {
+            btn.disabled = true;
+            btn.textContent = "Loading Library...";
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    });
+
+    // Start Loading
     loadCoolProp()
         .then((CP) => {
-            // 6. (成功) 物性库加载成功!
-            console.log("CoolProp loaded successfully.");
+            console.log("%c CoolProp WASM Loaded Successfully ", "background: #059669; color: #fff");
 
-            // 6.1 初始化所有计算模块 (使用正确的、已导入的函数名)
-            initMode1_2(CP);
-            initMode3(CP);
-            initMode4(CP);
-            initMode5(CP);
+            // 1. Initialize Modules
+            try {
+                initMode1_2(CP);
+                initMode3(CP);
+                initMode4(CP);
+                initMode5(CP);
+            } catch (initErr) {
+                console.error("Module Init Error:", initErr);
+                alert("Error initializing calculation modules. Check console.");
+            }
 
-            // 6.2 更新所有计算按钮的状态
+            // 2. Unlock Buttons
             buttons.forEach(btn => {
                 if (btn) {
-                    btn.textContent = buttonTexts[btn.id] || "计算";
+                    btn.textContent = btn.id.includes('co2') ? "Calculate CO₂" : "Calculate (计算)";
                     btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             });
             
-            // 6.3 [关键修复] 更新所有物性显示框, 显示默认工质信息
+            // 3. Update Default Fluid Info
             fluidInfos.forEach(fi => {
                 if (fi.select && fi.info) {
-                    // 将 CP 实例作为第三个参数传入
                     updateFluidInfo(fi.select, fi.info, CP);
                 }
             });
 
         })
         .catch((err) => {
-            // 7. (失败) 物性库加载失败!
-            console.error("Failed to load CoolProp:", err);
-            const errorMsg = `物性库加载失败: ${err.message}`;
+            console.error("CRITICAL ERROR:", err);
             
-            // 7.1 禁用所有按钮并显示错误
+            // Visual Error Feedback
             buttons.forEach(btn => {
                 if (btn) {
-                    btn.textContent = "物性库加载失败";
-                    btn.disabled = true;
+                    btn.textContent = "Library Load Failed";
+                    btn.classList.add('bg-red-600', 'text-white');
                 }
             });
             
-            // 7.2 在所有物性框显示错误
-            fluidInfos.forEach(fi => {
-                if (fi.info) {
-                    fi.info.textContent = errorMsg;
-                }
-            });
+            // Show Alert
+            const msg = "无法加载 CoolProp 物性库。\n请检查:\n1. public/coolprop.wasm 文件是否存在\n2. 终端是否有构建错误 (.jsx 错误)";
+            alert(msg);
         });
 
 });

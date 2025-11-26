@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表)
-// 版本: v8.11 (Bilingual Excel & State Table)
+// 版本: v8.12 (Fixed Syntax Error in drawPhDiagram)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -263,6 +263,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     return params.seriesName;
                 }
             },
+            // [关键修复] 之前这里缺少了 }, 导致构建失败
             grid: { top: 70, right: 50, bottom: 50, left: 60 },
             xAxis: { 
                 name: 'Enthalpy (kJ/kg)', 
