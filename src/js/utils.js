@@ -1,11 +1,128 @@
 // =====================================================================
-// utils.js: 通用工具库 (图表 & 导出 & 状态表)
-// 版本: v8.25 (Fix: Excel Export Robustness)
+// utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化)
+// 版本: v8.26 (Feature: AutoSaveManager)
 // =====================================================================
 
 import * as echarts from 'echarts';
 // 必须确保项目已安装 xlsx: npm install xlsx
 import * as XLSX from 'xlsx';
+
+/**
+ * 数据持久化管理器 (v8.26 New Feature)
+ * 负责将用户输入保存到 LocalStorage，并在刷新后恢复
+ */
+export class AutoSaveManager {
+    static STORAGE_KEY = 'v8_26_calc_data';
+    static TAB_KEY = 'v8_26_active_tab';
+
+    static init() {
+        console.log("[AutoSave] Initializing...");
+        
+        // 1. 恢复上次激活的 Tab
+        this.restoreTab();
+
+        // 2. 恢复表单数据
+        this.load();
+
+        // 3. 绑定保存事件 (防抖)
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('input', this.debounce(() => this.save(), 500));
+            form.addEventListener('change', this.debounce(() => this.save(), 500));
+        });
+
+        // 4. 绑定 Tab 切换事件以保存状态
+        const tabs = document.querySelectorAll('.tab-btn');
+        tabs.forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                localStorage.setItem(this.TAB_KEY, index);
+            });
+        });
+    }
+
+    static save() {
+        try {
+            const data = {};
+            // 遍历所有输入控件
+            const inputs = document.querySelectorAll('input, select');
+            inputs.forEach(el => {
+                if (!el.name) return; // 忽略无 name 的控件
+
+                if (el.type === 'radio') {
+                    if (el.checked) data[el.name] = el.value;
+                } else if (el.type === 'checkbox') {
+                    data[el.id || el.name] = el.checked;
+                } else {
+                    data[el.name] = el.value;
+                }
+            });
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+            // console.log("[AutoSave] Data saved."); // Debug usage
+        } catch (e) {
+            console.warn("[AutoSave] Save failed:", e);
+        }
+    }
+
+    static load() {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            if (!raw) return;
+            
+            const data = JSON.parse(raw);
+            console.log("[AutoSave] Data found, restoring...");
+
+            const inputs = document.querySelectorAll('input, select');
+            inputs.forEach(el => {
+                // Radio 处理
+                if (el.type === 'radio') {
+                    if (data[el.name] === el.value) {
+                        el.checked = true;
+                        // 触发 change 事件以更新 UI (如显隐逻辑)
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                } 
+                // Checkbox 处理 (优先使用 ID，因为 name 可能重复)
+                else if (el.type === 'checkbox') {
+                    const key = el.id || el.name;
+                    if (data[key] !== undefined) {
+                        el.checked = data[key];
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                } 
+                // 常规 Input/Select 处理
+                else if (el.name && data[el.name] !== undefined) {
+                    el.value = data[el.name];
+                    // 触发 input 事件以更新可能关联的计算或验证
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+
+        } catch (e) {
+            console.error("[AutoSave] Load failed:", e);
+        }
+    }
+
+    static restoreTab() {
+        const index = localStorage.getItem(this.TAB_KEY);
+        if (index !== null) {
+            const btn = document.getElementById(`tab-btn-${parseInt(index) + 1}`);
+            if (btn) btn.click();
+        } else {
+            // 默认点击第一个
+            const btn = document.getElementById('tab-btn-1');
+            if(btn) btn.click();
+        }
+    }
+
+    static debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+}
+
 
 /**
  * 导出数据到 Excel (双语版)
@@ -15,13 +132,11 @@ import * as XLSX from 'xlsx';
 export function exportToExcel(data, filename) {
     console.log("[Utils] Starting Excel export...", data);
 
-    // 1. 检查数据是否存在
     if (!data) {
         alert("无数据可导出 (No data). 请先点击计算按钮生成结果。");
         return;
     }
 
-    // 2. 检查依赖库是否加载
     if (!XLSX || !XLSX.utils) {
         alert("错误: 缺少 'xlsx' 库。\n请在 VS Code 终端运行: npm install xlsx\n然后重启开发服务器。");
         console.error("XLSX library not found.");
@@ -42,7 +157,6 @@ export function exportToExcel(data, filename) {
         // --- 辅助函数：添加行 ---
         const addRow = (key, val, unit="") => {
             if (val !== undefined && val !== null && val !== "") {
-                // 尝试转为数字以避免 Excel 里的绿色小三角警告
                 const num = parseFloat(val);
                 const displayVal = isNaN(num) ? val : Number(num.toFixed(4));
                 rows.push([key, displayVal, unit]);
@@ -66,6 +180,10 @@ export function exportToExcel(data, filename) {
         
         if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
         if(data.m_flow) addRow("Mass Flow 质量流量", data.m_flow * 3600, "kg/h");
+        
+        // 新增：多级压缩参数
+        if(data.stages) addRow("Stages 级数", data.stages, "");
+        if(data.intercool) addRow("Intercooling 级间冷却", data.intercool ? "Yes" : "No", "");
 
         // --- 2. 效率与性能 ---
         rows.push(["", "", ""]);
@@ -92,12 +210,11 @@ export function exportToExcel(data, filename) {
             
             if(data.cooling_info.q_loss > 0) addRow("Heat Removed 移除热量", data.cooling_info.q_loss, "kW");
             if(data.cooling_info.m_inj > 0) addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
-            if(data.cooling_info.t_raw) addRow("Adiabatic Discharge T 绝热排温", data.cooling_info.t_raw, "°C");
+            if(data.cooling_info.t_raw) addRow("Raw Discharge T 原始排温", data.cooling_info.t_raw, "°C");
         }
 
         // --- 生成文件 ---
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        // 设置列宽
         ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; 
 
         const wb = XLSX.utils.book_new();
@@ -105,7 +222,6 @@ export function exportToExcel(data, filename) {
         
         const finalName = `${filename}_${new Date().getTime()}.xlsx`;
         XLSX.writeFile(wb, finalName);
-        
         console.log(`[Utils] Export success: ${finalName}`);
 
     } catch (err) {
@@ -265,7 +381,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     return params.seriesName;
                 }
             },
-            grid: { top: 70, right: 50, bottom: 50, left: 60 }, // 确保这里有闭合括号
+            grid: { top: 70, right: 50, bottom: 50, left: 60 },
             xAxis: { 
                 name: 'Enthalpy (kJ/kg)', 
                 nameLocation: 'middle',

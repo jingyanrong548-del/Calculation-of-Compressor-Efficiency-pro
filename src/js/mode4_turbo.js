@@ -1,6 +1,6 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.23 (Feature: Turbo Desuperheating & Robustness)
+// 版本: v8.26 (Feature: Multi-Stage Polytropic Compression)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -21,12 +21,21 @@ function generateTurboDatasheet(d) {
         injHtml = `<div style="font-weight:800; color:#0d9488;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:12px">kg/h</span></div>`;
     }
 
+    // 级数信息
+    let stageInfo = "";
+    if (d.stages > 1) {
+        stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">
+            Stages: <b>${d.stages}</b> (No Intercooling)
+        </div>`;
+    }
+
     return `
     <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
         <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
                 <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">MVR TURBO DATASHEET</div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Centrifugal Compressor Simulation 离心式蒸汽压缩机</div>
+                ${stageInfo}
             </div>
             <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
                 Date: <strong>${d.date}</strong><br>
@@ -87,11 +96,10 @@ function generateTurboDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.23
+                Oil-Free Compressor Calculator Pro v8.26
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
-                Actual performance may vary based on specific mechanical design, manufacturing tolerances, and operating conditions. 
             </div>
         </div>
     </div>
@@ -134,11 +142,12 @@ async function calculateMode5(CP) {
             const formData = new FormData(calcFormM5);
             const fluid = formData.get('fluid_m5');
             
-            // Robust Defaults (防止 NaN)
+            // Robust Defaults
             const p_in_bar = parseFloat(formData.get('p_in_m5')) || 1.013;
             const t_in = parseFloat(formData.get('T_in_m5')) || 100;
             const dt = parseFloat(formData.get('delta_T_m5')) || 8;
             const eff_poly = (parseFloat(formData.get('eff_poly_m5')) || 80) / 100.0;
+            const stages = parseInt(formData.get('stages_m5') || 1);
             
             // Desuperheating Params
             const is_desuperheat = document.getElementById('enable_desuperheat_m5').checked;
@@ -148,7 +157,7 @@ async function calculateMode5(CP) {
             const p_in = p_in_bar * 1e5;
             const t_in_k = t_in + 273.15;
             
-            // 1. 压力计算
+            // 1. 压力计算 (总)
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
@@ -161,17 +170,47 @@ async function calculateMode5(CP) {
             // 3. 流量
             const { m_flow, v_flow_in } = getFlowRate(formData, d_in);
 
-            // 4. 压缩功 (Point 2: Dry Discharge)
-            // Approximation: Poly work ~ Isen work / Poly Eff
-            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
-            const w_poly_approx = (h_out_is - h_in); 
-            const w_real = w_poly_approx / eff_poly; 
-            const h_out_dry = h_in + w_real;
+            // 4. 多级离心压缩计算 (Polytropic Multi-Stage)
+            // 假设各级压比相等，且各级多变效率相同
+            const pr_total = p_out / p_in;
+            const pr_stage = Math.pow(pr_total, 1.0 / stages);
             
+            let current_p = p_in;
+            let current_h = h_in;
+            let current_s = s_in;
+            let total_work = 0;
+
+            // 用于绘图的中间点
+            const plotPoints = [];
+            plotPoints.push({ name: 'In', desc: 'Suction', p: p_in, t: t_in_k, h: h_in, s: s_in });
+
+            for(let i=0; i < stages; i++) {
+                let next_p = current_p * pr_stage;
+                if(i === stages - 1) next_p = p_out; // 修正精度
+
+                // 计算该级的等熵焓升
+                let h_out_is = CP.PropsSI('H', 'P', next_p, 'S', current_s, fluid);
+                let dh_is = h_out_is - current_h;
+                
+                // 基于多变效率计算实际焓升
+                // Polytropic Work ~ Isentropic Work / Polytropic Eff (近似)
+                let dh_real = dh_is / eff_poly;
+                
+                current_h = current_h + dh_real;
+                total_work += dh_real;
+                
+                // 更新状态
+                current_p = next_p;
+                current_s = CP.PropsSI('S', 'P', current_p, 'H', current_h, fluid);
+                
+                // MVR 离心机通常无级间冷却 (为了保留潜热)
+            }
+
+            const h_out_dry = current_h;
             const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
-            const s_out_dry = CP.PropsSI('S', 'P', p_out, 'H', h_out_dry, fluid);
+            const s_out_dry = current_s;
             
-            const power = w_real * m_flow / 1000.0;
+            const power = total_work * m_flow / 1000.0;
             
             // 5. COP 计算
             const h_gas_sat = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
@@ -191,7 +230,6 @@ async function calculateMode5(CP) {
                     const h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
                     const h_water = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
                     
-                    // Energy Balance
                     const num = m_flow * (h_out_dry - h_target);
                     const den = h_target - h_water;
                     if (den > 0) {
@@ -203,13 +241,13 @@ async function calculateMode5(CP) {
             }
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
 
-            // 构造状态点
+            // 构造状态点 (简略：只画首尾)
             const points = [
-                { name: '1', desc: 'Suction', p: p_in, t: t_in_k, h: h_in, s: s_in },
-                { name: '2', desc: 'Dry Disch.', p: p_out, t: t_out_dry, h: h_out_dry, s: s_out_dry }
+                { name: 'In', desc: 'Suction', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                { name: 'Dry', desc: 'Dry Disch.', p: p_out, t: t_out_dry, h: h_out_dry, s: s_out_dry }
             ];
             if(m_water > 0) {
-                points.push({ name: '3', desc: 'Cooled Out', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
+                points.push({ name: 'Fin', desc: 'Cooled Out', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
             }
 
             lastMode5Data = {
@@ -219,6 +257,7 @@ async function calculateMode5(CP) {
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt,
+                stages, // 保存级数
                 is_desuperheat, m_water, t_water
             };
 

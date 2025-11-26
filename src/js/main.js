@@ -1,8 +1,8 @@
 console.log("🚀 Main.js is attempting to load...");
-alert("Main.js start!"); // 强制弹窗
+
 import '../css/style.css';
 // =====================================================================
-// main.js: Application Entry Point (Error Handling Added)
+// main.js: Application Entry Point (v8.26 Persistence Enabled)
 // =====================================================================
 
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
@@ -10,6 +10,7 @@ import { initMode1_2 } from './mode2_predict.js';
 import { initMode3 } from './mode2c_air.js';
 import { initMode4 } from './mode3_mvr.js';
 import { initMode5 } from './mode4_turbo.js';
+import { AutoSaveManager } from './utils.js'; // [New] 导入自动保存管理器
 import './ui.js'; // Load UI interactions
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -44,18 +45,26 @@ document.addEventListener('DOMContentLoaded', () => {
         .then((CP) => {
             console.log("%c CoolProp WASM Loaded Successfully ", "background: #059669; color: #fff");
 
-            // 1. Initialize Modules
+            // 1. Initialize Calculation Modules
             try {
                 initMode1_2(CP);
                 initMode3(CP);
                 initMode4(CP);
                 initMode5(CP);
+                
+                // [New] 2. Initialize AutoSave Manager
+                // 必须在所有 initMode 之后调用，以确保 UI 事件监听器已挂载
+                // 这样恢复 checkbox 状态时才能触发相应的 display:block/none 联动
+                setTimeout(() => {
+                    AutoSaveManager.init();
+                }, 100); 
+
             } catch (initErr) {
                 console.error("Module Init Error:", initErr);
                 alert("Error initializing calculation modules. Check console.");
             }
 
-            // 2. Unlock Buttons
+            // 3. Unlock Buttons
             buttons.forEach(btn => {
                 if (btn) {
                     btn.textContent = btn.id.includes('co2') ? "Calculate CO₂" : "Calculate (计算)";
@@ -64,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // 3. Update Default Fluid Info
+            // 4. Update Default Fluid Info (Initial State)
             fluidInfos.forEach(fi => {
                 if (fi.select && fi.info) {
                     updateFluidInfo(fi.select, fi.info, CP);

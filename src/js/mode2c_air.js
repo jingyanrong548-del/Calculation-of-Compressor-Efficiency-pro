@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2c_air.js: 模式三 (空压机) 核心逻辑
-// 版本: v8.2 (Excel 导出版)
+// 版本: v8.27 (Fix: Variable Scope & Turbo Support)
 // =====================================================================
 
 import { exportToExcel } from './utils.js';
@@ -14,12 +14,21 @@ function generateAirDatasheet(d) {
     const bgColor = "#ecfeff";
     const borderColor = "#cffafe";
 
+    // 级数信息
+    let stageInfo = "";
+    if (d.stages > 1) {
+        stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">
+            Stages: <b>${d.stages}</b> | Intercooling: <b>${d.intercool ? "Yes" : "No"}</b>
+        </div>`;
+    }
+
     return `
     <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
         <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
                 <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">AIR COMPRESSOR DATASHEET</div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Thermodynamic Simulation (Humid Air) 湿空气模拟</div>
+                ${stageInfo}
             </div>
             <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
                 Date: <strong>${d.date}</strong><br>
@@ -63,7 +72,7 @@ function generateAirDatasheet(d) {
                  <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #ecfeff; padding-top:5px; padding-bottom:5px;">Performance Data 性能数据</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Pressure Ratio 压比</td><td style="text-align: right; font-weight: 600;">${d.pr.toFixed(2)}</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Pressure Ratio 总压比</td><td style="text-align: right; font-weight: 600;">${d.pr.toFixed(2)}</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Mass Flow (Dry) 干空气质量流量</td><td style="text-align: right; font-weight: 600;">${(d.m_da * 3600).toFixed(1)} kg/h</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power 比功率</td><td style="text-align: right; font-weight: 600;">${d.spec_power.toFixed(2)} kW/(m³/min)</td></tr>
                     
@@ -89,12 +98,10 @@ function generateAirDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.2
+                Oil-Free Compressor Calculator Pro v8.27
             </div>
             <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
                 Disclaimer: This simulation report is provided for engineering reference only. 
-                Actual performance may vary based on specific mechanical design, manufacturing tolerances, and operating conditions. 
-                The author assumes no liability for any errors, omissions, or consequences arising from the use of this data.
             </div>
         </div>
     </div>
@@ -111,7 +118,7 @@ function getAirFlowRate(formData, v_specific_in) {
 
     if (mode === 'rpm') {
         const rpm = parseFloat(formData.get('rpm_m3'));
-        const disp = parseFloat(formData.get('vol_disp_m3')) / 1e6; // cm3 -> m3
+        const disp = parseFloat(formData.get('vol_disp_m3')) / 1e6; 
         v_flow_in = (rpm / 60.0) * disp * vol_eff;
         m_da = v_flow_in / v_specific_in; 
     } else if (mode === 'mass') {
@@ -124,7 +131,7 @@ function getAirFlowRate(formData, v_specific_in) {
     return { m_da, v_flow_in };
 }
 
-// --- AI 推荐 ---
+// --- AI 推荐 (v8.27 Updated) ---
 function setupAiEffRecommendation() {
     const select = document.getElementById('ai_eff_m3');
     const isenInput = document.getElementById('eff_isen_m3');
@@ -147,6 +154,9 @@ function setupAiEffRecommendation() {
                 break;
             case 'screw_injected': 
                 isen = 85; vol = 94; coolType = 'injection';
+                break;
+            case 'turbo': // [New]
+                isen = 82; vol = 98; coolType = 'adiabatic';
                 break;
         }
 
@@ -185,76 +195,117 @@ async function calculateMode3(CP) {
             const p_out = parseFloat(formData.get('p_out_m3'));
             const eff_is = parseFloat(formData.get('eff_isen_m3')) / 100.0;
             const eff_vol = parseFloat(formData.get('vol_eff_m3')) / 100.0;
-            const cooling_type = formData.get('cooling_type_m3');
+            const cooling_type = formData.get('cooling_type_m3'); 
+            
+            const stages = parseInt(formData.get('stages_m3') || 1);
+            const enable_intercool = document.getElementById('enable_intercool_m3').checked;
 
             const p_in_pa = p_in * 1e5;
             const t_in_k = t_in + 273.15;
             const p_out_pa = p_out * 1e5;
 
+            // 1. 初始状态 (Unified Variable Names)
             const v_da_in = CP.HAPropsSI('V', 'T', t_in_k, 'P', p_in_pa, 'R', rh_in);
-            const h_in = CP.HAPropsSI('H', 'T', t_in_k, 'P', p_in_pa, 'R', rh_in);
-            const s_in = CP.HAPropsSI('S', 'T', t_in_k, 'P', p_in_pa, 'R', rh_in);
-            const w_in = CP.HAPropsSI('W', 'T', t_in_k, 'P', p_in_pa, 'R', rh_in);
-
+            let current_w = CP.HAPropsSI('W', 'T', t_in_k, 'P', p_in_pa, 'R', rh_in);
+            let current_h = CP.HAPropsSI('H', 'T', t_in_k, 'P', p_in_pa, 'W', current_w);
+            let current_s = CP.HAPropsSI('S', 'T', t_in_k, 'P', p_in_pa, 'W', current_w);
+            
             const { m_da, v_flow_in } = getAirFlowRate(formData, v_da_in);
 
-            const h_out_isen = CP.HAPropsSI('H', 'P', p_out_pa, 'S', s_in, 'W', w_in);
-            const work_isen = h_out_isen - h_in; 
-            const work_real = work_isen / eff_is; 
-
-            let h_out_real = h_in + work_real; 
+            // 2. 多级压缩循环
+            const pr_total = p_out / p_in;
+            const pr_stage = Math.pow(pr_total, 1.0 / stages);
+            
+            let total_work_per_kg = 0;
+            let current_p = p_in_pa;
+            let current_t = t_in_k;
+            
+            let total_q_removed = 0; 
             let cooling_desc = "Adiabatic (None)";
             let cooling_detail = "";
-            let t_out_k = 0;
-            let q_jacket = 0; 
 
-            if (cooling_type === 'jacket') {
-                const jacket_percent = parseFloat(formData.get('jacket_heat_percent_m3') || 15) / 100.0;
-                const q_removed_per_kg = work_real * jacket_percent;
-                h_out_real = h_in + work_real - q_removed_per_kg;
+            for (let i = 0; i < stages; i++) {
+                let next_p = current_p * pr_stage;
+                if (i === stages - 1) next_p = p_out_pa;
+
+                // 等熵过程 (S不变, W不变)
+                let h_out_isen = CP.HAPropsSI('H', 'P', next_p, 'S', current_s, 'W', current_w);
+                let work_isen = h_out_isen - current_h; 
+                let work_real = work_isen / eff_is; 
                 
-                t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
-                q_jacket = q_removed_per_kg * m_da / 1000.0; 
+                let h_out_real = current_h + work_real; 
 
-                cooling_desc = "Jacket Water Cooling 夹套水冷";
-                cooling_detail = `Heat Removal: ${q_jacket.toFixed(2)} kW (${(jacket_percent*100).toFixed(0)}%)`;
-            
-            } else if (cooling_type === 'injection') {
-                const t_inject = parseFloat(formData.get('T_inject_m3') || 25);
-                const heat_removal_ratio = 0.35; 
-                const q_removed_per_kg = work_real * heat_removal_ratio;
-                h_out_real = h_in + work_real - q_removed_per_kg;
-                t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
+                // 级内冷却
+                if (cooling_type === 'jacket') {
+                    const jacket_percent = parseFloat(formData.get('jacket_heat_percent_m3') || 15) / 100.0;
+                    const q_removed_stage = work_real * jacket_percent;
+                    h_out_real -= q_removed_stage;
+                    total_q_removed += q_removed_stage;
+                    if(i===0) {
+                         cooling_desc = "Jacket Water Cooling 夹套水冷";
+                         cooling_detail = `Heat Removal Ratio: ${(jacket_percent*100).toFixed(0)}%`;
+                    }
+                } else if (cooling_type === 'injection') {
+                    const heat_removal_ratio = 0.35; 
+                    const q_removed_stage = work_real * heat_removal_ratio;
+                    h_out_real -= q_removed_stage;
+                    if(i===0) {
+                        cooling_desc = "Liquid Injection 喷液冷却";
+                        cooling_detail = "Injected to Chamber";
+                    }
+                } else {
+                    if(i===0) cooling_desc = "Adiabatic 绝热压缩";
+                }
 
-                cooling_desc = "Liquid Injection 喷液冷却";
-                cooling_detail = `Injection Temp: ${t_inject.toFixed(1)}°C`;
-            
-            } else {
-                t_out_k = CP.HAPropsSI('T', 'P', p_out_pa, 'H', h_out_real, 'W', w_in);
-                cooling_desc = "Adiabatic 绝热压缩";
+                total_work_per_kg += work_real;
+
+                // 更新状态
+                current_p = next_p;
+                current_t = CP.HAPropsSI('T', 'P', current_p, 'H', h_out_real, 'W', current_w);
+                current_h = h_out_real;
+                current_s = CP.HAPropsSI('S', 'P', current_p, 'H', current_h, 'W', current_w);
+
+                // 级间冷却 (Intercooling)
+                if (enable_intercool && i < stages - 1) {
+                    const t_target = t_in_k; // Cooling target (Input Temp)
+                    // Check saturation
+                    const w_sat = CP.HAPropsSI('W', 'T', t_target, 'P', current_p, 'R', 1.0);
+                    
+                    if (current_w > w_sat) {
+                        current_w = w_sat; // Condensation occurred
+                    }
+                    
+                    // Reset Temp
+                    current_t = t_target;
+                    // Recalculate H & S for next stage
+                    current_h = CP.HAPropsSI('H', 'T', current_t, 'P', current_p, 'W', current_w);
+                    current_s = CP.HAPropsSI('S', 'T', current_t, 'P', current_p, 'W', current_w);
+                }
             }
 
             // 后冷负荷
             let q_aftercool = 0;
             if (formData.get('enable_cooler_calc_m3') === 'on') {
                 const t_target = parseFloat(formData.get('target_temp_m3')) + 273.15;
-                const h_target = CP.HAPropsSI('H', 'T', t_target, 'P', p_out_pa, 'R', 1.0);
-                q_aftercool = (h_out_real - h_target) * m_da / 1000.0;
+                const h_target = CP.HAPropsSI('H', 'T', t_target, 'P', p_out_pa, 'W', current_w);
+                q_aftercool = (current_h - h_target) * m_da / 1000.0;
             }
 
-            const power_shaft = (work_real * m_da) / 1000.0; 
+            const power_shaft = (total_work_per_kg * m_da) / 1000.0; 
             const spec_power = power_shaft / (v_flow_in * 60); 
+            const q_jacket_total = total_q_removed * m_da / 1000.0;
 
             lastMode3Data = {
                 date: new Date().toLocaleDateString(),
                 ai_model: document.getElementById('ai_eff_m3').options[document.getElementById('ai_eff_m3').selectedIndex].text.split('(')[0].trim(),
-                p_in, t_in, rh_in, w_in,
-                p_out, t_out: t_out_k - 273.15,
+                p_in, t_in, rh_in, w_in: current_w, 
+                p_out, t_out: current_t - 273.15,
                 m_da, v_flow: v_flow_in,
                 eff_is, eff_vol, pr: p_out/p_in,
+                stages, intercool: enable_intercool,
                 power: power_shaft, spec_power,
                 cooling_desc, cooling_detail,
-                q_jacket, q_aftercool
+                q_jacket: q_jacket_total, q_aftercool
             };
 
             resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data);
@@ -274,6 +325,7 @@ async function calculateMode3(CP) {
 
         } catch (err) {
             resultsDivM3.textContent = "Error: " + err.message;
+            console.error(err);
             calcButtonM3.textContent = "计算失败";
             calcButtonM3.disabled = false;
         }
