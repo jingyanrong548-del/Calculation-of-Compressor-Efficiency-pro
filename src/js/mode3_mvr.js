@@ -1,6 +1,6 @@
 // =====================================================================
 // mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
-// 版本: v8.29 (Input: Superheat instead of T_in)
+// 版本: v8.30 (Feature: Theoretical Swept Volume Logic)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -58,14 +58,19 @@ function generateMVRDatasheet(d) {
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
                      <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Rise 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
                 </table>
+                
+                <div style="font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Efficiency 效率</div>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff. 容积效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol*100).toFixed(1)} %</td></tr>
+                </table>
             </div>
             
             <div>
                  <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Machine & Thermal 机器与热管理</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Operating Speed 转速</td><td style="text-align: right; font-weight: 600;">${d.rpm ? d.rpm + ' RPM' : '-'}</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Vol Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Vol Flow (Actual) 实际吸气</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Dry) 干排温</td><td style="text-align: right; font-weight: 600;">${d.t_out_dry.toFixed(1)} °C</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power 比功率</td><td style="text-align: right; font-weight: 600;">${(d.power / (d.m_flow*3600/1000)).toFixed(2)} kWh/t</td></tr>
                     ${d.is_desuperheat ? `
@@ -76,45 +81,39 @@ function generateMVRDatasheet(d) {
                 </table>
             </div>
         </div>
-        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999;">Oil-Free Compressor Efficiency Calculator Pro v8.29</div>
+        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999;">Oil-Free Compressor Efficiency Calculator Pro v8.30</div>
     </div>
     `;
 }
 
-// --- Helper: 获取流量 ---
+// --- Helper: 流量计算 (核心修改) ---
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m4');
     let m_flow = 0, v_flow_in = 0, rpm = 0;
+    
+    // 获取容积效率
+    const vol_eff = parseFloat(formData.get('vol_eff_m4') || '80') / 100.0;
 
     if (mode === 'rpm') {
+        // RPM模式：理论 = 转速 * 排量
+        // 实际 = 理论 * 容积效率
         rpm = parseFloat(formData.get('rpm_m4'));
         const disp = parseFloat(formData.get('vol_disp_m4')) / 1e6; 
-        const vol_eff = parseFloat(formData.get('vol_eff_m4')) / 100.0;
-        v_flow_in = (rpm / 60.0) * disp * vol_eff;
+        const v_flow_th = (rpm / 60.0) * disp;
+        v_flow_in = v_flow_th * vol_eff; 
         m_flow = v_flow_in * density_in;
     } else if (mode === 'mass') {
+        // 质量模式：直接输入，无需理论修正
         m_flow = parseFloat(formData.get('mass_flow_m4')) / 3600.0;
         v_flow_in = m_flow / density_in;
     } else if (mode === 'vol') {
-        v_flow_in = parseFloat(formData.get('vol_flow_m4')) / 3600.0;
+        // 体积模式：输入为"理论"
+        // 实际 = 理论输入 * 容积效率
+        const v_flow_th = parseFloat(formData.get('vol_flow_m4')) / 3600.0;
+        v_flow_in = v_flow_th * vol_eff; 
         m_flow = v_flow_in * density_in;
     }
     return { m_flow, v_flow_in, rpm };
-}
-
-function setupAiEff() {
-    const select = document.getElementById('ai_eff_m4');
-    if (!select) return;
-    select.addEventListener('change', () => {
-        const val = select.value;
-        if (val === 'roots') {
-            document.getElementById('eff_isen_m4').value = 60;
-            document.getElementById('vol_eff_m4').value = 75;
-        } else if (val === 'screw_mvr') {
-            document.getElementById('eff_isen_m4').value = 75;
-            document.getElementById('vol_eff_m4').value = 85;
-        }
-    });
 }
 
 // --- 计算核心 ---
@@ -128,35 +127,22 @@ async function calculateMode4(CP) {
             const formData = new FormData(calcFormM4);
             const fluid = formData.get('fluid_m4');
             
-            const p_in_bar = parseFloat(formData.get('p_in_m4')) || 1.013;
-            // [Change] Read SH instead of T
+            const p_in = parseFloat(formData.get('p_in_m4')) * 1e5;
             const sh_in = parseFloat(formData.get('SH_in_m4')) || 0;
-            const dt = parseFloat(formData.get('delta_T_m4')) || 10;
-            const eff_is = (parseFloat(formData.get('eff_isen_m4')) || 65) / 100.0;
-            const eff_vol = (parseFloat(formData.get('vol_eff_m4')) || 80) / 100.0;
-            
-            const is_desuperheat = document.getElementById('enable_desuperheat_m4').checked;
-            const t_water = parseFloat(formData.get('T_water_in_m4')) || 30;
-            const target_sh = parseFloat(formData.get('target_superheat_m4')) || 0;
-
-            const p_in = p_in_bar * 1e5;
-            
-            // 1. Determine Temperatures
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
-            const t_in_k = t_sat_in + sh_in; // Calculate T_in
+            const t_in = t_sat_in + sh_in;
             
-            const t_sat_out = t_sat_in + dt;
-            const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
-            
-            // 2. State Points
-            const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in_k, fluid);
-            const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
-            const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
+            const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in, fluid);
+            const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in, fluid);
+            const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in, fluid);
 
-            // 3. Flow
+            const dt = parseFloat(formData.get('delta_T_m4'));
+            const p_out = CP.PropsSI('P', 'T', t_sat_in + dt, 'Q', 1, fluid);
+            
+            // 流量计算 (已修正)
             const { m_flow, v_flow_in, rpm } = getFlowRate(formData, d_in);
 
-            // 4. Compression
+            const eff_is = parseFloat(formData.get('eff_isen_m4'))/100;
             const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_is;
             const h_out_dry = h_in + w_real;
@@ -164,11 +150,16 @@ async function calculateMode4(CP) {
             
             const power = w_real * m_flow / 1000.0;
 
-            // 5. Desuperheating
+            // 喷水减温
+            const is_desuperheat = document.getElementById('enable_desuperheat_m4').checked;
+            const t_water = parseFloat(formData.get('T_water_in_m4')) || 30;
+            const target_sh = parseFloat(formData.get('target_superheat_m4')) || 0;
+            
             let m_water = 0;
             let h_out_final = h_out_dry;
             let t_out_final = t_out_dry;
-            
+            const t_sat_out = t_sat_in + dt;
+
             if (is_desuperheat) {
                 const t_target_k = t_sat_out + target_sh;
                 if (t_out_dry > t_target_k) {
@@ -185,23 +176,15 @@ async function calculateMode4(CP) {
             }
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
 
-            const h_gas_sat = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
-            const h_liq_sat = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
-            const latent_heat = h_gas_sat - h_liq_sat; 
-            const q_latent = m_flow * latent_heat / 1000.0; 
-            const cop = power > 0 ? q_latent / power : 0;
-
             lastMode4Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in_bar, 
-                t_sat_in: t_sat_in - 273.15,
-                sh_in, // New data field
-                t_in: t_in_k - 273.15, 
-                dt, rpm, eff_is, eff_vol,
+                fluid, p_in: p_in/1e5, 
+                t_sat_in: t_sat_in - 273.15, sh_in,
+                dt, rpm, eff_is, eff_vol: parseFloat(formData.get('vol_eff_m4'))/100,
                 p_out: p_out/1e5, t_sat_out: t_sat_out - 273.15, 
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
-                power, m_flow, v_flow_in, cop,
+                power, m_flow, v_flow_in, 
                 is_desuperheat, m_water, t_water
             };
 
@@ -210,7 +193,7 @@ async function calculateMode4(CP) {
             if(chartDivM4) {
                 chartDivM4.classList.remove('hidden');
                 const points = [
-                    { name: '1', desc: 'Suc', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                    { name: '1', desc: 'Suc', p: p_in, t: t_in, h: h_in, s: s_in },
                     { name: '2', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: s_in }
                 ];
                 if (m_water > 0) points.push({ name: '3', desc: 'Fin', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
@@ -218,10 +201,9 @@ async function calculateMode4(CP) {
             }
 
         } catch (err) {
-            console.error(err);
             resultsDivM4.innerHTML = `<div class="text-red-600 p-4">Error: ${err.message}</div>`;
         } finally {
-            calcButtonM4.textContent = "计算喷水量";
+            calcButtonM4.textContent = "计算 MVR";
             calcButtonM4.disabled = false;
             if(printButtonM4) printButtonM4.disabled = false;
             if(exportButtonM4) exportButtonM4.disabled = false;
@@ -239,13 +221,18 @@ export function initMode4(CP) {
     fluidSelectM4 = document.getElementById('fluid_m4');
     
     if (calcFormM4) {
-        setupAiEff();
+        const aiSelect = document.getElementById('ai_eff_m4');
+        if(aiSelect) {
+            aiSelect.addEventListener('change', () => {
+                if (aiSelect.value === 'roots') { document.getElementById('eff_isen_m4').value = 60; document.getElementById('vol_eff_m4').value = 75; }
+                else if (aiSelect.value === 'screw_mvr') { document.getElementById('eff_isen_m4').value = 75; document.getElementById('vol_eff_m4').value = 85; }
+            });
+        }
         calcFormM4.addEventListener('submit', (e) => { e.preventDefault(); calculateMode4(CP); });
         if(fluidSelectM4) {
             fluidSelectM4.addEventListener('change', () => updateFluidInfo(fluidSelectM4, document.getElementById('fluid-info-m4'), CP));
         }
     }
-
     if (printButtonM4) {
         printButtonM4.onclick = () => {
             if (lastMode4Data) {
