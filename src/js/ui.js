@@ -1,5 +1,5 @@
 // =====================================================================
-// ui.js: UI 界面交互逻辑 (v8.28: Fix Mode 3 & Thermal Toggles)
+// ui.js: UI 界面交互逻辑 (v8.32: Batch Calc Toggle Added)
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCo2CycleToggle();
 
     // -----------------------------------------------------------------
-    // 4. 流量输入框切换逻辑 (通用)
+    // 4. 流量输入框切换逻辑 (通用 + Mode 3 批量特化)
     // -----------------------------------------------------------------
     function setupFlowToggle(modeSuffix) {
         const radioName = `flow_mode_${modeSuffix}`;
@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const divMass = document.getElementById(`flow-inputs-mass-${modeSuffix}`);
             const divVol = document.getElementById(`flow-inputs-vol-${modeSuffix}`);
 
+            // 通用显示函数：控制显隐并禁用/启用 input 以避免提交多余数据
             const setDisplay = (el, show, displayType = 'block') => {
                 if (!el) return;
                 if (show) {
@@ -122,12 +123,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            setDisplay(divRpm, val === 'rpm', 'grid');
+            // --- 特殊处理 Mode 3 (Air) 的批量计算逻辑 ---
+            if (modeSuffix === 'm3') {
+                const isBatch = document.getElementById('batch_mode_m3')?.checked;
+                const divBatch = document.getElementById('flow-inputs-batch-m3');
+                
+                // 只有在 RPM 模式下才允许批量（逻辑上最简单）
+                if (val === 'rpm') {
+                    // 如果是批量模式：隐藏单点 RPM，显示批量 RPM 范围
+                    setDisplay(divRpm, !isBatch, 'grid'); 
+                    setDisplay(divBatch, isBatch, 'block');
+                } else {
+                    // 质量或体积流量模式下：隐藏 RPM 相关所有输入
+                    setDisplay(divRpm, false);
+                    setDisplay(divBatch, false);
+                }
+            } else {
+                // 其他模式的标准逻辑
+                setDisplay(divRpm, val === 'rpm', 'grid');
+            }
+
             setDisplay(divMass, val === 'mass');
             setDisplay(divVol, val === 'vol');
         };
 
         radios.forEach(r => r.addEventListener('change', updateVisibility));
+        
+        // 额外监听 Mode 3 的批量复选框
+        if (modeSuffix === 'm3') {
+            const batchChk = document.getElementById('batch_mode_m3');
+            if(batchChk) {
+                batchChk.addEventListener('change', updateVisibility);
+            }
+        }
+
         updateVisibility(); 
     }
 

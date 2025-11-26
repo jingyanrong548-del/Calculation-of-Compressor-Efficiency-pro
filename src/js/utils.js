@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化)
-// 版本: v8.32 (Feature: CO2 Optimization Chart)
+// 版本: v8.32 (Feature: Performance Map & Optimization Curve)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -59,8 +59,7 @@ export class AutoSaveManager {
             const raw = localStorage.getItem(this.STORAGE_KEY);
             if (!raw) return;
             const data = JSON.parse(raw);
-            console.log("[AutoSave] Data found, restoring...");
-
+            
             const inputs = document.querySelectorAll('input, select');
             inputs.forEach(el => {
                 if (el.type === 'radio') {
@@ -109,8 +108,6 @@ export class AutoSaveManager {
  * 导出数据到 Excel
  */
 export function exportToExcel(data, filename) {
-    console.log("[Utils] Starting Excel export...", data);
-
     if (!data) {
         alert("无数据可导出 (No data). 请先点击计算按钮生成结果。");
         return;
@@ -130,7 +127,7 @@ export function exportToExcel(data, filename) {
         if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
         if(data.cycle_type) rows.push(["Cycle Type 循环类型", data.cycle_type, ""]);
         
-        // 如果有优化建议
+        // 如果有优化建议 (A阶段功能)
         if (data.opt_p_val) {
              rows.push(["Optimal Pressure (Calc)", data.opt_p_val.toFixed(2), "bar"]);
              rows.push(["Max Possible COP", data.opt_cop_val.toFixed(3), "-"]);
@@ -173,6 +170,7 @@ export function exportToExcel(data, filename) {
         if(data.cop_c) addRow("COP (Cooling) 制冷系数", data.cop_c, "-");
         if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
         if(data.cop && !data.cop_c) addRow("COP 性能系数", data.cop, "-");
+        if(data.spec_power) addRow("Specific Power 比功率", data.spec_power, "kW/(m³/min)");
 
         if (data.cooling_info) {
             rows.push(["", "", ""]);
@@ -261,10 +259,10 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     if (!dom) return;
 
     dom.classList.remove('hidden');
-    // 如果之前有实例，先销毁或重用。为了防止图表类型切换冲突，建议 clear 或销毁
+    // 如果之前有实例，先销毁或重用。
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
-        existingChart.clear(); // 清除之前的图表内容（例如可能是优化曲线）
+        existingChart.clear(); 
     }
 
     let chart = existingChart || echarts.init(dom);
@@ -429,10 +427,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
 }
 
 /**
- * [New in v8.32] 绘制 CO2 跨临界 COP 优化曲线
- * @param {string} domId - 图表容器 ID
- * @param {Array} optimizationData - [{p: bar, cop: number}, ...]
- * @param {number} currentP - 当前用户选定的高压侧压力 (bar)
+ * 绘制 CO2 跨临界 COP 优化曲线 (From Stage A)
  */
 export function drawOptimizationCurve(domId, optimizationData, currentP) {
     const dom = document.getElementById(domId);
@@ -441,34 +436,23 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     dom.classList.remove('hidden');
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
-        existingChart.clear(); // 清除之前的图表 (如 P-h 图)
+        existingChart.clear(); 
     }
 
     let chart = existingChart || echarts.init(dom);
     chart.showLoading();
 
     try {
-        // 1. 准备数据
-        const xData = optimizationData.map(d => d.p);
-        const yData = optimizationData.map(d => d.cop);
-        
-        // 找到最大 COP 点
-        let maxCOP = -1;
+        const maxCOP = Math.max(...optimizationData.map(d => d.cop));
         let optP = 0;
-        optimizationData.forEach(d => {
-            if (d.cop > maxCOP) {
-                maxCOP = d.cop;
-                optP = d.p;
-            }
-        });
+        optimizationData.forEach(d => { if(d.cop === maxCOP) optP = d.p; });
 
-        // 2. 构建 Option
         const option = {
             title: {
                 text: 'CO₂ Transcritical Optimization',
                 subtext: `Optimal P: ${optP.toFixed(1)} bar (COP: ${maxCOP.toFixed(3)})`,
                 left: 'center',
-                textStyle: { color: '#c2410c', fontWeight: 'bold' } // Orange color
+                textStyle: { color: '#c2410c', fontWeight: 'bold' } 
             },
             tooltip: {
                 trigger: 'axis',
@@ -505,11 +489,6 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
                             { offset: 1, color: 'rgba(234, 88, 12, 0.05)' }
                         ])
                     },
-                    markPoint: {
-                        data: [
-                            { type: 'max', name: 'Max COP', itemStyle: { color: '#ea580c' } }
-                        ]
-                    },
                     markLine: {
                         symbol: 'none',
                         data: [
@@ -527,7 +506,6 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
         chart.hideLoading();
         chart.setOption(option);
         
-        // 隐藏下方的状态表 (因为优化曲线不需要显示状态点表格)
         let tableDiv = dom.nextElementSibling;
         if (tableDiv && tableDiv.classList.contains('state-table-container')) {
             tableDiv.style.display = 'none';
@@ -540,4 +518,102 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
         chart.hideLoading();
         dom.innerHTML = `<div class="p-4 text-center text-red-500">Error drawing chart: ${err.message}</div>`;
     }
+}
+
+/**
+ * [New in v8.32] 绘制性能地图 (Flow vs Power/Pressure)
+ * @param {string} domId - 图表容器 ID
+ * @param {Array} batchData - [{v_flow, power, spec_power, rpm}, ...]
+ */
+export function drawPerformanceMap(domId, batchData) {
+    const dom = document.getElementById(domId);
+    if (!dom) return;
+
+    dom.classList.remove('hidden');
+    let chart = echarts.getInstanceByDom(dom);
+    if (chart) chart.clear();
+    else chart = echarts.init(dom);
+
+    // Prepare Data
+    // X: Volume Flow (m3/h)
+    // Y1: Power (kW)
+    // Y2: Specific Power (kW/(m3/min))
+    const xData = batchData.map(d => (d.v_flow * 3600).toFixed(1));
+    const yPower = batchData.map(d => d.power.toFixed(2));
+    const ySpecPower = batchData.map(d => d.spec_power.toFixed(2));
+
+    const option = {
+        title: {
+            text: 'Performance Curve (Variable RPM)',
+            subtext: 'Volume Flow vs Power & Specific Power',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross' }
+        },
+        legend: {
+            data: ['Shaft Power (kW)', 'Specific Power (kW/m³/min)'],
+            bottom: 0
+        },
+        grid: {
+            left: '3%', right: '4%', bottom: '10%', containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: xData,
+            name: 'Flow (m³/h)',
+            nameLocation: 'middle',
+            nameGap: 25
+        },
+        yAxis: [
+            {
+                type: 'value',
+                name: 'Power (kW)',
+                position: 'left',
+                axisLine: { show: true, lineStyle: { color: '#059669' } },
+                axisLabel: { formatter: '{value} kW' }
+            },
+            {
+                type: 'value',
+                name: 'Spec. Power',
+                position: 'right',
+                axisLine: { show: true, lineStyle: { color: '#d97706' } },
+                axisLabel: { formatter: '{value}' },
+                splitLine: { show: false }
+            }
+        ],
+        series: [
+            {
+                name: 'Shaft Power (kW)',
+                type: 'line',
+                data: yPower,
+                smooth: true,
+                yAxisIndex: 0,
+                itemStyle: { color: '#059669' },
+                lineStyle: { width: 3 },
+                areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0, color:'rgba(5,150,105,0.3)'}, {offset:1, color:'rgba(5,150,105,0.05)'}]) }
+            },
+            {
+                name: 'Specific Power (kW/m³/min)',
+                type: 'line',
+                data: ySpecPower,
+                smooth: true,
+                yAxisIndex: 1,
+                itemStyle: { color: '#d97706' },
+                lineStyle: { width: 3, type: 'dashed' }
+            }
+        ]
+    };
+
+    chart.setOption(option);
+    
+    // 隐藏状态表，因为批量计算结果已经有了专门的表格
+    let tableDiv = dom.nextElementSibling;
+    if (tableDiv && tableDiv.classList.contains('state-table-container')) {
+        tableDiv.style.display = 'none';
+    }
+
+    window.addEventListener('resize', () => chart.resize());
 }

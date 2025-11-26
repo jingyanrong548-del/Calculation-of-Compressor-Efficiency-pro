@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.30 (Theoretical Flow Update)</title>
+    <title>无油压缩机性能计算器 v8.32 (Batch Performance Map)</title>
     <link rel="stylesheet" href="/src/css/style.css">
     <style>
         .sub-tab-btn.active {
@@ -37,7 +37,7 @@
 
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md no-print">
             <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v8.30 (Theoretical Volumetric Flow Update)</p>
+            <p class="text-lg text-gray-600 mt-2">v8.32 (Batch Performance Map)</p>
         </header>
 
         <div class="bg-white rounded-lg shadow-md no-print">
@@ -599,6 +599,15 @@
                         <div>
                             <h2 class="text-2xl font-semibold text-cyan-700 mb-4 border-b pb-2">2. 流量与冷却 (Flow &
                                 Cooling)</h2>
+                            
+                            <div class="mb-2 flex justify-between items-center bg-gray-50 p-2 rounded border">
+                                <span class="text-sm font-bold text-gray-700">计算模式:</span>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="batch_mode_m3" name="batch_mode_m3" class="h-4 w-4 text-cyan-600">
+                                    <label for="batch_mode_m3" class="ml-2 text-sm font-bold text-cyan-700">批量变工况 (Batch Run)</label>
+                                </div>
+                            </div>
+
                             <div class="mb-3">
                                 <div class="flex space-x-4 text-sm">
                                     <label><input type="radio" name="flow_mode_m3" value="rpm" checked> 转速/排量</label>
@@ -606,14 +615,34 @@
                                     <label><input type="radio" name="flow_mode_m3" value="vol"> 理论体积流量</label>
                                 </div>
                             </div>
+                            
                             <div id="flow-inputs-rpm-m3" class="grid grid-cols-2 gap-x-4">
                                 <div class="input-group"><label class="text-sm">RPM</label><input type="number"
                                         name="rpm_m3" value="1500" step="1"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
                                 <div class="input-group"><label class="text-sm">排量 (cm³)</label><input type="number"
-                                        name="vol_disp_m3" value="1000" step="0.01"
+                                        id="vol_disp_m3_single" name="vol_disp_m3" value="1000" step="0.01"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
                             </div>
+
+                            <div id="flow-inputs-batch-m3" class="hidden bg-cyan-50 p-2 rounded border border-cyan-200 animate-fade-in mb-2">
+                                <div class="text-xs font-bold text-cyan-800 mb-2">批量扫描范围 (RPM Range)</div>
+                                <div class="grid grid-cols-3 gap-x-2">
+                                    <div class="input-group"><label class="text-xs">Start RPM</label><input type="number"
+                                            name="rpm_start_m3" value="1000" step="1"
+                                            class="w-full border-gray-300 rounded px-1 py-1 text-sm"></div>
+                                    <div class="input-group"><label class="text-xs">End RPM</label><input type="number"
+                                            name="rpm_end_m3" value="3000" step="1"
+                                            class="w-full border-gray-300 rounded px-1 py-1 text-sm"></div>
+                                    <div class="input-group"><label class="text-xs">Step</label><input type="number"
+                                            name="rpm_step_m3" value="200" step="1"
+                                            class="w-full border-gray-300 rounded px-1 py-1 text-sm"></div>
+                                </div>
+                                <div class="input-group mt-2"><label class="text-xs">排量 (cm³)</label><input type="number"
+                                    name="vol_disp_m3_batch" value="1000" step="0.01"
+                                    class="w-full border-gray-300 rounded px-2 py-1 text-sm"></div>
+                            </div>
+
                             <div id="flow-inputs-mass-m3" class="hidden"><label class="text-sm">质量流量
                                     (kg/s)</label><input type="number" name="mass_flow_m3" value="0.5" step="0.001"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
@@ -680,6 +709,7 @@
                     </form>
                     <div class="mt-8">
                         <div id="results-3" class="bg-white border p-4 rounded min-h-[200px]">--- 结果区 ---</div>
+                        <div id="chart-m3" class="chart-container hidden" style="width:100%; height:400px;"></div>
                         <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
                             <button type="button" id="print-button-3"
                                 class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2"
