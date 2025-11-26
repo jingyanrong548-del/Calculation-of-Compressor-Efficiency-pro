@@ -1,5 +1,5 @@
 // =====================================================================
-// ui.js: UI 界面交互逻辑 (v8.24: CO2 Dual Mode & Thermal UI)
+// ui.js: UI 界面交互逻辑 (v8.28: Fix Mode 3 & Thermal Toggles)
 // =====================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,22 +16,19 @@ document.addEventListener('DOMContentLoaded', () => {
         content: document.getElementById(`tab-content-${id}`)
     })).filter(t => t.btn && t.content);
 
-    if (tabs.length === 0) console.error("UI Critical Error: No tabs found!");
-
     tabs.forEach(tab => {
         tab.btn.addEventListener('click', () => {
-            // 重置所有
+            // Reset all
             tabs.forEach(t => {
                 t.btn.classList.remove('active', 'text-teal-600', 'border-teal-600', 'bg-teal-50');
                 t.btn.classList.add('text-gray-600');
                 t.content.style.display = 'none';
             });
-            // 激活当前
+            // Activate current
             tab.btn.classList.remove('text-gray-600');
             tab.btn.classList.add('active', 'text-teal-600', 'border-teal-600', 'bg-teal-50');
             tab.content.style.display = 'block';
             
-            // 触发 Resize 以修复图表显示
             window.dispatchEvent(new Event('resize'));
         });
     });
@@ -63,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------
-    // [新增] 3. Mode 1 CO2 循环类型切换 (跨临界 vs 亚临界)
+    // 3. Mode 1 CO2 循环类型切换 (跨临界 vs 亚临界)
     // -----------------------------------------------------------------
     function setupCo2CycleToggle() {
         const radios = document.querySelectorAll('input[name="cycle_type_m1_co2"]');
@@ -73,12 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!radios.length || !divTrans || !divSub) return;
 
         const update = () => {
-            const val = document.querySelector('input[name="cycle_type_m1_co2"]:checked').value;
-            
+            const val = document.querySelector('input[name="cycle_type_m1_co2"]:checked')?.value;
+            if (!val) return;
+
             if (val === 'transcritical') {
                 divTrans.classList.remove('hidden');
                 divSub.classList.add('hidden');
-                // 启用/禁用输入框以防干扰
                 divTrans.querySelectorAll('input').forEach(i => i.disabled = false);
                 divSub.querySelectorAll('input').forEach(i => i.disabled = true);
             } else {
@@ -187,28 +184,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // 6. 绑定业务逻辑联动
     // -----------------------------------------------------------------
 
-    // Mode 2 Gas: 冷却方式切换
+    // Mode 2 Gas
     setupRadioToggle('cooling_mode_m2', 'target_t', 'cooling-inputs-m2');
     setupCheckboxToggle('enable_cooler_calc_m2', 'cooler-inputs-m2');
 
-    // Mode 3 Air: 冷却方式切换
+    // Mode 3 Air (Fix for v8.28)
     const m3Radios = document.querySelectorAll('input[name="cooling_type_m3"]');
     if(m3Radios.length) {
         const updateM3 = () => {
-            const val = document.querySelector('input[name="cooling_type_m3"]:checked').value;
+            const checked = document.querySelector('input[name="cooling_type_m3"]:checked');
+            if(!checked) return;
+            const val = checked.value;
+            
             const jacketDiv = document.getElementById('jacket-inputs-m3');
             const injDiv = document.getElementById('injection-inputs-m3');
+            
             if(jacketDiv) {
-                jacketDiv.style.display = (val === 'jacket') ? 'block' : 'none';
-                jacketDiv.querySelectorAll('input').forEach(i => i.disabled = (val !== 'jacket'));
+                const show = (val === 'jacket');
+                jacketDiv.style.display = show ? 'block' : 'none';
+                jacketDiv.classList.toggle('hidden', !show);
+                jacketDiv.querySelectorAll('input').forEach(i => i.disabled = !show);
             }
+            
             if(injDiv) {
-                injDiv.style.display = (val === 'injection') ? 'block' : 'none';
-                injDiv.querySelectorAll('input').forEach(i => i.disabled = (val !== 'injection'));
+                const show = (val === 'injection');
+                // 强制显示 "预期排温" 输入框
+                injDiv.style.display = show ? 'block' : 'none';
+                injDiv.classList.toggle('hidden', !show);
+                injDiv.querySelectorAll('input').forEach(i => i.disabled = !show);
             }
         };
         m3Radios.forEach(r => r.addEventListener('change', updateM3));
-        updateM3();
+        updateM3(); // Init
     }
     setupCheckboxToggle('enable_cooler_calc_m3', 'cooler-inputs-m3');
 
@@ -218,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mode 1 Helper Toggles
     setupCheckboxToggle('enable_dynamic_eff_m1', 'dynamic-eff-inputs-m1');
-    setupCheckboxToggle('enable_dynamic_eff_m2', 'dynamic-eff-inputs-m2');
 
     console.log("UI: Initialization Complete.");
 });

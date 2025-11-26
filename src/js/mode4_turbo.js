@@ -1,6 +1,6 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.26 (Feature: Multi-Stage Polytropic Compression)
+// 版本: v8.28 (Fix: Print & Export Buttons Binding)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -15,13 +15,11 @@ function generateTurboDatasheet(d) {
     const bgColor = "#f0fdfa";
     const borderColor = "#ccfbf1";
 
-    // 喷水显示逻辑
     let injHtml = `<div style="color:#999; font-size:11px;">Disabled</div>`;
     if (d.is_desuperheat && d.m_water > 0) {
         injHtml = `<div style="font-weight:800; color:#0d9488;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:12px">kg/h</span></div>`;
     }
 
-    // 级数信息
     let stageInfo = "";
     if (d.stages > 1) {
         stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">
@@ -30,44 +28,44 @@ function generateTurboDatasheet(d) {
     }
 
     return `
-    <div style="padding: 30px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #fff; color: #333; width: 100%; box-sizing: border-box;">
+    <div style="padding: 30px; font-family: 'Segoe UI', sans-serif; background: #fff; color: #333;">
         <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
-                <div style="font-size: 28px; font-weight: 900; color: ${themeColor}; line-height: 1;">MVR TURBO DATASHEET</div>
+                <div style="font-size: 28px; font-weight: 900; color: ${themeColor};">MVR TURBO DATASHEET</div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Centrifugal Compressor Simulation 离心式蒸汽压缩机</div>
                 ${stageInfo}
             </div>
-            <div style="text-align: right; font-size: 12px; color: #666; line-height: 1.5;">
+            <div style="text-align: right; font-size: 12px; color: #666;">
                 Date: <strong>${d.date}</strong><br>
                 Fluid: <strong>${d.fluid}</strong>
             </div>
         </div>
         
-        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px;">
              <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Evaporation 蒸发量</div>
+                <div style="font-size: 11px; color: #666;">Evaporation 蒸发量</div>
                 <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${(d.m_flow * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Impeller Power 叶轮功率</div>
+                <div style="font-size: 11px; color: #666;">Impeller Power 叶轮功率</div>
                 <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
             </div>
              <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Injection Water 喷水量</div>
+                <div style="font-size: 11px; color: #666;">Injection Water 喷水量</div>
                 ${injHtml}
             </div>
         </div>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
             <div>
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb; padding:5px;">Suction Conditions 吸气工况</div>
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Suction Conditions 吸气工况</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp 吸气温度</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
                 </table>
 
-                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb; padding:5px;">Efficiency Settings 效率设定</div>
+                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Efficiency Settings 效率设定</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Polytropic Eff. 多变效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_poly * 100).toFixed(1)} %</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">COP 性能系数</td><td style="text-align: right; font-weight: 600;">${d.cop.toFixed(2)}</td></tr>
@@ -75,7 +73,7 @@ function generateTurboDatasheet(d) {
             </div>
 
             <div>
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb; padding:5px;">Discharge & Thermal 排气与热管理</div>
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Discharge & Thermal 排气与热管理</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Temp Lift (Sat) 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
@@ -96,10 +94,7 @@ function generateTurboDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.26
-            </div>
-            <div style="font-style: italic; color: #9ca3af; max-width: 80%; margin: 0 auto; line-height: 1.5;">
-                Disclaimer: This simulation report is provided for engineering reference only. 
+                Oil-Free Compressor Calculator Pro v8.28
             </div>
         </div>
     </div>
@@ -142,14 +137,12 @@ async function calculateMode5(CP) {
             const formData = new FormData(calcFormM5);
             const fluid = formData.get('fluid_m5');
             
-            // Robust Defaults
             const p_in_bar = parseFloat(formData.get('p_in_m5')) || 1.013;
             const t_in = parseFloat(formData.get('T_in_m5')) || 100;
             const dt = parseFloat(formData.get('delta_T_m5')) || 8;
             const eff_poly = (parseFloat(formData.get('eff_poly_m5')) || 80) / 100.0;
             const stages = parseInt(formData.get('stages_m5') || 1);
             
-            // Desuperheating Params
             const is_desuperheat = document.getElementById('enable_desuperheat_m5').checked;
             const t_water = parseFloat(formData.get('T_water_in_m5')) || 30;
             const target_sh = parseFloat(formData.get('target_superheat_m5')) || 0;
@@ -157,21 +150,16 @@ async function calculateMode5(CP) {
             const p_in = p_in_bar * 1e5;
             const t_in_k = t_in + 273.15;
             
-            // 1. 压力计算 (总)
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
 
-            // 2. 吸气点 (Point 1)
             const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
             
-            // 3. 流量
             const { m_flow, v_flow_in } = getFlowRate(formData, d_in);
 
-            // 4. 多级离心压缩计算 (Polytropic Multi-Stage)
-            // 假设各级压比相等，且各级多变效率相同
             const pr_total = p_out / p_in;
             const pr_stage = Math.pow(pr_total, 1.0 / stages);
             
@@ -180,30 +168,19 @@ async function calculateMode5(CP) {
             let current_s = s_in;
             let total_work = 0;
 
-            // 用于绘图的中间点
-            const plotPoints = [];
-            plotPoints.push({ name: 'In', desc: 'Suction', p: p_in, t: t_in_k, h: h_in, s: s_in });
-
             for(let i=0; i < stages; i++) {
                 let next_p = current_p * pr_stage;
-                if(i === stages - 1) next_p = p_out; // 修正精度
+                if(i === stages - 1) next_p = p_out;
 
-                // 计算该级的等熵焓升
                 let h_out_is = CP.PropsSI('H', 'P', next_p, 'S', current_s, fluid);
                 let dh_is = h_out_is - current_h;
-                
-                // 基于多变效率计算实际焓升
-                // Polytropic Work ~ Isentropic Work / Polytropic Eff (近似)
                 let dh_real = dh_is / eff_poly;
                 
                 current_h = current_h + dh_real;
                 total_work += dh_real;
                 
-                // 更新状态
                 current_p = next_p;
                 current_s = CP.PropsSI('S', 'P', current_p, 'H', current_h, fluid);
-                
-                // MVR 离心机通常无级间冷却 (为了保留潜热)
             }
 
             const h_out_dry = current_h;
@@ -212,14 +189,12 @@ async function calculateMode5(CP) {
             
             const power = total_work * m_flow / 1000.0;
             
-            // 5. COP 计算
             const h_gas_sat = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
             const h_liq_sat = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
             const latent_heat = h_gas_sat - h_liq_sat; 
-            const q_latent = m_flow * latent_heat / 1000.0; // kW
+            const q_latent = m_flow * latent_heat / 1000.0; 
             const cop = power > 0 ? q_latent / power : 0;
 
-            // 6. 喷水减温 (Desuperheating)
             let m_water = 0;
             let h_out_final = h_out_dry;
             let t_out_final = t_out_dry;
@@ -241,14 +216,11 @@ async function calculateMode5(CP) {
             }
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
 
-            // 构造状态点 (简略：只画首尾)
             const points = [
-                { name: 'In', desc: 'Suction', p: p_in, t: t_in_k, h: h_in, s: s_in },
-                { name: 'Dry', desc: 'Dry Disch.', p: p_out, t: t_out_dry, h: h_out_dry, s: s_out_dry }
+                { name: 'In', desc: 'Suc', p: p_in, t: t_in_k, h: h_in, s: s_in },
+                { name: 'Dry', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: s_out_dry }
             ];
-            if(m_water > 0) {
-                points.push({ name: 'Fin', desc: 'Cooled Out', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
-            }
+            if(m_water > 0) points.push({ name: 'Fin', desc: 'Cooled', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
 
             lastMode5Data = {
                 date: new Date().toLocaleDateString(),
@@ -256,14 +228,12 @@ async function calculateMode5(CP) {
                 p_out: p_out/1e5, power, cop,
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
-                dt_sat: dt,
-                stages, // 保存级数
+                dt_sat: dt, stages,
                 is_desuperheat, m_water, t_water
             };
 
             resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data);
             
-            // 绘制图表
             if(chartDivM5) {
                 chartDivM5.classList.remove('hidden');
                 drawPhDiagram(CP, fluid, { points }, 'chart-m5');
@@ -271,10 +241,11 @@ async function calculateMode5(CP) {
 
         } catch (err) {
             console.error(err);
-            resultsDivM5.innerHTML = `<div class="p-4 bg-red-50 border border-red-200 text-red-600 rounded"><strong>Calculation Error:</strong> ${err.message}</div>`;
+            resultsDivM5.innerHTML = `<div class="p-4 text-red-600">Error: ${err.message}</div>`;
         } finally {
             calcButtonM5.textContent = "计算透平 MVR";
             calcButtonM5.disabled = false;
+            // [Fix] Bindings
             if(printButtonM5) printButtonM5.disabled = false;
             if(exportButtonM5) exportButtonM5.disabled = false;
         }
@@ -296,5 +267,23 @@ export function initMode5(CP) {
         if(fluidSelectM5) {
             fluidSelectM5.addEventListener('change', () => updateFluidInfo(fluidSelectM5, document.getElementById('fluid-info-m5'), CP));
         }
+    }
+
+    // [Fix] Bind Click Events
+    if (printButtonM5) {
+        printButtonM5.onclick = () => {
+            if (lastMode5Data) {
+                const win = window.open('', '_blank');
+                win.document.write(`<html><head><title>MVR Turbo Report</title></head><body style="margin:0">${generateTurboDatasheet(lastMode5Data)}</body></html>`);
+                win.document.close();
+                setTimeout(() => win.print(), 200);
+            } else alert("Please Calculate First");
+        };
+    }
+    if (exportButtonM5) {
+        exportButtonM5.onclick = () => {
+            if (lastMode5Data) exportToExcel(lastMode5Data, "MVR_Turbo_Result");
+            else alert("Please Calculate First");
+        };
     }
 }
