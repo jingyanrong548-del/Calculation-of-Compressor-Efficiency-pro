@@ -1,6 +1,6 @@
 // =====================================================================
 // mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
-// 版本: v8.28 (Fix: Print & Export Buttons Binding)
+// 版本: v8.29 (Input: Superheat instead of T_in)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -53,16 +53,10 @@ function generateMVRDatasheet(d) {
                  <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Process Parameters 工艺参数</div>
                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp 吸气温度</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp 饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Superheat 吸气过热度</td><td style="text-align: right; font-weight: 600; color:${themeColor}">${d.sh_in.toFixed(1)} K</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
                      <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Rise 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
-                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Out 出口饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_out.toFixed(1)} °C</td></tr>
-                </table>
-                
-                <div style="margin-top: 20px; font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Performance 性能指标</div>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">COP (Latent/Power)</td><td style="text-align: right; font-weight: 600;">${d.cop.toFixed(2)}</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Spec. Power 比功率</td><td style="text-align: right; font-weight: 600;">${(d.power / (d.m_flow*3600/1000)).toFixed(2)} kWh/t</td></tr>
                 </table>
             </div>
             
@@ -73,16 +67,16 @@ function generateMVRDatasheet(d) {
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Vol Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Dry) 干排温</td><td style="text-align: right; font-weight: 600;">${d.t_out_dry.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power 比功率</td><td style="text-align: right; font-weight: 600;">${(d.power / (d.m_flow*3600/1000)).toFixed(2)} kWh/t</td></tr>
                     ${d.is_desuperheat ? `
                     <tr style="background-color:#fdf4ff;"><td style="padding: 8px 0; color: #d946ef; font-weight:bold;">Final Discharge T 最终排温</td><td style="text-align: right; font-weight: 800; color: #d946ef;">${d.t_out_final.toFixed(1)} °C</td></tr>
-                    <tr style="background-color:#fdf4ff;"><td style="padding: 8px 0; color: #555;">Injection Temp 喷水温度</td><td style="text-align: right;">${d.t_water.toFixed(1)} °C</td></tr>
                     ` : `
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #999;">Desuperheating</td><td style="text-align: right; color: #999;">Disabled</td></tr>
                     `}
                 </table>
             </div>
         </div>
-        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999;">Oil-Free Compressor Efficiency Calculator Pro v8.28</div>
+        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999;">Oil-Free Compressor Efficiency Calculator Pro v8.29</div>
     </div>
     `;
 }
@@ -135,7 +129,8 @@ async function calculateMode4(CP) {
             const fluid = formData.get('fluid_m4');
             
             const p_in_bar = parseFloat(formData.get('p_in_m4')) || 1.013;
-            const t_in = parseFloat(formData.get('T_in_m4')) || 100;
+            // [Change] Read SH instead of T
+            const sh_in = parseFloat(formData.get('SH_in_m4')) || 0;
             const dt = parseFloat(formData.get('delta_T_m4')) || 10;
             const eff_is = (parseFloat(formData.get('eff_isen_m4')) || 65) / 100.0;
             const eff_vol = (parseFloat(formData.get('vol_eff_m4')) || 80) / 100.0;
@@ -145,18 +140,23 @@ async function calculateMode4(CP) {
             const target_sh = parseFloat(formData.get('target_superheat_m4')) || 0;
 
             const p_in = p_in_bar * 1e5;
-            const t_in_k = t_in + 273.15;
-
+            
+            // 1. Determine Temperatures
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
+            const t_in_k = t_sat_in + sh_in; // Calculate T_in
+            
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
             
+            // 2. State Points
             const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in_k, fluid);
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
 
+            // 3. Flow
             const { m_flow, v_flow_in, rpm } = getFlowRate(formData, d_in);
 
+            // 4. Compression
             const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_is;
             const h_out_dry = h_in + w_real;
@@ -164,6 +164,7 @@ async function calculateMode4(CP) {
             
             const power = w_real * m_flow / 1000.0;
 
+            // 5. Desuperheating
             let m_water = 0;
             let h_out_final = h_out_dry;
             let t_out_final = t_out_dry;
@@ -172,9 +173,6 @@ async function calculateMode4(CP) {
                 const t_target_k = t_sat_out + target_sh;
                 if (t_out_dry > t_target_k) {
                     const h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
-                    // Correct: Water vapor enthalpy at low pressure
-                    // Approximation for injection: Liquid water enters, vapor leaves. 
-                    // Balance: m_s * (H_dry - H_target) = m_w * (H_target - H_water_in)
                     const h_water_in = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
                     const num = m_flow * (h_out_dry - h_target);
                     const den = h_target - h_water_in;
@@ -195,7 +193,11 @@ async function calculateMode4(CP) {
 
             lastMode4Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in_bar, t_in, dt, rpm, eff_is, eff_vol,
+                fluid, p_in: p_in_bar, 
+                t_sat_in: t_sat_in - 273.15,
+                sh_in, // New data field
+                t_in: t_in_k - 273.15, 
+                dt, rpm, eff_is, eff_vol,
                 p_out: p_out/1e5, t_sat_out: t_sat_out - 273.15, 
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
@@ -221,7 +223,6 @@ async function calculateMode4(CP) {
         } finally {
             calcButtonM4.textContent = "计算喷水量";
             calcButtonM4.disabled = false;
-            // [Fix] Re-enable buttons
             if(printButtonM4) printButtonM4.disabled = false;
             if(exportButtonM4) exportButtonM4.disabled = false;
         }
@@ -245,7 +246,6 @@ export function initMode4(CP) {
         }
     }
 
-    // [Fix] Bind Click Events
     if (printButtonM4) {
         printButtonM4.onclick = () => {
             if (lastMode4Data) {

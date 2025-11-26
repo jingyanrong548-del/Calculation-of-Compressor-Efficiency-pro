@@ -1,6 +1,6 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.28 (Fix: Print & Export Buttons Binding)
+// 版本: v8.29 (Input: Superheat instead of T_in)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -61,7 +61,8 @@ function generateTurboDatasheet(d) {
                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Suction Conditions 吸气工况</div>
                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Temp 吸气温度</td><td style="text-align: right; font-weight: 600;">${d.t_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp 饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_in.toFixed(1)} °C</td></tr>
+                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Superheat 吸气过热度</td><td style="text-align: right; font-weight: 600; color:${themeColor}">${d.sh_in.toFixed(1)} K</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
                 </table>
 
@@ -78,7 +79,6 @@ function generateTurboDatasheet(d) {
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Temp Lift (Sat) 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Dry) 干排温</td><td style="text-align: right; font-weight: 600;">${d.t_out_dry.toFixed(1)} °C</td></tr>
-                    
                     ${d.is_desuperheat ? `
                     <tr style="background-color:#f0fdfa;"><td style="padding: 8px 0; color: #0f766e; font-weight:bold;">Final Discharge T 最终排温</td><td style="text-align: right; font-weight: 800; color: #0f766e;">${d.t_out_final.toFixed(1)} °C</td></tr>
                     <tr style="background-color:#f0fdfa;"><td style="padding: 8px 0; color: #555;">Injection Temp 喷水温度</td><td style="text-align: right;">${d.t_water.toFixed(1)} °C</td></tr>
@@ -94,7 +94,7 @@ function generateTurboDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.28
+                Oil-Free Compressor Calculator Pro v8.29
             </div>
         </div>
     </div>
@@ -138,7 +138,8 @@ async function calculateMode5(CP) {
             const fluid = formData.get('fluid_m5');
             
             const p_in_bar = parseFloat(formData.get('p_in_m5')) || 1.013;
-            const t_in = parseFloat(formData.get('T_in_m5')) || 100;
+            // [Change] Read SH instead of T
+            const sh_in = parseFloat(formData.get('SH_in_m5')) || 0;
             const dt = parseFloat(formData.get('delta_T_m5')) || 8;
             const eff_poly = (parseFloat(formData.get('eff_poly_m5')) || 80) / 100.0;
             const stages = parseInt(formData.get('stages_m5') || 1);
@@ -148,9 +149,11 @@ async function calculateMode5(CP) {
             const target_sh = parseFloat(formData.get('target_superheat_m5')) || 0;
 
             const p_in = p_in_bar * 1e5;
-            const t_in_k = t_in + 273.15;
             
+            // 1. Determine Temp
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
+            const t_in_k = t_sat_in + sh_in; // T_in = Sat + Superheat
+
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
 
@@ -203,10 +206,10 @@ async function calculateMode5(CP) {
                 const t_target_k = t_sat_out + target_sh;
                 if (t_out_dry > t_target_k) {
                     const h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
-                    const h_water = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
+                    const h_water_in = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
                     
                     const num = m_flow * (h_out_dry - h_target);
-                    const den = h_target - h_water;
+                    const den = h_target - h_water_in;
                     if (den > 0) {
                         m_water = num / den;
                         h_out_final = h_target;
@@ -224,7 +227,11 @@ async function calculateMode5(CP) {
 
             lastMode5Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in_bar, t_in, m_flow, v_flow_in, dt, eff_poly,
+                fluid, p_in: p_in_bar, 
+                t_sat_in: t_sat_in - 273.15,
+                sh_in, // New Data Field
+                t_in: t_in_k - 273.15, 
+                m_flow, v_flow_in, dt, eff_poly,
                 p_out: p_out/1e5, power, cop,
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
@@ -245,7 +252,6 @@ async function calculateMode5(CP) {
         } finally {
             calcButtonM5.textContent = "计算透平 MVR";
             calcButtonM5.disabled = false;
-            // [Fix] Bindings
             if(printButtonM5) printButtonM5.disabled = false;
             if(exportButtonM5) exportButtonM5.disabled = false;
         }
@@ -269,7 +275,6 @@ export function initMode5(CP) {
         }
     }
 
-    // [Fix] Bind Click Events
     if (printButtonM5) {
         printButtonM5.onclick = () => {
             if (lastMode5Data) {
