@@ -1,6 +1,6 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.29 (Input: Superheat instead of T_in)
+// 版本: v8.32 (Feature: Real Gas Properties Z/A/k)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -26,6 +26,22 @@ function generateTurboDatasheet(d) {
             Stages: <b>${d.stages}</b> (No Intercooling)
         </div>`;
     }
+
+    // [New in v8.32] Real Gas Properties Block
+    const realGasBlock = `
+    <div style="margin-top:20px; border-top:1px dashed #ccc; padding-top:10px;">
+        <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:5px; text-transform:uppercase;">Real Gas Properties (Suction)</div>
+        <table style="width:100%; font-size:12px; color:#444;">
+            <tr>
+                <td>Compressibility Z:</td><td style="text-align:right; font-family:monospace; font-weight:bold;">${d.z_in ? d.z_in.toFixed(4) : '-'}</td>
+                <td style="padding-left:15px;">Speed of Sound:</td><td style="text-align:right; font-family:monospace; font-weight:bold;">${d.sound_speed_in ? d.sound_speed_in.toFixed(1) + ' m/s' : '-'}</td>
+            </tr>
+            <tr>
+                <td>Isentropic Exp. (k):</td><td style="text-align:right; font-family:monospace;">${d.gamma_in ? d.gamma_in.toFixed(3) : '-'}</td>
+                <td style="padding-left:15px;">Density:</td><td style="text-align:right; font-family:monospace;">${(d.m_flow/d.v_flow_in).toFixed(3)} kg/m³</td>
+            </tr>
+        </table>
+    </div>`;
 
     return `
     <div style="padding: 30px; font-family: 'Segoe UI', sans-serif; background: #fff; color: #333;">
@@ -71,6 +87,7 @@ function generateTurboDatasheet(d) {
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Polytropic Eff. 多变效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_poly * 100).toFixed(1)} %</td></tr>
                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">COP 性能系数</td><td style="text-align: right; font-weight: 600;">${d.cop.toFixed(2)}</td></tr>
                 </table>
+                ${realGasBlock}
             </div>
 
             <div>
@@ -94,7 +111,7 @@ function generateTurboDatasheet(d) {
                 Prepared by Yanrong Jing (荆炎荣)
             </div>
             <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.29
+                Oil-Free Compressor Calculator Pro v8.32
             </div>
         </div>
     </div>
@@ -138,7 +155,6 @@ async function calculateMode5(CP) {
             const fluid = formData.get('fluid_m5');
             
             const p_in_bar = parseFloat(formData.get('p_in_m5')) || 1.013;
-            // [Change] Read SH instead of T
             const sh_in = parseFloat(formData.get('SH_in_m5')) || 0;
             const dt = parseFloat(formData.get('delta_T_m5')) || 8;
             const eff_poly = (parseFloat(formData.get('eff_poly_m5')) || 80) / 100.0;
@@ -150,9 +166,14 @@ async function calculateMode5(CP) {
 
             const p_in = p_in_bar * 1e5;
             
-            // 1. Determine Temp
+            // 1. Determine Temp & Props
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
-            const t_in_k = t_sat_in + sh_in; // T_in = Sat + Superheat
+            const t_in_k = t_sat_in + sh_in; 
+
+            // [New] Real Gas Properties Calculation
+            const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
+            const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
+            const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
 
             const t_sat_out = t_sat_in + dt;
             const p_out = CP.PropsSI('P', 'T', t_sat_out, 'Q', 1, fluid);
@@ -229,14 +250,16 @@ async function calculateMode5(CP) {
                 date: new Date().toLocaleDateString(),
                 fluid, p_in: p_in_bar, 
                 t_sat_in: t_sat_in - 273.15,
-                sh_in, // New Data Field
+                sh_in,
                 t_in: t_in_k - 273.15, 
                 m_flow, v_flow_in, dt, eff_poly,
                 p_out: p_out/1e5, power, cop,
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt, stages,
-                is_desuperheat, m_water, t_water
+                is_desuperheat, m_water, t_water,
+                // [New] Add to data object
+                z_in, sound_speed_in, gamma_in
             };
 
             resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data);

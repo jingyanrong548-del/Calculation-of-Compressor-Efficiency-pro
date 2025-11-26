@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化)
-// 版本: v8.32 (Feature: Performance Map & Optimization Curve)
+// 版本: v8.32 (Feature: Z-Factor & Real Gas Properties Support)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -106,6 +106,7 @@ export class AutoSaveManager {
 
 /**
  * 导出数据到 Excel
+ * [Updated in v8.32] Add Real Gas Properties (Z, Speed of Sound, Gamma)
  */
 export function exportToExcel(data, filename) {
     if (!data) {
@@ -127,7 +128,7 @@ export function exportToExcel(data, filename) {
         if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
         if(data.cycle_type) rows.push(["Cycle Type 循环类型", data.cycle_type, ""]);
         
-        // 如果有优化建议 (A阶段功能)
+        // 优化建议 (A阶段)
         if (data.opt_p_val) {
              rows.push(["Optimal Pressure (Calc)", data.opt_p_val.toFixed(2), "bar"]);
              rows.push(["Max Possible COP", data.opt_cop_val.toFixed(3), "-"]);
@@ -147,6 +148,11 @@ export function exportToExcel(data, filename) {
         addRow("Suction Pressure 吸气压力", data.p_in, "bar");
         addRow("Suction Temp 吸气温度", data.t_in, "°C");
         
+        // [New] Real Gas Properties
+        if (data.z_in) addRow("Compressibility Factor Z", data.z_in, "-");
+        if (data.sound_speed_in) addRow("Speed of Sound (Suction)", data.sound_speed_in, "m/s");
+        if (data.gamma_in) addRow("Isentropic Exponent k/γ", data.gamma_in, "-");
+
         if (data.t_gc_out !== undefined) {
             addRow("Gas Cooler Exit Temp 气冷出口", data.t_gc_out, "°C");
             if (data.p_out) addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
@@ -259,7 +265,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     if (!dom) return;
 
     dom.classList.remove('hidden');
-    // 如果之前有实例，先销毁或重用。
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
         existingChart.clear(); 
@@ -521,7 +526,7 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
 }
 
 /**
- * [New in v8.32] 绘制性能地图 (Flow vs Power/Pressure)
+ * [New in v8.32] 绘制性能地图 (Flow vs Power/Pressure) (From Stage B)
  * @param {string} domId - 图表容器 ID
  * @param {Array} batchData - [{v_flow, power, spec_power, rpm}, ...]
  */

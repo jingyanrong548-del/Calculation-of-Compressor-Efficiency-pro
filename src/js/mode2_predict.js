@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷/CO2) & 模式二 (气体)
-// 版本: v8.32 (Feature: CO2 Smart Optimization)
+// 版本: v8.32 (Feature: Real Gas Properties Z/A/k + CO2 Opt)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -41,16 +41,11 @@ function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
     return { m_flow, v_flow_in };
 }
 
-// --- Helper: CO2 跨临界寻优算法 (New in v8.32) ---
+// --- Helper: CO2 跨临界寻优算法 (From Option A) ---
 function runCO2OptimizationSweep(CP, params) {
-    // 提取参数
     const { 
-        h_in, s_in, // 吸气状态 (固定)
-        t_gc_out,   // 气冷出口温度 (固定)
-        eff_isen,   // 等熵效率 (固定)
-        // 容积效率参数 (用于更精准的流量预测)
+        h_in, s_in, t_gc_out, eff_isen,
         clearance, n_index,
-        // 流量基础数据
         rpm, vol_disp, density_in, p_in
     } = params;
 
@@ -58,8 +53,6 @@ function runCO2OptimizationSweep(CP, params) {
     const t_gc_out_k = t_gc_out + 273.15;
     const results = [];
     
-    // 扫描范围: 74 bar 到 140 bar (CO2 临界压力 ~73.8 bar)
-    // 步长: 1 bar
     const p_start = 74e5;
     const p_end = 140e5;
     const step = 1e5;
@@ -69,51 +62,33 @@ function runCO2OptimizationSweep(CP, params) {
 
     for (let p_curr = p_start; p_curr <= p_end; p_curr += step) {
         try {
-            // 1. 压缩过程
             const h_out_is = CP.PropsSI('H', 'P', p_curr, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
-            const h_out_real = h_in + w_real;
             
-            // 2. 流量计算 (考虑压比对容积效率的影响)
             const pr = p_curr / p_in;
-            // Vol Eff = 0.98 * [1 - C * (PR^(1/n) - 1)]
             let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0/n_index) - 1.0));
-            eff_vol = Math.max(0.1, Math.min(0.99, eff_vol)); // 物理限制
+            eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
 
             const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6);
             const m_flow_calc = v_flow_th * eff_vol * density_in;
 
-            // 3. 制冷能力 (假设等焓膨胀，气冷出口 -> 蒸发器入口)
             const h_gc_out = CP.PropsSI('H', 'T', t_gc_out_k, 'P', p_curr, fluid);
-            const q_evap = m_flow_calc * (h_in - h_gc_out) / 1000.0; // kW
-            
-            // 4. 功耗
-            const power = w_real * m_flow_calc / 1000.0; // kW
+            const q_evap = m_flow_calc * (h_in - h_gc_out) / 1000.0; 
+            const power = w_real * m_flow_calc / 1000.0; 
 
             const cop = q_evap / power;
 
-            results.push({
-                p: p_curr / 1e5, // bar
-                cop: cop
-            });
+            results.push({ p: p_curr / 1e5, cop: cop });
 
             if (cop > bestCOP) {
                 bestCOP = cop;
                 bestP = p_curr / 1e5;
             }
-
-        } catch (e) {
-            // 忽略计算错误的点 (例如物性库边界)
-        }
+        } catch (e) { }
     }
 
-    return {
-        data: results, // [{p, cop}, ...]
-        bestP,
-        bestCOP
-    };
+    return { data: results, bestP, bestCOP };
 }
-
 
 // --- Helper: Datasheet 生成器 ---
 function generateDatasheetHTML(d, title) {
@@ -138,7 +113,7 @@ function generateDatasheetHTML(d, title) {
         let optInfo = "";
         if (isCO2Trans && d.opt_p_val) {
             const diff = Math.abs(d.p_out - d.opt_p_val);
-            const color = diff > 2.0 ? "#dc2626" : "#16a34a"; // Red if far, Green if close
+            const color = diff > 2.0 ? "#dc2626" : "#16a34a"; 
             const msg = diff > 2.0 ? "Optimized P available" : "Operating at Optimal";
             
             optInfo = `
@@ -148,12 +123,8 @@ function generateDatasheetHTML(d, title) {
                     <span>Optimal P: <b>${d.opt_p_val.toFixed(1)} bar</b></span>
                     <span style="color:${color}; font-weight:600;">${msg}</span>
                 </div>
-                <button id="btn-show-opt-curve" style="margin-top:8px; width:100%; padding:6px; background:#ea580c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">
-                    📈 View Optimization Curve
-                </button>
-                <button id="btn-show-ph-chart" style="margin-top:4px; width:100%; padding:6px; background:#fff; color:#666; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px; display:none;">
-                    ↩ Back to P-h Diagram
-                </button>
+                <button id="btn-show-opt-curve" style="margin-top:8px; width:100%; padding:6px; background:#ea580c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">📈 View Optimization Curve</button>
+                <button id="btn-show-ph-chart" style="margin-top:4px; width:100%; padding:6px; background:#fff; color:#666; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px; display:none;">↩ Back to P-h Diagram</button>
             </div>`;
         }
 
@@ -161,6 +132,22 @@ function generateDatasheetHTML(d, title) {
         if (d.stages && d.stages > 1) {
             stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">Stages: <b>${d.stages}</b> | Intercooling: <b>${d.intercool ? "Yes" : "No"}</b></div>`;
         }
+
+        // [New in v8.32] Real Gas Properties Table Block
+        const realGasBlock = `
+        <div style="margin-top:20px; border-top:1px dashed #ddd; padding-top:10px;">
+            <div style="font-size:11px; font-weight:bold; color:#666; margin-bottom:5px; text-transform:uppercase;">Real Gas Properties (Suction)</div>
+            <table style="width:100%; font-size:12px; color:#444;">
+                <tr>
+                    <td>Compressibility Z:</td><td style="text-align:right; font-family:monospace;">${d.z_in ? d.z_in.toFixed(4) : '-'}</td>
+                    <td style="padding-left:15px;">Sound Speed:</td><td style="text-align:right; font-family:monospace;">${d.sound_speed_in ? d.sound_speed_in.toFixed(1) + ' m/s' : '-'}</td>
+                </tr>
+                <tr>
+                    <td>Isentropic Exp. (k):</td><td style="text-align:right; font-family:monospace;">${d.gamma_in ? d.gamma_in.toFixed(3) : '-'}</td>
+                    <td style="padding-left:15px;">Density:</td><td style="text-align:right; font-family:monospace;">${(d.m_flow/d.v_flow).toFixed(2)} kg/m³</td>
+                </tr>
+            </table>
+        </div>`;
 
         return `
         <div style="padding:30px; font-family:'Segoe UI', sans-serif; background:#fff; color:#333;">
@@ -193,6 +180,7 @@ function generateDatasheetHTML(d, title) {
                         <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">Vol Flow (Actual)</td><td style="text-align:right; font-weight:600;">${(d.v_flow * 3600).toFixed(1)} m³/h</td></tr>
                         ${d.cop_c ? `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">COP (Cooling)</td><td style="text-align:right; font-weight:600;">${d.cop_c.toFixed(2)}</td></tr>` : ''}
                     </table>
+                    ${realGasBlock}
                 </div>
             </div>
 
@@ -229,11 +217,15 @@ async function calculateMode1_CO2(CP) {
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
 
+            // [New] Real Gas Properties
+            const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
+            const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
+            const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
+
             let p_out, t_out_point3_k, h_point3;
             let report_vals = {};
             let optimizationResults = null;
 
-            // 基础参数提取
             const eff_isen = parseFloat(fd.get('eff_isen_peak_m1_co2')); 
             const pr_des = parseFloat(fd.get('pr_design_m1_co2'));
             const clearance = parseFloat(fd.get('clearance_m1_co2'));
@@ -249,7 +241,7 @@ async function calculateMode1_CO2(CP) {
                 h_point3 = CP.PropsSI('H', 'P', p_out, 'T', t_out_point3_k, fluid);
                 report_vals = { t_gc_out };
 
-                // [New] 执行 COP 优化扫描
+                // Optimization Scan
                 optimizationResults = runCO2OptimizationSweep(CP, {
                     h_in, s_in, t_gc_out, eff_isen,
                     clearance, n_index,
@@ -269,8 +261,6 @@ async function calculateMode1_CO2(CP) {
             }
 
             const pr_act = p_out / p_in;
-
-            // 容积效率计算 (Standard)
             let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr_act, 1.0/n_index) - 1.0));
             eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
             
@@ -286,7 +276,7 @@ async function calculateMode1_CO2(CP) {
             const cool_mode = coolRadio ? coolRadio.value : 'adiabatic';
             let h_out_final = h_out_raw;
             let t_out_final_k = t_out_raw_k;
-            let q_loss = 0, m_inj = 0; // Simplified cooling logic for display
+            let q_loss = 0, m_inj = 0; 
 
             const q_evap = (h_in - h_point3) * m_flow / 1000.0;
             const q_cond = (h_out_final - h_point3) * m_flow / 1000.0;
@@ -298,11 +288,12 @@ async function calculateMode1_CO2(CP) {
                 p_out: p_out/1e5, t_out: t_out_final_k - 273.15,
                 pr: pr_act,
                 ...report_vals,
+                // [New] Store Real Gas Properties
+                z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power: power_shaft, q_evap, q_cond,
                 cop_c: q_evap/power_shaft, cop_h: q_cond/power_shaft,
                 eff_isen, eff_vol, eff_note: `AI-CO2 (${cycleType})`,
                 cooling_info: { type: cool_mode, t_raw: t_out_raw_k - 273.15, q_loss, m_inj },
-                // 保存优化结果
                 opt_curve_data: optimizationResults ? optimizationResults.data : null,
                 opt_p_val: optimizationResults ? optimizationResults.bestP : null,
                 opt_cop_val: optimizationResults ? optimizationResults.bestCOP : null
@@ -310,11 +301,9 @@ async function calculateMode1_CO2(CP) {
 
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "CO2 REPORT");
 
-            // 绑定图表切换按钮事件
             if (optimizationResults) {
                 const btnOpt = document.getElementById('btn-show-opt-curve');
                 const btnPh = document.getElementById('btn-show-ph-chart');
-                
                 if(btnOpt && btnPh) {
                     btnOpt.onclick = () => {
                         drawOptimizationCurve('chart-m1', optimizationResults.data, p_out/1e5);
@@ -329,7 +318,6 @@ async function calculateMode1_CO2(CP) {
                 }
             }
 
-            // 默认显示 P-h 图
             if(chartDivM1) {
                 chartDivM1.classList.remove('hidden');
                 drawPh();
@@ -339,7 +327,6 @@ async function calculateMode1_CO2(CP) {
                 const h_4 = h_point3; 
                 const s_4 = CP.PropsSI('S', 'P', p_in, 'H', h_4, fluid);
                 const s_3 = CP.PropsSI('S', 'P', p_out, 'H', h_point3, fluid);
-                // 恢复表格显示
                 const tbl = document.querySelector('.state-table-container');
                 if(tbl) tbl.style.display = 'block';
                 
@@ -361,10 +348,6 @@ async function calculateMode1_CO2(CP) {
     }, 50);
 }
 
-// ... calculateMode2 和 calculateMode1 保持不变，省略以节省空间，实际文件应保留 ...
-// (此处省略了 calculateMode2 和 calculateMode1 的代码，它们与之前版本一致)
-// ...
-
 async function calculateMode2(CP) {
     if (!CP) return;
     calcButtonM2.disabled = true; calcButtonM2.textContent = "计算中...";
@@ -377,6 +360,12 @@ async function calculateMode2(CP) {
             const p_out = parseFloat(fd.get('p_out_m2')) * 1e5;
             const eff_isen = parseFloat(fd.get('eff_isen_m2'))/100;
             const vol_eff = parseFloat(fd.get('vol_eff_m2'))/100;
+            
+            // [New] Real Gas Properties
+            const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in, fluid);
+            const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in, fluid);
+            const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in, fluid);
+
             const d_in = CP.PropsSI('D','P', p_in, 'T', t_in, fluid);
             
             let { m_flow, v_flow_in } = getFlowRate(fd, 'm2', d_in, vol_eff);
@@ -402,6 +391,8 @@ async function calculateMode2(CP) {
             lastMode2Data = {
                 date: new Date().toLocaleDateString(), fluid,
                 p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out: t_out_final-273.15,
+                // [New]
+                z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power, pr: p_out/p_in,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
                 cooling_info: { type: cooling_mode, t_raw: t_out_adiabatic - 273.15, q_loss }
@@ -435,6 +426,12 @@ async function calculateMode1(CP) {
             const vol_eff = parseFloat(fd.get('vol_eff_m1'))/100;
             const t_in_k = t_evap + parseFloat(fd.get('SH_m1')) + 273.15;
             const d_in = CP.PropsSI('D','P', p_in, 'T', t_in_k, fluid);
+            
+            // [New] Real Gas Properties
+            const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
+            const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
+            const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
+
             let { m_flow, v_flow_in } = getFlowRate(fd, 'm1', d_in, vol_eff);
             const t_cond = parseFloat(fd.get('T_cond_m1'));
             const sc = parseFloat(fd.get('SC_m1'));
@@ -451,10 +448,13 @@ async function calculateMode1(CP) {
             const q_evap = (h_in - h_liq) * m_flow / 1000.0; 
             const q_cond = (h_out - h_liq) * m_flow / 1000.0; 
             const power = w_real * m_flow / 1000.0;
+            
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
                 p_in: p_in/1e5, t_in: t_in_k-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
                 t_cond, sc, m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
+                // [New]
+                z_in, sound_speed_in, gamma_in,
                 cop_c: q_evap/power, cop_h: q_cond/power,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard"
             };
@@ -521,7 +521,6 @@ export function initMode1_2(CP) {
     if (calcFormM1_CO2) {
         calcFormM1_CO2.addEventListener('submit', (e) => { e.preventDefault(); calculateMode1_CO2(CP); });
         
-        // [New] 升级推荐按钮逻辑：现在使用严格寻优算法
         if(btnOptP) btnOptP.addEventListener('click', () => {
             if(!CP_INSTANCE) return;
             const btn = btnOptP;
@@ -538,7 +537,6 @@ export function initMode1_2(CP) {
                     const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, 'R744');
                     const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, 'R744');
 
-                    // 快速运行一次优化
                     const res = runCO2OptimizationSweep(CP, {
                         h_in, s_in, t_gc_out,
                         eff_isen: parseFloat(fd.get('eff_isen_peak_m1_co2')),
@@ -552,7 +550,6 @@ export function initMode1_2(CP) {
                     document.getElementById('p_high_m1_co2').value = res.bestP.toFixed(1);
                 } catch(e) {
                     console.error("Quick opt failed", e);
-                    // Fallback to old empirical
                     const t = parseFloat(document.getElementById('T_gc_out_m1_co2').value);
                     if (!isNaN(t)) document.getElementById('p_high_m1_co2').value = (2.75 * t - 6.5).toFixed(1);
                 } finally {
