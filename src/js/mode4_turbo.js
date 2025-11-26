@@ -1,6 +1,6 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.32 (Feature: Real Gas Properties Z/A/k)
+// 版本: v8.33 (Feature: Mobile Responsive Datasheet & Real Gas Props)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -9,115 +9,111 @@ import { drawPhDiagram, exportToExcel } from './utils.js';
 let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5, exportButtonM5, chartDivM5, fluidSelectM5;
 let lastMode5Data = null;
 
-// --- Helper: MVR 透平 Datasheet 生成器 ---
+// --- Helper: MVR Turbo Datasheet (Mobile Optimized) ---
 function generateTurboDatasheet(d) {
-    const themeColor = "#0f766e"; 
-    const bgColor = "#f0fdfa";
-    const borderColor = "#ccfbf1";
+    const themeColor = "text-teal-700 border-teal-600";
+    const themeBg = "bg-teal-50";
+    const themeBorder = "border-teal-100";
 
-    let injHtml = `<div style="color:#999; font-size:11px;">Disabled</div>`;
-    if (d.is_desuperheat && d.m_water > 0) {
-        injHtml = `<div style="font-weight:800; color:#0d9488;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:12px">kg/h</span></div>`;
-    }
-
-    let stageInfo = "";
-    if (d.stages > 1) {
-        stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">
-            Stages: <b>${d.stages}</b> (No Intercooling)
+    // 辅助行生成器
+    const row = (label, val, unit = "") => `
+        <div class="flex justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+            <span class="text-gray-500 text-sm font-medium">${label}</span>
+            <span class="font-mono font-bold text-gray-800 text-right">${val} <span class="text-xs text-gray-400 ml-1 font-sans">${unit}</span></span>
         </div>`;
-    }
 
-    // [New in v8.32] Real Gas Properties Block
+    let injHtml = d.is_desuperheat && d.m_water > 0 
+        ? `<span class="text-teal-600 font-bold">${(d.m_water * 3600).toFixed(1)} <span class="text-xs font-normal text-gray-500">kg/h</span></span>` 
+        : `<span class="text-gray-400 text-xs">Disabled</span>`;
+
+    let stageInfo = d.stages > 1 ? `<span class="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">Stages: ${d.stages}</span>` : "";
+
+    // Real Gas Properties Block
     const realGasBlock = `
-    <div style="margin-top:20px; border-top:1px dashed #ccc; padding-top:10px;">
-        <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:5px; text-transform:uppercase;">Real Gas Properties (Suction)</div>
-        <table style="width:100%; font-size:12px; color:#444;">
-            <tr>
-                <td>Compressibility Z:</td><td style="text-align:right; font-family:monospace; font-weight:bold;">${d.z_in ? d.z_in.toFixed(4) : '-'}</td>
-                <td style="padding-left:15px;">Speed of Sound:</td><td style="text-align:right; font-family:monospace; font-weight:bold;">${d.sound_speed_in ? d.sound_speed_in.toFixed(1) + ' m/s' : '-'}</td>
-            </tr>
-            <tr>
-                <td>Isentropic Exp. (k):</td><td style="text-align:right; font-family:monospace;">${d.gamma_in ? d.gamma_in.toFixed(3) : '-'}</td>
-                <td style="padding-left:15px;">Density:</td><td style="text-align:right; font-family:monospace;">${(d.m_flow/d.v_flow_in).toFixed(3)} kg/m³</td>
-            </tr>
-        </table>
+    <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
+        <div class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Real Gas Props (Suction)</div>
+        <div class="grid grid-cols-1 gap-y-1">
+            ${row("Compressibility Z", d.z_in ? d.z_in.toFixed(4) : '-')}
+            ${row("Sound Speed", d.sound_speed_in ? d.sound_speed_in.toFixed(1) : '-', 'm/s')}
+            ${row("Isentropic Exp (k)", d.gamma_in ? d.gamma_in.toFixed(3) : '-')}
+            ${row("Density", (d.m_flow/d.v_flow_in).toFixed(2), 'kg/m³')}
+        </div>
     </div>`;
 
     return `
-    <div style="padding: 30px; font-family: 'Segoe UI', sans-serif; background: #fff; color: #333;">
-        <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
+        <div class="border-b-2 border-teal-600 pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
             <div>
-                <div style="font-size: 28px; font-weight: 900; color: ${themeColor};">MVR TURBO DATASHEET</div>
-                <div style="font-size: 14px; color: #666; margin-top: 5px;">Centrifugal Compressor Simulation 离心式蒸汽压缩机</div>
-                ${stageInfo}
+                <h2 class="text-xl md:text-2xl font-bold text-teal-800 leading-tight">MVR TURBO REPORT</h2>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <span class="px-2 py-0.5 bg-teal-50 text-teal-700 rounded text-xs font-bold">Centrifugal</span>
+                    <span class="text-xs text-gray-400">${d.date}</span>
+                    ${stageInfo}
+                </div>
             </div>
-            <div style="text-align: right; font-size: 12px; color: #666;">
-                Date: <strong>${d.date}</strong><br>
-                Fluid: <strong>${d.fluid}</strong>
+            <div class="mt-2 md:mt-0 text-right">
+                <span class="text-xs font-bold text-gray-500 mr-2">Fluid:</span>
+                <span class="text-sm font-bold text-gray-800">${d.fluid}</span>
             </div>
         </div>
-        
-        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px;">
-             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Evaporation 蒸发量</div>
-                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${(d.m_flow * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Impeller Power 叶轮功率</div>
-                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
-            </div>
-             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Injection Water 喷水量</div>
-                ${injHtml}
-            </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-            <div>
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Suction Conditions 吸气工况</div>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp 饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_in.toFixed(1)} °C</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Superheat 吸气过热度</td><td style="text-align: right; font-weight: 600; color:${themeColor}">${d.sh_in.toFixed(1)} K</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Volume Flow 吸气流量</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
-                </table>
 
-                <div style="font-size: 14px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Efficiency Settings 效率设定</div>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Polytropic Eff. 多变效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_poly * 100).toFixed(1)} %</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">COP 性能系数</td><td style="text-align: right; font-weight: 600;">${d.cop.toFixed(2)}</td></tr>
-                </table>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Evaporation</div>
+                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${(d.m_flow * 3600).toFixed(1)} <span class="text-sm font-normal text-gray-600">kg/h</span></div>
+            </div>
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Impeller Pwr</div>
+                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${d.power.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+            </div>
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm flex flex-col justify-center items-center">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Injection</div>
+                <div class="text-lg font-bold">${injHtml}</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Suction Conditions</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-6">
+                    ${row("Suction Press", d.p_in.toFixed(3), "bar")}
+                    ${row("Sat. Temp", d.t_sat_in.toFixed(1), "°C")}
+                    ${row("Superheat", d.sh_in.toFixed(1), "K")}
+                    ${row("Vol Flow", (d.v_flow_in * 3600).toFixed(1), "m³/h")}
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    ${row("Polytropic Eff.", (d.eff_poly * 100).toFixed(1), "%")}
+                    ${row("COP", d.cop.toFixed(2))}
+                </div>
                 ${realGasBlock}
             </div>
 
             <div>
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #f9fafb;">Discharge & Thermal 排气与热管理</div>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Temp Lift (Sat) 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Dry) 干排温</td><td style="text-align: right; font-weight: 600;">${d.t_out_dry.toFixed(1)} °C</td></tr>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Discharge & Thermal</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    ${row("Temp Lift (Sat)", d.dt.toFixed(1), "K")}
+                    ${row("Discharge Press", d.p_out.toFixed(3), "bar")}
+                    ${row("Dry Discharge T", d.t_out_dry.toFixed(1), "°C")}
                     ${d.is_desuperheat ? `
-                    <tr style="background-color:#f0fdfa;"><td style="padding: 8px 0; color: #0f766e; font-weight:bold;">Final Discharge T 最终排温</td><td style="text-align: right; font-weight: 800; color: #0f766e;">${d.t_out_final.toFixed(1)} °C</td></tr>
-                    <tr style="background-color:#f0fdfa;"><td style="padding: 8px 0; color: #555;">Injection Temp 喷水温度</td><td style="text-align: right;">${d.t_water.toFixed(1)} °C</td></tr>
-                    ` : `
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #999;">Desuperheating</td><td style="text-align: right; color: #999;">Disabled</td></tr>
-                    `}
-                </table>
+                        <div class="mt-3 pt-2 border-t border-teal-100">
+                            <div class="text-[10px] text-teal-600 font-bold uppercase mb-1">After Injection</div>
+                            ${row("Final Discharge T", d.t_out_final.toFixed(1), "°C")}
+                            ${row("Injection Temp", d.t_water.toFixed(1), "°C")}
+                        </div>
+                    ` : row("Desuperheating", "Disabled")}
+                </div>
             </div>
         </div>
 
-        <div style="margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; font-size: 11px; color: #6b7280;">
-            <div style="margin-bottom: 5px; font-weight: bold; color: #374151; font-size: 12px;">
-                Prepared by Yanrong Jing (荆炎荣)
-            </div>
-            <div style="margin-bottom: 8px;">
-                Oil-Free Compressor Calculator Pro v8.32
-            </div>
+        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.33</p>
         </div>
-    </div>
-    `;
+    </div>`;
 }
 
+// --- Helper: Flow Calculation ---
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m5');
     let m_flow = 0;
@@ -133,7 +129,10 @@ function getFlowRate(formData, density_in) {
     return { m_flow, v_flow_in };
 }
 
+// --- Setup AI Preset ---
 function setupAiEff() {
+    // Note: Basic logic kept here, but main presets logic moved to ui.js in v8.33
+    // This is kept for fallback or specific local logic if needed
     const select = document.getElementById('ai_eff_m5');
     if (!select) return;
     select.addEventListener('change', () => {
@@ -144,6 +143,7 @@ function setupAiEff() {
     });
 }
 
+// --- Core Calculation Logic ---
 async function calculateMode5(CP) {
     if (!CP) return;
     calcButtonM5.textContent = "计算中...";
@@ -258,7 +258,7 @@ async function calculateMode5(CP) {
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt, stages,
                 is_desuperheat, m_water, t_water,
-                // [New] Add to data object
+                // Real Gas Props
                 z_in, sound_speed_in, gamma_in
             };
 
@@ -291,7 +291,8 @@ export function initMode5(CP) {
     fluidSelectM5 = document.getElementById('fluid_m5');
     
     if (calcFormM5) {
-        setupAiEff();
+        // Local listener is kept as fallback, though ui.js handles presets now.
+        setupAiEff(); 
         calcFormM5.addEventListener('submit', (e) => { e.preventDefault(); calculateMode5(CP); });
         if(fluidSelectM5) {
             fluidSelectM5.addEventListener('change', () => updateFluidInfo(fluidSelectM5, document.getElementById('fluid-info-m5'), CP));
@@ -302,8 +303,7 @@ export function initMode5(CP) {
         printButtonM5.onclick = () => {
             if (lastMode5Data) {
                 const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>MVR Turbo Report</title></head><body style="margin:0">${generateTurboDatasheet(lastMode5Data)}</body></html>`);
-                win.document.close();
+                win.document.write(`<html><head><title>MVR Turbo Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateTurboDatasheet(lastMode5Data)}</body></html>`);
                 setTimeout(() => win.print(), 200);
             } else alert("Please Calculate First");
         };

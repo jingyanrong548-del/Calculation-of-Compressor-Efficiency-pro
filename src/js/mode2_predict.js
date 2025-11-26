@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷/CO2) & 模式二 (气体)
-// 版本: v8.32 (Feature: Real Gas Properties Z/A/k + CO2 Opt)
+// 版本: v8.33 (Feature: Mobile Responsive Datasheet)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -41,7 +41,7 @@ function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
     return { m_flow, v_flow_in };
 }
 
-// --- Helper: CO2 跨临界寻优算法 (From Option A) ---
+// --- Helper: CO2 跨临界寻优算法 ---
 function runCO2OptimizationSweep(CP, params) {
     const { 
         h_in, s_in, t_gc_out, eff_isen,
@@ -90,111 +90,138 @@ function runCO2OptimizationSweep(CP, params) {
     return { data: results, bestP, bestCOP };
 }
 
-// --- Helper: Datasheet 生成器 ---
+// --- Helper: Datasheet 生成器 (Mobile Optimized) ---
 function generateDatasheetHTML(d, title) {
     try {
-        const themeColor = (d.fluid && d.fluid.includes('R744')) ? "#ea580c" : (title.includes("GAS") ? "#0891b2" : "#059669");
+        // 根据流体类型决定主题色
+        const themeColor = (d.fluid && d.fluid.includes('R744')) ? "text-orange-600 border-orange-600" : (title.includes("GAS") ? "text-cyan-700 border-cyan-700" : "text-emerald-700 border-emerald-700");
+        const themeBg = (d.fluid && d.fluid.includes('R744')) ? "bg-orange-50" : "bg-gray-50";
+        const themeBorder = (d.fluid && d.fluid.includes('R744')) ? "border-orange-200" : "border-gray-200";
+        
         const isGas = title.includes("GAS");
         const isCO2Trans = d.fluid === 'R744' && d.cycle_type === 'Transcritical';
         
-        let highSideRow = "";
+        // 辅助：生成表格行 (Tailwind Responsive)
+        const row = (label, val, unit = "") => `
+            <div class="flex justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                <span class="text-gray-500 text-sm font-medium">${label}</span>
+                <span class="font-mono font-bold text-gray-800 text-right">${val} <span class="text-xs text-gray-400 ml-1 font-sans">${unit}</span></span>
+            </div>`;
+
+        let highSideContent = "";
         if (d.cycle_type === 'Subcritical') {
-            highSideRow = `<tr><td style="padding:6px;">Condensing Temp</td><td style="text-align:right;">${d.t_cond.toFixed(2)} °C</td></tr>
-            <tr><td style="padding:6px;">Subcooling</td><td style="text-align:right;">${d.sc.toFixed(1)} K</td></tr>
-            <tr><td style="padding:6px;">Discharge Pressure</td><td style="text-align:right;">${d.p_out.toFixed(2)} bar</td></tr>`;
+            highSideContent = row("Condensing Temp", d.t_cond.toFixed(2), "°C") +
+                              row("Subcooling", d.sc.toFixed(1), "K") +
+                              row("Discharge Press", d.p_out.toFixed(2), "bar");
         } else if (d.cycle_type === 'Transcritical') {
-            highSideRow = `<tr><td style="padding:6px;">Gas Cooler Press.</td><td style="text-align:right; font-weight:bold;">${d.p_out.toFixed(1)} bar</td></tr>
-            <tr><td style="padding:6px;">Gas Cooler Exit T</td><td style="text-align:right;">${d.t_gc_out.toFixed(1)} °C</td></tr>`;
+            highSideContent = row("Gas Cooler Press", d.p_out.toFixed(1), "bar") +
+                              row("Gas Cooler Exit", d.t_gc_out.toFixed(1), "°C");
         } else {
-            highSideRow = `<tr><td style="padding:6px;">Discharge Pressure</td><td style="text-align:right;">${d.p_out.toFixed(2)} bar</td></tr>
-            <tr><td style="padding:6px;">Discharge Temp</td><td style="text-align:right;">${d.t_out.toFixed(2)} °C</td></tr>`;
+            highSideContent = row("Discharge Press", d.p_out.toFixed(2), "bar") +
+                              row("Discharge Temp", d.t_out.toFixed(2), "°C");
         }
 
+        // CO2 优化信息卡片
         let optInfo = "";
         if (isCO2Trans && d.opt_p_val) {
             const diff = Math.abs(d.p_out - d.opt_p_val);
-            const color = diff > 2.0 ? "#dc2626" : "#16a34a"; 
+            const colorClass = diff > 2.0 ? "text-red-600" : "text-green-600";
             const msg = diff > 2.0 ? "Optimized P available" : "Operating at Optimal";
             
             optInfo = `
-            <div style="margin-top:15px; padding:10px; background:#fff7ed; border:1px dashed #f97316; border-radius:4px;">
-                <div style="font-size:12px; font-weight:bold; color:#ea580c; margin-bottom:5px;">💡 AI Optimization Suggestion</div>
-                <div style="display:flex; justify-content:space-between; font-size:13px;">
-                    <span>Optimal P: <b>${d.opt_p_val.toFixed(1)} bar</b></span>
-                    <span style="color:${color}; font-weight:600;">${msg}</span>
+            <div class="mt-6 p-4 bg-orange-50 border border-dashed border-orange-300 rounded-lg">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-orange-700 uppercase tracking-wider">💡 AI Optimization</span>
+                    <span class="text-xs font-bold ${colorClass}">${msg}</span>
                 </div>
-                <button id="btn-show-opt-curve" style="margin-top:8px; width:100%; padding:6px; background:#ea580c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">📈 View Optimization Curve</button>
-                <button id="btn-show-ph-chart" style="margin-top:4px; width:100%; padding:6px; background:#fff; color:#666; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:12px; display:none;">↩ Back to P-h Diagram</button>
+                <div class="flex justify-between text-sm mb-4">
+                    <span class="text-gray-600">Suggested Pressure:</span>
+                    <span class="font-bold text-gray-900">${d.opt_p_val.toFixed(1)} bar</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btn-show-opt-curve" class="py-2 px-3 bg-orange-600 text-white text-xs font-bold rounded shadow hover:bg-orange-700 transition duration-200">
+                        📈 View Curve
+                    </button>
+                    <button id="btn-show-ph-chart" class="hidden py-2 px-3 bg-white text-gray-600 border border-gray-300 text-xs font-bold rounded shadow hover:bg-gray-50 transition duration-200">
+                        ↩ Back to P-h
+                    </button>
+                </div>
             </div>`;
         }
 
-        let stageInfo = "";
-        if (d.stages && d.stages > 1) {
-            stageInfo = `<div style="margin-top:5px; font-size:12px; color:#555;">Stages: <b>${d.stages}</b> | Intercooling: <b>${d.intercool ? "Yes" : "No"}</b></div>`;
-        }
+        let stageInfo = d.stages > 1 ? `<span class="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">Stages: ${d.stages}</span>` : "";
 
-        // [New in v8.32] Real Gas Properties Table Block
+        // 真实气体物性卡片
         const realGasBlock = `
-        <div style="margin-top:20px; border-top:1px dashed #ddd; padding-top:10px;">
-            <div style="font-size:11px; font-weight:bold; color:#666; margin-bottom:5px; text-transform:uppercase;">Real Gas Properties (Suction)</div>
-            <table style="width:100%; font-size:12px; color:#444;">
-                <tr>
-                    <td>Compressibility Z:</td><td style="text-align:right; font-family:monospace;">${d.z_in ? d.z_in.toFixed(4) : '-'}</td>
-                    <td style="padding-left:15px;">Sound Speed:</td><td style="text-align:right; font-family:monospace;">${d.sound_speed_in ? d.sound_speed_in.toFixed(1) + ' m/s' : '-'}</td>
-                </tr>
-                <tr>
-                    <td>Isentropic Exp. (k):</td><td style="text-align:right; font-family:monospace;">${d.gamma_in ? d.gamma_in.toFixed(3) : '-'}</td>
-                    <td style="padding-left:15px;">Density:</td><td style="text-align:right; font-family:monospace;">${(d.m_flow/d.v_flow).toFixed(2)} kg/m³</td>
-                </tr>
-            </table>
+        <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
+            <div class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Real Gas Properties (Suction)</div>
+            <div class="grid grid-cols-1 gap-y-1">
+                ${row("Compressibility Z", d.z_in ? d.z_in.toFixed(4) : '-')}
+                ${row("Sound Speed", d.sound_speed_in ? d.sound_speed_in.toFixed(1) : '-', 'm/s')}
+                ${row("Isentropic Exp (k)", d.gamma_in ? d.gamma_in.toFixed(3) : '-')}
+                ${row("Density", (d.m_flow/d.v_flow).toFixed(2), 'kg/m³')}
+            </div>
         </div>`;
 
+        // 响应式主布局
         return `
-        <div style="padding:30px; font-family:'Segoe UI', sans-serif; background:#fff; color:#333;">
-            <div style="border-bottom:3px solid ${themeColor}; padding-bottom:15px; margin-bottom:20px;">
-                <h2 style="color:${themeColor}; margin:0;">${title}</h2>
-                <div style="font-size:12px; color:#666; margin-top:5px;">Fluid: <strong>${d.fluid}</strong> | Date: <strong>${d.date}</strong></div>
-                ${stageInfo}
+        <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
+            <div class="border-b-2 ${themeColor} pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
+                <div>
+                    <h2 class="text-xl md:text-2xl font-bold ${themeColor.split(' ')[0]} leading-tight">${title}</h2>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-bold text-gray-700">${d.fluid}</span>
+                        <span class="text-xs text-gray-400">${d.date}</span>
+                        ${stageInfo}
+                    </div>
+                </div>
             </div>
             
-            <div style="display:flex; justify-content:space-around; background:#f9fafb; padding:20px; border-radius:8px; margin-bottom:30px; border:1px solid #eee;">
-                <div style="text-align:center;"><div style="font-size:11px; color:#666;">SHAFT POWER</div><div style="font-size:24px; font-weight:800; color:${themeColor}">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div></div>
-                ${!isGas ? `<div style="text-align:center;"><div style="font-size:11px; color:#666;">COOLING CAP</div><div style="font-size:24px; font-weight:800; color:${themeColor}">${d.q_evap.toFixed(2)} <span style="font-size:14px">kW</span></div></div>` : ''}
-                <div style="text-align:center;"><div style="font-size:11px; color:#666;">${d.q_cond ? 'HEATING/GC LOAD' : 'PRESSURE RATIO'}</div><div style="font-size:24px; font-weight:800; color:${themeColor}">${d.q_cond ? d.q_cond.toFixed(2) + ' <span style="font-size:14px">kW</span>' : d.pr.toFixed(2)}</div></div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Shaft Power</div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.power.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                </div>
+                ${!isGas ? `
+                <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Cooling Cap</div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.q_evap.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                </div>` : ''}
+                <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">${d.q_cond ? 'Heating/GC' : 'Pressure Ratio'}</div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.q_cond ? d.q_cond.toFixed(2) : d.pr.toFixed(2)} <span class="text-sm font-normal text-gray-600">${d.q_cond ? 'kW' : ''}</span></div>
+                </div>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                    <div style="font-weight:bold; border-left:4px solid ${themeColor}; padding-left:10px; margin-bottom:10px; background:#f9fafb;">Operating Conditions</div>
-                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                        <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">Suction Pressure</td><td style="text-align:right; font-weight:600;">${d.p_in.toFixed(2)} bar</td></tr>
-                        <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">Suction Temp</td><td style="text-align:right; font-weight:600;">${d.t_in.toFixed(2)} °C</td></tr>
-                        ${highSideRow}
-                    </table>
+                    <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Operating Conditions</h3>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        ${row("Suction Press", d.p_in.toFixed(2), "bar")}
+                        ${row("Suction Temp", d.t_in.toFixed(2), "°C")}
+                        ${highSideContent}
+                    </div>
                     ${optInfo}
                 </div>
+
                 <div>
-                    <div style="font-weight:bold; border-left:4px solid ${themeColor}; padding-left:10px; margin-bottom:10px; background:#f9fafb;">Performance Data</div>
-                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                        <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">Mass Flow</td><td style="text-align:right; font-weight:600;">${(d.m_flow * 3600).toFixed(1)} kg/h</td></tr>
-                        <tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">Vol Flow (Actual)</td><td style="text-align:right; font-weight:600;">${(d.v_flow * 3600).toFixed(1)} m³/h</td></tr>
-                        ${d.cop_c ? `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 0; color:#555;">COP (Cooling)</td><td style="text-align:right; font-weight:600;">${d.cop_c.toFixed(2)}</td></tr>` : ''}
-                    </table>
+                    <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Performance</h3>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        ${row("Mass Flow", (d.m_flow * 3600).toFixed(1), "kg/h")}
+                        ${row("Vol Flow (Actual)", (d.v_flow * 3600).toFixed(1), "m³/h")}
+                        ${d.cop_c ? row("COP (Cooling)", d.cop_c.toFixed(2)) : ''}
+                    </div>
                     ${realGasBlock}
                 </div>
             </div>
 
-            ${d.cooling_info ? `
-            <div style="margin-top:20px; padding:15px; background:#fff1f2; border-left:4px solid ${isGas?'#0891b2':'#dc2626'}; border-radius:4px; font-size:13px;">
-                <div style="font-weight:bold; color:#991b1b; margin-bottom:5px;">THERMAL MANAGEMENT (${d.cooling_info.type})</div>
-                ${d.cooling_info.q_loss > 0 ? `<div>Heat Removed: <strong>${d.cooling_info.q_loss.toFixed(2)} kW</strong></div>` : ''}
-                ${d.cooling_info.t_raw ? `<div>Raw Discharge T: ${d.cooling_info.t_raw.toFixed(1)} °C</div>` : ''}
-            </div>` : ''}
-            <div style="margin-top:40px; text-align:center; font-size:11px; color:#999; border-top:1px solid #eee; padding-top:10px;">Calculation of Compressor Efficiency Pro v8.32</div>
+            <div class="mt-8 pt-4 border-t border-gray-100 text-center">
+                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.33</p>
+            </div>
         </div>`;
     } catch (e) {
         console.error("HTML Gen Error:", e);
-        return `<div style="color:red;">Report Error: ${e.message}</div>`;
+        return `<div class="p-4 bg-red-50 text-red-600 rounded border border-red-200 text-center">Report Generation Error: ${e.message}</div>`;
     }
 }
 
@@ -217,7 +244,7 @@ async function calculateMode1_CO2(CP) {
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
 
-            // [New] Real Gas Properties
+            // Real Gas Props
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
             const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
@@ -241,7 +268,6 @@ async function calculateMode1_CO2(CP) {
                 h_point3 = CP.PropsSI('H', 'P', p_out, 'T', t_out_point3_k, fluid);
                 report_vals = { t_gc_out };
 
-                // Optimization Scan
                 optimizationResults = runCO2OptimizationSweep(CP, {
                     h_in, s_in, t_gc_out, eff_isen,
                     clearance, n_index,
@@ -288,7 +314,6 @@ async function calculateMode1_CO2(CP) {
                 p_out: p_out/1e5, t_out: t_out_final_k - 273.15,
                 pr: pr_act,
                 ...report_vals,
-                // [New] Store Real Gas Properties
                 z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power: power_shaft, q_evap, q_cond,
                 cop_c: q_evap/power_shaft, cop_h: q_cond/power_shaft,
@@ -339,7 +364,7 @@ async function calculateMode1_CO2(CP) {
             }
 
         } catch (err) {
-            resultsDivM1.innerHTML = `<div class="p-4 bg-red-50 text-red-600">Error: ${err.message}</div>`;
+            resultsDivM1.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded">Error: ${err.message}</div>`;
         } finally {
             calcButtonM1_CO2.disabled = false; calcButtonM1_CO2.textContent = "🔥 计算 CO2 (R744) 循环";
             if(printButtonM1) printButtonM1.disabled = false;
@@ -361,7 +386,6 @@ async function calculateMode2(CP) {
             const eff_isen = parseFloat(fd.get('eff_isen_m2'))/100;
             const vol_eff = parseFloat(fd.get('vol_eff_m2'))/100;
             
-            // [New] Real Gas Properties
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in, fluid);
             const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in, fluid);
@@ -391,7 +415,6 @@ async function calculateMode2(CP) {
             lastMode2Data = {
                 date: new Date().toLocaleDateString(), fluid,
                 p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out: t_out_final-273.15,
-                // [New]
                 z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power, pr: p_out/p_in,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
@@ -427,7 +450,6 @@ async function calculateMode1(CP) {
             const t_in_k = t_evap + parseFloat(fd.get('SH_m1')) + 273.15;
             const d_in = CP.PropsSI('D','P', p_in, 'T', t_in_k, fluid);
             
-            // [New] Real Gas Properties
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
             const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
@@ -453,7 +475,6 @@ async function calculateMode1(CP) {
                 date: new Date().toLocaleDateString(), fluid,
                 p_in: p_in/1e5, t_in: t_in_k-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
                 t_cond, sc, m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
-                // [New]
                 z_in, sound_speed_in, gamma_in,
                 cop_c: q_evap/power, cop_h: q_cond/power,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard"
@@ -499,8 +520,7 @@ export function initMode1_2(CP) {
     if (printButtonM1) printButtonM1.onclick = () => {
         if (lastMode1Data) {
             const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Report</title></head><body style="margin:0">${generateDatasheetHTML(lastMode1Data, lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT")}</body></html>`);
-            win.document.close();
+            win.document.write(`<html><head><title>Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode1Data, lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT")}</body></html>`);
             setTimeout(() => win.print(), 200);
         } else alert("Please Calculate First");
     };
@@ -509,8 +529,7 @@ export function initMode1_2(CP) {
     if (printButtonM2) printButtonM2.onclick = () => {
         if (lastMode2Data) {
             const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Gas Report</title></head><body style="margin:0">${generateDatasheetHTML(lastMode2Data, "GAS REPORT")}</body></html>`);
-            win.document.close();
+            win.document.write(`<html><head><title>Gas Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode2Data, "GAS REPORT")}</body></html>`);
             setTimeout(() => win.print(), 200);
         } else alert("Please Calculate First");
     };
