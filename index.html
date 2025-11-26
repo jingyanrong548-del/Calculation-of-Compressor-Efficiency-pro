@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.29 (MVR Superheat Input)</title>
+    <title>无油压缩机性能计算器 v8.30 (Theoretical Flow Update)</title>
     <style>
         .sub-tab-btn.active {
             background-color: #059669;
@@ -28,7 +28,7 @@
             animation: fadeIn 0.3s ease-out;
         }
     </style>
-  <script type="module" crossorigin src="/Calculation-of-Compressor-Efficiency-pro/assets/index-BiTvBkRG.js"></script>
+  <script type="module" crossorigin src="/Calculation-of-Compressor-Efficiency-pro/assets/index-DlKmaX-g.js"></script>
   <link rel="stylesheet" crossorigin href="/Calculation-of-Compressor-Efficiency-pro/assets/index-CNKn54tI.css">
 </head>
 
@@ -38,7 +38,7 @@
 
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md no-print">
             <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v8.29 (MVR Suction Superheat Input)</p>
+            <p class="text-lg text-gray-600 mt-2">v8.30 (Theoretical Volumetric Flow Update)</p>
         </header>
 
         <div class="bg-white rounded-lg shadow-md no-print">
@@ -63,9 +63,6 @@
 
             <div class="p-6 md:p-8">
 
-                <!-- ================================================================= -->
-                <!-- TAB 1: 制冷/CO2 (Standard & Transcritical) -->
-                <!-- ================================================================= -->
                 <div id="tab-content-1" class="tab-content">
 
                     <div class="flex justify-center space-x-4 mb-6 border-b pb-4">
@@ -79,7 +76,6 @@
                         </button>
                     </div>
 
-                    <!-- 1.1 Standard Heat Pump -->
                     <div id="panel-m1-std">
                         <form id="calc-form-1" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                             <div>
@@ -175,7 +171,7 @@
                                         <label><input type="radio" name="flow_mode_m1" value="rpm" checked>
                                             转速/排量</label>
                                         <label><input type="radio" name="flow_mode_m1" value="mass"> 质量流量</label>
-                                        <label><input type="radio" name="flow_mode_m1" value="vol"> 体积流量</label>
+                                        <label><input type="radio" name="flow_mode_m1" value="vol"> 理论体积流量</label>
                                     </div>
                                 </div>
                                 <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-x-4">
@@ -189,8 +185,8 @@
                                 <div id="flow-inputs-mass-m1" class="hidden"><label class="text-sm">质量流量
                                         (kg/s)</label><input type="number" name="mass_flow_m1" value="1.0" step="0.001"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
-                                <div id="flow-inputs-vol-m1" class="hidden"><label class="text-sm">吸气体积流量
-                                        (m³/h)</label><input type="number" name="vol_flow_m1" value="100" step="0.01"
+                                <div id="flow-inputs-vol-m1" class="hidden"><label class="text-sm font-bold text-blue-700">理论体积流量
+                                        (Theoretical m³/h)</label><input type="number" name="vol_flow_m1" value="100" step="0.01"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                                 <div class="mt-8"><button type="submit" id="calc-button-1"
@@ -200,7 +196,6 @@
                         </form>
                     </div>
 
-                    <!-- 1.2 CO2 Heat Pump -->
                     <div id="panel-m1-co2" class="hidden">
                         <form id="calc-form-1-co2" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                             <div>
@@ -359,7 +354,7 @@
                                         <label><input type="radio" name="flow_mode_m1_co2" value="rpm" checked>
                                             转速/排量</label>
                                         <label><input type="radio" name="flow_mode_m1_co2" value="mass"> 质量流量</label>
-                                        <label><input type="radio" name="flow_mode_m1_co2" value="vol"> 体积流量</label>
+                                        <label><input type="radio" name="flow_mode_m1_co2" value="vol"> 理论体积流量</label>
                                     </div>
                                 </div>
                                 <div id="flow-inputs-rpm-m1_co2" class="grid grid-cols-2 gap-x-4">
@@ -373,8 +368,8 @@
                                 <div id="flow-inputs-mass-m1_co2" class="hidden"><label class="text-sm">质量流量
                                         (kg/s)</label><input type="number" name="mass_flow_m1_co2" value="0.1"
                                         step="0.001" class="w-full border-gray-300 rounded px-2 py-1"></div>
-                                <div id="flow-inputs-vol-m1_co2" class="hidden"><label class="text-sm">吸气体积流量
-                                        (m³/h)</label><input type="number" name="vol_flow_m1_co2" value="5" step="0.01"
+                                <div id="flow-inputs-vol-m1_co2" class="hidden"><label class="text-sm font-bold text-blue-700">理论体积流量
+                                        (Theoretical m³/h)</label><input type="number" name="vol_flow_m1_co2" value="5" step="0.01"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                                 <div class="mt-8">
@@ -407,9 +402,6 @@
                     </div>
                 </div>
 
-                <!-- ================================================================= -->
-                <!-- TAB 2: 气体压缩 (Gas) -->
-                <!-- ================================================================= -->
                 <div id="tab-content-2" class="tab-content" style="display: none;">
                     <form id="calc-form-2" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -496,7 +488,7 @@
                                 <div class="flex space-x-4 text-sm">
                                     <label><input type="radio" name="flow_mode_m2" value="rpm" checked> RPM</label>
                                     <label><input type="radio" name="flow_mode_m2" value="mass"> 质量</label>
-                                    <label><input type="radio" name="flow_mode_m2" value="vol"> 体积</label>
+                                    <label><input type="radio" name="flow_mode_m2" value="vol"> 理论体积流量</label>
                                 </div>
                             </div>
                             <div id="flow-inputs-rpm-m2" class="grid grid-cols-2 gap-x-4">
@@ -510,8 +502,8 @@
                             <div id="flow-inputs-mass-m2" class="hidden"><label class="text-sm">质量流量
                                     (kg/s)</label><input type="number" name="mass_flow_m2" value="1.0" step="0.001"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
-                            <div id="flow-inputs-vol-m2" class="hidden"><label class="text-sm">吸气体积流量
-                                    (m³/h)</label><input type="number" name="vol_flow_m2" value="100" step="0.01"
+                            <div id="flow-inputs-vol-m2" class="hidden"><label class="text-sm font-bold text-blue-700">理论体积流量
+                                    (Theoretical m³/h)</label><input type="number" name="vol_flow_m2" value="100" step="0.01"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                             <div class="mt-4 pt-2 border-t">
@@ -552,9 +544,6 @@
                     </div>
                 </div>
 
-                <!-- ================================================================= -->
-                <!-- TAB 3: 空压机 (Air Compressor) v8.28 Modified -->
-                <!-- ================================================================= -->
                 <div id="tab-content-3" class="tab-content" style="display: none;">
                     <form id="calc-form-3" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -577,7 +566,6 @@
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
                             </div>
 
-                            <!-- Multi-Stage -->
                             <div
                                 class="grid grid-cols-2 gap-x-4 mt-2 bg-yellow-50 p-2 rounded border border-yellow-100">
                                 <div class="input-group"><label class="text-sm">压缩级数 (Stages)</label><input
@@ -590,7 +578,6 @@
                                 </div>
                             </div>
 
-                            <!-- AI Recommend -->
                             <div class="input-group bg-blue-50 p-2 rounded border border-blue-200 mt-2">
                                 <label class="block text-xs font-bold text-blue-800 mb-1">🤖 AI 推荐</label>
                                 <select id="ai_eff_m3"
@@ -617,7 +604,7 @@
                                 <div class="flex space-x-4 text-sm">
                                     <label><input type="radio" name="flow_mode_m3" value="rpm" checked> 转速/排量</label>
                                     <label><input type="radio" name="flow_mode_m3" value="mass"> 质量流量</label>
-                                    <label><input type="radio" name="flow_mode_m3" value="vol"> 体积流量</label>
+                                    <label><input type="radio" name="flow_mode_m3" value="vol"> 理论体积流量</label>
                                 </div>
                             </div>
                             <div id="flow-inputs-rpm-m3" class="grid grid-cols-2 gap-x-4">
@@ -631,8 +618,8 @@
                             <div id="flow-inputs-mass-m3" class="hidden"><label class="text-sm">质量流量
                                     (kg/s)</label><input type="number" name="mass_flow_m3" value="0.5" step="0.001"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
-                            <div id="flow-inputs-vol-m3" class="hidden"><label class="text-sm">体积流量 (m³/h)</label><input
-                                    type="number" name="vol_flow_m3" value="600" step="0.01"
+                            <div id="flow-inputs-vol-m3" class="hidden"><label class="text-sm font-bold text-blue-700">理论体积流量
+                                    (Theoretical m³/h)</label><input type="number" name="vol_flow_m3" value="600" step="0.01"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                             <div class="mt-4 border-t pt-2">
@@ -655,7 +642,6 @@
                                         class="w-full border-gray-300 rounded px-2 py-1">
                                 </div>
 
-                                <!-- v8.28 Injection Inputs -->
                                 <div id="injection-inputs-m3"
                                     class="mt-2 hidden bg-blue-50 p-2 rounded border border-blue-200 animate-fade-in">
                                     <div class="grid grid-cols-2 gap-x-2">
@@ -710,17 +696,6 @@
                     </div>
                 </div>
 
-                <div id="tab-content-1" class="tab-content">
-                    <div class="p-4 bg-gray-50 text-center text-sm text-gray-500">Mode 1 代码保持 v8.28</div>
-                </div>
-                <div id="tab-content-2" class="tab-content" style="display:none;">
-                    <div class="p-4 bg-gray-50 text-center text-sm text-gray-500">Mode 2 代码保持 v8.28</div>
-                </div>
-                <div id="tab-content-3" class="tab-content" style="display:none;">
-                    <div class="p-4 bg-gray-50 text-center text-sm text-gray-500">Mode 3 代码保持 v8.28</div>
-                </div>
-
-                <!-- TAB 4: MVR (容积式) v8.29 Modified -->
                 <div id="tab-content-4" class="tab-content" style="display: none;">
                     <form id="calc-form-4" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -736,7 +711,6 @@
                                 <div class="input-group"><label class="text-sm">吸气压力 (bar)</label><input type="number"
                                         name="p_in_m4" value="1.013" step="0.001"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
-                                <!-- Changed: T_in -> SH_in -->
                                 <div class="input-group"><label class="text-sm font-bold text-purple-800">吸气过热度
                                         (K)</label><input type="number" name="SH_in_m4" value="0" step="0.1"
                                         class="w-full border-gray-300 rounded px-2 py-1" title="0 for Saturated Steam">
@@ -770,7 +744,7 @@
                                 <div class="flex space-x-2 text-xs">
                                     <label><input type="radio" name="flow_mode_m4" value="rpm" checked> RPM/排量</label>
                                     <label><input type="radio" name="flow_mode_m4" value="mass"> 质量流量</label>
-                                    <label><input type="radio" name="flow_mode_m4" value="vol"> 体积流量</label>
+                                    <label><input type="radio" name="flow_mode_m4" value="vol"> 理论体积流量</label>
                                 </div>
                             </div>
                             <div id="flow-inputs-rpm-m4" class="grid grid-cols-2 gap-x-4">
@@ -784,8 +758,8 @@
                             <div id="flow-inputs-mass-m4" class="hidden"><label class="text-sm">蒸发量 (kg/h)</label><input
                                     type="number" name="mass_flow_m4" value="1000" step="0.001"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
-                            <div id="flow-inputs-vol-m4" class="hidden"><label class="text-sm">体积流量 (m³/h)</label><input
-                                    type="number" name="vol_flow_m4" value="2000" step="0.01"
+                            <div id="flow-inputs-vol-m4" class="hidden"><label class="text-sm font-bold text-blue-700">理论体积流量
+                                    (Theoretical m³/h)</label><input type="number" name="vol_flow_m4" value="2000" step="0.01"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
 
                             <div class="mt-4 pt-2 border-t border-gray-200 bg-purple-50 p-2 rounded">
@@ -809,8 +783,8 @@
                             </div>
 
                             <div class="mt-6"><button type="submit" id="calc-button-4"
-                                    class="w-full bg-purple-600 text-white font-bold py-3 rounded hover:bg-purple-700">计算
-                                    MVR</button></div>
+                                    class="w-full bg-purple-600 text-white font-bold py-3 rounded hover:bg-purple-700">计算喷水量</button>
+                            </div>
                         </div>
                     </form>
                     <div class="mt-8">
@@ -819,15 +793,18 @@
                         <div class="mt-6 flex flex-col md:flex-row gap-4 justify-center">
                             <button type="button" id="print-button-4"
                                 class="w-full md:w-auto bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-900 transition duration-300 flex items-center justify-center gap-2"
-                                disabled>🖨️ 打印</button>
+                                disabled>
+                                🖨️ 打印技术规格书
+                            </button>
                             <button type="button" id="export-button-4"
                                 class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition duration-300 flex items-center justify-center gap-2"
-                                disabled>📊 导出</button>
+                                disabled>
+                                📊 导出 Excel
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB 5: MVR (透平式) v8.29 Modified -->
                 <div id="tab-content-5" class="tab-content" style="display: none;">
                     <form id="calc-form-5" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <div>
@@ -840,7 +817,6 @@
                                 <div class="input-group"><label class="text-sm">吸气压力 (bar)</label><input type="number"
                                         name="p_in_m5" value="1.013" step="0.001"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
-                                <!-- Changed: T_in -> SH_in -->
                                 <div class="input-group"><label class="text-sm font-bold text-teal-800">吸气过热度
                                         (K)</label><input type="number" name="SH_in_m5" value="0" step="0.1"
                                         class="w-full border-gray-300 rounded px-2 py-1"></div>
@@ -860,7 +836,7 @@
                             <div id="flow-inputs-mass-m5"><label class="text-sm">蒸发量 (kg/h)</label><input type="number"
                                     name="mass_flow_m5" value="5000" step="0.001"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
-                            <div id="flow-inputs-vol-m5" class="hidden"><label class="text-sm">吸气体积流量
+                            <div id="flow-inputs-vol-m5" class="hidden"><label class="text-sm">理论体积流量
                                     (m³/h)</label><input type="number" name="vol_flow_m5" value="8000" step="0.01"
                                     class="w-full border-gray-300 rounded px-2 py-1"></div>
 
@@ -926,7 +902,6 @@
         </div>
     </div>
 
-    <script src="/src/js/libs/coolprop.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
