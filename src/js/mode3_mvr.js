@@ -1,114 +1,158 @@
 // =====================================================================
 // mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
-// 版本: v8.30 (Feature: Theoretical Swept Volume Logic)
+// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, exportToExcel } from './utils.js';
+import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml } from './utils.js';
 
 let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4, exportButtonM4, chartDivM4, fluidSelectM4;
 let lastMode4Data = null;
+let baselineMode4 = null; // Baseline data for comparison
 
-// --- Helper: MVR Datasheet 生成器 ---
-function generateMVRDatasheet(d) {
-    const themeColor = "#7e22ce"; 
-    const bgColor = "#faf5ff";
-    const borderColor = "#e9d5ff";
+// --- Global Event Listeners (New in v8.35) ---
+document.addEventListener('unit-change', () => {
+    if (lastMode4Data) {
+        resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
+    }
+});
 
-    let injHtml = `<div style="color:#999; font-size:11px;">Disabled</div>`;
+document.addEventListener('pin-baseline', () => {
+    if (lastMode4Data && document.getElementById('tab-content-4').style.display !== 'none') {
+        baselineMode4 = { ...lastMode4Data };
+        resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
+    }
+});
+
+// --- Helper: MVR Datasheet Generator (v8.35) ---
+function generateMVRDatasheet(d, base = null) {
+    const themeColor = "text-purple-700 border-purple-600";
+    const themeBg = "bg-purple-50";
+    const themeBorder = "border-purple-100";
+
+    // Helper Row with Comparison
+    const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
+        const formatted = formatValue(valSI, type);
+        const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
+        return `
+        <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+            <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
+            <div class="text-right">
+                <div class="font-mono font-bold text-gray-800">${formatted}</div>
+                ${diff}
+            </div>
+        </div>`;
+    };
+
+    let injHtml = `<span class="text-gray-400 text-xs">Disabled</span>`;
     if (d.is_desuperheat && d.m_water > 0) {
-        injHtml = `<div style="font-weight:800; color:#d946ef;">${(d.m_water * 3600).toFixed(1)} <span style="font-size:12px">kg/h</span></div>`;
+        // Injection Water Flow
+        const val = d.m_water * 3600;
+        const baseVal = base?.m_water ? base.m_water * 3600 : null;
+        const fmt = formatValue(val, 'flow_mass');
+        const diff = base ? getDiffHtml(val, baseVal, false) : '';
+        injHtml = `<div class="flex flex-col items-center"><span class="text-purple-600 font-bold">${fmt}</span>${diff}</div>`;
     }
 
     return `
-    <div style="padding: 30px; font-family: 'Segoe UI', sans-serif; background: #fff; color: #333;">
-        <div style="border-bottom: 3px solid ${themeColor}; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
+        <div class="border-b-2 border-purple-600 pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
             <div>
-                <div style="font-size: 28px; font-weight: 900; color: ${themeColor};">MVR DATASHEET</div>
-                <div style="font-size: 14px; color: #666; margin-top: 5px;">Mechanical Vapor Recompression (Volumetric)</div>
+                <h2 class="text-xl md:text-2xl font-bold text-purple-800 leading-tight">MVR DATASHEET</h2>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <span class="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-bold">Volumetric</span>
+                    <span class="text-xs text-gray-400">${d.date}</span>
+                </div>
             </div>
-            <div style="text-align: right; font-size: 12px; color: #666;">
-                Date: <strong>${d.date}</strong><br>
-                Fluid: <strong>${d.fluid}</strong>
-            </div>
+            ${base ? '<div class="mt-2 md:mt-0 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
         </div>
 
-        <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 20px; border-radius: 8px; display: flex; justify-content: space-around; margin-bottom: 30px;">
-             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Evaporation 蒸发量</div>
-                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${(d.m_flow * 3600).toFixed(1)} <span style="font-size:14px">kg/h</span></div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Evaporation</div>
+                <div class="text-2xl md:text-3xl font-extrabold text-purple-800">${formatValue(d.m_flow * 3600, 'flow_mass')}</div>
+                ${getDiffHtml(d.m_flow, base?.m_flow, false)}
             </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Shaft Power 轴功率</div>
-                <div style="font-size: 24px; font-weight: 800; color: ${themeColor};">${d.power.toFixed(2)} <span style="font-size:14px">kW</span></div>
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Shaft Power</div>
+                <div class="text-2xl md:text-3xl font-extrabold text-purple-800">${formatValue(d.power, 'power')}</div>
+                ${getDiffHtml(d.power, base?.power, true)}
             </div>
-             <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Injection Water 喷水量</div>
+            <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm flex flex-col justify-center items-center">
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Injection Water</div>
                 ${injHtml}
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Process Parameters 工艺参数</div>
-                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Pressure 吸气压力</td><td style="text-align: right; font-weight: 600;">${d.p_in.toFixed(3)} bar</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Saturation Temp 饱和温度</td><td style="text-align: right; font-weight: 600;">${d.t_sat_in.toFixed(1)} °C</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Superheat 吸气过热度</td><td style="text-align: right; font-weight: 600; color:${themeColor}">${d.sh_in.toFixed(1)} K</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Pressure 排气压力</td><td style="text-align: right; font-weight: 600;">${d.p_out.toFixed(3)} bar</td></tr>
-                     <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Sat. Temp Rise 饱和温升</td><td style="text-align: right; font-weight: 600;">${d.dt.toFixed(1)} K</td></tr>
-                </table>
-                
-                <div style="font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Efficiency 效率</div>
-                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Isentropic Eff. 等熵效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_is*100).toFixed(1)} %</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Volumetric Eff. 容积效率</td><td style="text-align: right; font-weight: 600;">${(d.eff_vol*100).toFixed(1)} %</td></tr>
-                </table>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Process Parameters</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-6">
+                    ${rowCmp("Suction Pressure", d.p_in, base?.p_in, "pressure")}
+                    ${rowCmp("Saturation Temp", d.t_sat_in, base?.t_sat_in, "temp")}
+                    ${rowCmp("Suction Superheat", d.sh_in, base?.sh_in, "delta_temp")}
+                    ${rowCmp("Discharge Pressure", d.p_out, base?.p_out, "pressure")}
+                    ${rowCmp("Sat. Temp Rise", d.dt, base?.dt, "delta_temp")}
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                </div>
             </div>
             
             <div>
-                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-left: 5px solid ${themeColor}; padding-left: 10px; background: #faf5ff;">Machine & Thermal 机器与热管理</div>
-                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Operating Speed 转速</td><td style="text-align: right; font-weight: 600;">${d.rpm ? d.rpm + ' RPM' : '-'}</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Suction Vol Flow (Actual) 实际吸气</td><td style="text-align: right; font-weight: 600;">${(d.v_flow_in * 3600).toFixed(1)} m³/h</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Discharge Temp (Dry) 干排温</td><td style="text-align: right; font-weight: 600;">${d.t_out_dry.toFixed(1)} °C</td></tr>
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #555;">Specific Power 比功率</td><td style="text-align: right; font-weight: 600;">${(d.power / (d.m_flow*3600/1000)).toFixed(2)} kWh/t</td></tr>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Machine & Thermal</h3>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                        <span class="text-gray-500 text-sm font-medium mt-0.5">Operating Speed</span>
+                        <span class="font-mono font-bold text-gray-800">${d.rpm} <span class="text-xs text-gray-400 ml-1">RPM</span></span>
+                    </div>
+                    ${rowCmp("Suction Vol Flow", d.v_flow_in * 3600, base?.v_flow_in ? base.v_flow_in * 3600 : null, "flow_vol")}
+                    ${rowCmp("Discharge Temp (Dry)", d.t_out_dry, base?.t_out_dry, "temp")}
+                    
+                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                        <span class="text-gray-500 text-sm font-medium mt-0.5">Specific Power</span>
+                        <div class="text-right">
+                            <div class="font-mono font-bold text-gray-800">${(d.power / (d.m_flow*3.6)).toFixed(2)} <span class="text-xs text-gray-400 ml-1">kWh/t</span></div>
+                        </div>
+                    </div>
+
                     ${d.is_desuperheat ? `
-                    <tr style="background-color:#fdf4ff;"><td style="padding: 8px 0; color: #d946ef; font-weight:bold;">Final Discharge T 最终排温</td><td style="text-align: right; font-weight: 800; color: #d946ef;">${d.t_out_final.toFixed(1)} °C</td></tr>
-                    ` : `
-                    <tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px 0; color: #999;">Desuperheating</td><td style="text-align: right; color: #999;">Disabled</td></tr>
-                    `}
-                </table>
+                    <div class="mt-3 pt-2 border-t border-purple-100">
+                        <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">After Injection</div>
+                        ${rowCmp("Final Discharge T", d.t_out_final, base?.t_out_final, "temp")}
+                    </div>
+                    ` : ''}
+                </div>
             </div>
         </div>
-        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999;">Oil-Free Compressor Efficiency Calculator Pro v8.30</div>
+
+        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
+        </div>
     </div>
     `;
 }
 
-// --- Helper: 流量计算 (核心修改) ---
+// --- Helper: Flow Calculation (Logic from v8.30) ---
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m4');
     let m_flow = 0, v_flow_in = 0, rpm = 0;
     
-    // 获取容积效率
     const vol_eff = parseFloat(formData.get('vol_eff_m4') || '80') / 100.0;
 
     if (mode === 'rpm') {
-        // RPM模式：理论 = 转速 * 排量
-        // 实际 = 理论 * 容积效率
         rpm = parseFloat(formData.get('rpm_m4'));
         const disp = parseFloat(formData.get('vol_disp_m4')) / 1e6; 
         const v_flow_th = (rpm / 60.0) * disp;
         v_flow_in = v_flow_th * vol_eff; 
         m_flow = v_flow_in * density_in;
     } else if (mode === 'mass') {
-        // 质量模式：直接输入，无需理论修正
-        m_flow = parseFloat(formData.get('mass_flow_m4')) / 3600.0;
+        m_flow = parseFloat(formData.get('mass_flow_m4')) / 3600.0; // kg/h -> kg/s
         v_flow_in = m_flow / density_in;
     } else if (mode === 'vol') {
-        // 体积模式：输入为"理论"
-        // 实际 = 理论输入 * 容积效率
         const v_flow_th = parseFloat(formData.get('vol_flow_m4')) / 3600.0;
         v_flow_in = v_flow_th * vol_eff; 
         m_flow = v_flow_in * density_in;
@@ -116,7 +160,7 @@ function getFlowRate(formData, density_in) {
     return { m_flow, v_flow_in, rpm };
 }
 
-// --- 计算核心 ---
+// --- Core Calculation ---
 async function calculateMode4(CP) {
     if (!CP) return;
     calcButtonM4.textContent = "计算中...";
@@ -139,7 +183,6 @@ async function calculateMode4(CP) {
             const dt = parseFloat(formData.get('delta_T_m4'));
             const p_out = CP.PropsSI('P', 'T', t_sat_in + dt, 'Q', 1, fluid);
             
-            // 流量计算 (已修正)
             const { m_flow, v_flow_in, rpm } = getFlowRate(formData, d_in);
 
             const eff_is = parseFloat(formData.get('eff_isen_m4'))/100;
@@ -148,9 +191,9 @@ async function calculateMode4(CP) {
             const h_out_dry = h_in + w_real;
             const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
             
-            const power = w_real * m_flow / 1000.0;
+            const power = w_real * m_flow / 1000.0; // kW
 
-            // 喷水减温
+            // Injection Logic
             const is_desuperheat = document.getElementById('enable_desuperheat_m4').checked;
             const t_water = parseFloat(formData.get('T_water_in_m4')) || 30;
             const target_sh = parseFloat(formData.get('target_superheat_m4')) || 0;
@@ -188,7 +231,7 @@ async function calculateMode4(CP) {
                 is_desuperheat, m_water, t_water
             };
 
-            resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data);
+            resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
             
             if(chartDivM4) {
                 chartDivM4.classList.remove('hidden');
@@ -221,6 +264,7 @@ export function initMode4(CP) {
     fluidSelectM4 = document.getElementById('fluid_m4');
     
     if (calcFormM4) {
+        // Note: AI Preset logic moved to ui.js, kept here as fallback if ui.js fails to load
         const aiSelect = document.getElementById('ai_eff_m4');
         if(aiSelect) {
             aiSelect.addEventListener('change', () => {
@@ -237,8 +281,7 @@ export function initMode4(CP) {
         printButtonM4.onclick = () => {
             if (lastMode4Data) {
                 const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>MVR Report</title></head><body style="margin:0">${generateMVRDatasheet(lastMode4Data)}</body></html>`);
-                win.document.close();
+                win.document.write(`<html><head><title>MVR Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateMVRDatasheet(lastMode4Data, baselineMode4)}</body></html>`);
                 setTimeout(() => win.print(), 200);
             } else alert("Please Calculate First");
         };

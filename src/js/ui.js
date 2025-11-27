@@ -1,9 +1,10 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑
-// 版本: v8.34 (Feature: Case Management Integration)
+// 版本: v8.35 (Feature: Unit Switch & Baseline Pinning)
 // =====================================================================
 
 import { CaseStorage } from './storage.js';
+import { UnitState } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("UI: Initializing Interface Logic...");
@@ -33,7 +34,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -----------------------------------------------------------------
-    // 2. 工况管理 (Case Management) - [New in v8.34]
+    // 2. 全局控制 (Unit Switch & Baseline) - [New in v8.35]
+    // -----------------------------------------------------------------
+    function setupGlobalControls() {
+        // Unit Toggle
+        const unitToggle = document.getElementById('unit-toggle');
+        const unitLabel = document.getElementById('unit-label');
+        
+        if (unitToggle) {
+            unitToggle.addEventListener('change', () => {
+                const newUnit = UnitState.toggle(); // SI <-> IMP
+                if(unitLabel) unitLabel.textContent = newUnit;
+                
+                // Dispatch event for all modules to re-render datasheet
+                document.dispatchEvent(new Event('unit-change'));
+            });
+        }
+
+        // Pin Baseline Button
+        const pinBtn = document.getElementById('btn-pin-baseline');
+        if (pinBtn) {
+            pinBtn.addEventListener('click', () => {
+                // Dispatch event for active module to store its last result as baseline
+                document.dispatchEvent(new Event('pin-baseline'));
+                
+                // Visual feedback
+                const originalText = pinBtn.innerHTML;
+                pinBtn.innerHTML = "📌 Pinned!";
+                pinBtn.classList.add('bg-yellow-100', 'text-yellow-700', 'border-yellow-300');
+                setTimeout(() => {
+                    pinBtn.innerHTML = originalText;
+                    pinBtn.classList.remove('bg-yellow-100', 'text-yellow-700', 'border-yellow-300');
+                }, 1500);
+            });
+        }
+    }
+    setupGlobalControls();
+
+    // -----------------------------------------------------------------
+    // 3. 工况管理 (Case Management)
     // -----------------------------------------------------------------
     const saveModal = document.getElementById('save-modal');
     const loadModal = document.getElementById('load-modal');
@@ -45,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const caseListContainer = document.getElementById('case-list-container');
     const saveNameInput = document.getElementById('save-case-name');
 
-    // Helper: Toggle Modal
     const toggleModal = (modal, show) => {
         if (show) {
             modal.classList.remove('hidden');
@@ -56,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Helper: Gather all form data
     const gatherFormData = () => {
         const data = {};
         document.querySelectorAll('input, select').forEach(el => {
@@ -72,34 +109,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return data;
     };
 
-    // Helper: Restore form data
     const restoreFormData = (data) => {
         document.querySelectorAll('input, select').forEach(el => {
-            // Radio
             if (el.type === 'radio') {
                 if (data[el.name] === el.value) {
                     el.checked = true;
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-            }
-            // Checkbox
-            else if (el.type === 'checkbox') {
+            } else if (el.type === 'checkbox') {
                 const key = el.id || el.name;
                 if (data[key] !== undefined) {
                     el.checked = data[key];
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-            }
-            // Text/Number/Select
-            else if (el.name && data[el.name] !== undefined) {
+            } else if (el.name && data[el.name] !== undefined) {
                 el.value = data[el.name];
                 el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true })); // Trigger presets
+                el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
     };
 
-    // --- Save Logic ---
     if(btnOpenSave) {
         btnOpenSave.addEventListener('click', () => {
             saveNameInput.value = `Case ${new Date().toLocaleTimeString()}`;
@@ -114,27 +144,21 @@ document.addEventListener('DOMContentLoaded', () => {
         btnConfirmSave.addEventListener('click', () => {
             const name = saveNameInput.value.trim();
             if (!name) { alert("请输入工况名称"); return; }
-            
-            // Get Active Tab Name for summary
             const activeTabBtn = document.querySelector('.tab-btn.active');
             const modeName = activeTabBtn ? activeTabBtn.innerText.replace(/\n/g, ' ').trim() : 'Unknown';
-            
             CaseStorage.saveCase(name, modeName, gatherFormData());
             toggleModal(saveModal, false);
             alert("工况已保存! (Case Saved)");
         });
     }
 
-    // --- Load Logic ---
     const renderCaseList = () => {
         const cases = CaseStorage.listCases();
         caseListContainer.innerHTML = '';
-
         if (cases.length === 0) {
             caseListContainer.innerHTML = `<div class="text-center text-gray-400 py-8">暂无保存的工况 (No saved cases)</div>`;
             return;
         }
-
         cases.forEach(c => {
             const item = document.createElement('div');
             item.className = "bg-white border border-gray-200 rounded p-3 hover:shadow-md transition flex justify-between items-center";
@@ -148,25 +172,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn-delete px-2 py-1 text-red-400 hover:text-red-600 text-xs">&times;</button>
                 </div>
             `;
-            
-            // Restore Action
             item.querySelector('.btn-restore').addEventListener('click', () => {
-                if(confirm(`确认加载工况 "${c.name}"? 当前未保存的数据将丢失。`)) {
+                if(confirm(`确认加载工况 "${c.name}"?`)) {
                     restoreFormData(c.data);
                     toggleModal(loadModal, false);
-                    // Switch to correct tab (simple guess based on stored data or mode name)
-                    // Advanced: Store activeTabIndex in CaseStorage. For now user stays on current or switches manually.
                 }
             });
-
-            // Delete Action
             item.querySelector('.btn-delete').addEventListener('click', () => {
                 if(confirm(`删除工况 "${c.name}"?`)) {
                     CaseStorage.deleteCase(c.id);
-                    renderCaseList(); // Re-render
+                    renderCaseList(); 
                 }
             });
-
             caseListContainer.appendChild(item);
         });
     };
@@ -180,15 +197,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(btnCloseLoad) btnCloseLoad.addEventListener('click', () => toggleModal(loadModal, false));
 
-    // Close modals on backdrop click
     window.addEventListener('click', (e) => {
         if (e.target === saveModal) toggleModal(saveModal, false);
         if (e.target === loadModal) toggleModal(loadModal, false);
     });
 
-
     // -----------------------------------------------------------------
-    // 3. Mode 1 子选项卡切换
+    // 4. 模式 1 子选项卡切换
     // -----------------------------------------------------------------
     const btnStd = document.getElementById('sub-tab-std');
     const btnCo2 = document.getElementById('sub-tab-co2');
@@ -214,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------
-    // 4. Mode 1 CO2 循环类型切换
+    // 5. Mode 1 CO2 循环类型切换
     // -----------------------------------------------------------------
     function setupCo2CycleToggle() {
         const radios = document.querySelectorAll('input[name="cycle_type_m1_co2"]');
@@ -244,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCo2CycleToggle();
 
     // -----------------------------------------------------------------
-    // 5. 流量输入框切换逻辑 (通用 + Mode 3 Batch)
+    // 6. 流量输入框切换逻辑
     // -----------------------------------------------------------------
     function setupFlowToggle(modeSuffix) {
         const radioName = `flow_mode_${modeSuffix}`;
@@ -303,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['m1', 'm1_co2', 'm2', 'm3', 'm4', 'm5'].forEach(setupFlowToggle);
 
     // -----------------------------------------------------------------
-    // 6. AI 效率预设联动
+    // 7. AI 效率预设联动
     // -----------------------------------------------------------------
     function setupAiPresets() {
         const setVal = (id, val) => {
@@ -363,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAiPresets();
 
     // -----------------------------------------------------------------
-    // 7. 通用显隐 & 业务逻辑联动
+    // 8. 通用显隐 & 业务逻辑联动
     // -----------------------------------------------------------------
     function setupRadioToggle(name, targetValue, targetDivId) {
         const radios = document.querySelectorAll(`input[name="${name}"]`);

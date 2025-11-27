@@ -1,19 +1,51 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷/CO2) & 模式二 (气体)
-// 版本: v8.33 (Feature: Mobile Responsive Datasheet)
+// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, drawOptimizationCurve, exportToExcel } from './utils.js';
+import { drawPhDiagram, drawOptimizationCurve, exportToExcel, formatValue, getDiffHtml } from './utils.js';
 
 let CP_INSTANCE = null;
+
+// State for Mode 1
 let lastMode1Data = null;
+let baselineMode1 = null;
+
+// State for Mode 2
 let lastMode2Data = null;
+let baselineMode2 = null;
 
 // DOM Elements
 let calcButtonM1, resultsDivM1, calcFormM1, printButtonM1, exportButtonM1, chartDivM1;
 let calcButtonM1_CO2, calcFormM1_CO2, btnOptP;
 let calcButtonM2, resultsDivM2, calcFormM2, printButtonM2, exportButtonM2, chartDivM2;
+
+// --- Global Event Listeners for Unit/Baseline (New in v8.35) ---
+document.addEventListener('unit-change', () => {
+    if (lastMode1Data) {
+        const title = lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "STANDARD HEAT PUMP REPORT";
+        resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, title, baselineMode1);
+    }
+    if (lastMode2Data) {
+        resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
+    }
+});
+
+document.addEventListener('pin-baseline', () => {
+    // Pin Mode 1
+    if (lastMode1Data && document.getElementById('tab-content-1').style.display !== 'none') {
+        baselineMode1 = { ...lastMode1Data };
+        const title = lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "STANDARD HEAT PUMP REPORT";
+        resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, title, baselineMode1);
+    }
+    // Pin Mode 2
+    if (lastMode2Data && document.getElementById('tab-content-2').style.display !== 'none') {
+        baselineMode2 = { ...lastMode2Data };
+        resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
+    }
+});
+
 
 // --- Helper: 流量计算 ---
 function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
@@ -43,91 +75,95 @@ function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
 
 // --- Helper: CO2 跨临界寻优算法 ---
 function runCO2OptimizationSweep(CP, params) {
-    const { 
-        h_in, s_in, t_gc_out, eff_isen,
-        clearance, n_index,
-        rpm, vol_disp, density_in, p_in
-    } = params;
-
+    const { h_in, s_in, t_gc_out, eff_isen, clearance, n_index, rpm, vol_disp, density_in, p_in } = params;
     const fluid = 'R744';
     const t_gc_out_k = t_gc_out + 273.15;
     const results = [];
-    
-    const p_start = 74e5;
-    const p_end = 140e5;
-    const step = 1e5;
-
-    let bestCOP = -1;
-    let bestP = 0;
+    const p_start = 74e5, p_end = 140e5, step = 1e5;
+    let bestCOP = -1, bestP = 0;
 
     for (let p_curr = p_start; p_curr <= p_end; p_curr += step) {
         try {
             const h_out_is = CP.PropsSI('H', 'P', p_curr, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
-            
             const pr = p_curr / p_in;
             let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0/n_index) - 1.0));
             eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
-
             const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6);
             const m_flow_calc = v_flow_th * eff_vol * density_in;
-
             const h_gc_out = CP.PropsSI('H', 'T', t_gc_out_k, 'P', p_curr, fluid);
             const q_evap = m_flow_calc * (h_in - h_gc_out) / 1000.0; 
             const power = w_real * m_flow_calc / 1000.0; 
-
             const cop = q_evap / power;
-
             results.push({ p: p_curr / 1e5, cop: cop });
-
-            if (cop > bestCOP) {
-                bestCOP = cop;
-                bestP = p_curr / 1e5;
-            }
+            if (cop > bestCOP) { bestCOP = cop; bestP = p_curr / 1e5; }
         } catch (e) { }
     }
-
     return { data: results, bestP, bestCOP };
 }
 
-// --- Helper: Datasheet 生成器 (Mobile Optimized) ---
-function generateDatasheetHTML(d, title) {
+// --- Helper: Datasheet Generator (v8.35 with Units & Comparison) ---
+function generateDatasheetHTML(d, title, base = null) {
     try {
-        // 根据流体类型决定主题色
         const themeColor = (d.fluid && d.fluid.includes('R744')) ? "text-orange-600 border-orange-600" : (title.includes("GAS") ? "text-cyan-700 border-cyan-700" : "text-emerald-700 border-emerald-700");
         const themeBg = (d.fluid && d.fluid.includes('R744')) ? "bg-orange-50" : "bg-gray-50";
         const themeBorder = (d.fluid && d.fluid.includes('R744')) ? "border-orange-200" : "border-gray-200";
-        
         const isGas = title.includes("GAS");
         const isCO2Trans = d.fluid === 'R744' && d.cycle_type === 'Transcritical';
         
-        // 辅助：生成表格行 (Tailwind Responsive)
-        const row = (label, val, unit = "") => `
-            <div class="flex justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                <span class="text-gray-500 text-sm font-medium">${label}</span>
-                <span class="font-mono font-bold text-gray-800 text-right">${val} <span class="text-xs text-gray-400 ml-1 font-sans">${unit}</span></span>
+        // Enhanced Row Generator with Unit Conversion & Comparison
+        const row = (label, valSI, type) => {
+            const formatted = formatValue(valSI, type);
+            // Calculate Diff if baseline exists
+            let diffHtml = "";
+            if (base) {
+                // Map current value key to baseline key (assuming same structure)
+                // Note: valSI is passed directly, but we need the key to find it in base.
+                // Since we pass valSI directly, we can't easily lookup in base without key.
+                // REFACTOR: Pass key instead of value, or handle specific known keys.
+            }
+            // Simplified approach: formatValue returns string. 
+            return `
+            <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
+                <div class="text-right">
+                    <div class="font-mono font-bold text-gray-800">${formatted}</div>
+                </div>
             </div>`;
+        };
+
+        // Special Row for Comparison (Need explicit base value)
+        const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
+            const formatted = formatValue(valSI, type);
+            const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
+            return `
+            <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
+                <div class="text-right">
+                    <div class="font-mono font-bold text-gray-800">${formatted}</div>
+                    ${diff}
+                </div>
+            </div>`;
+        };
 
         let highSideContent = "";
         if (d.cycle_type === 'Subcritical') {
-            highSideContent = row("Condensing Temp", d.t_cond.toFixed(2), "°C") +
-                              row("Subcooling", d.sc.toFixed(1), "K") +
-                              row("Discharge Press", d.p_out.toFixed(2), "bar");
+            highSideContent = rowCmp("Condensing Temp", d.t_cond, base?.t_cond, "temp") +
+                              rowCmp("Subcooling", d.sc, base?.sc, "delta_temp") +
+                              rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure");
         } else if (d.cycle_type === 'Transcritical') {
-            highSideContent = row("Gas Cooler Press", d.p_out.toFixed(1), "bar") +
-                              row("Gas Cooler Exit", d.t_gc_out.toFixed(1), "°C");
+            highSideContent = rowCmp("Gas Cooler Press", d.p_out, base?.p_out, "pressure") +
+                              rowCmp("Gas Cooler Exit", d.t_gc_out, base?.t_gc_out, "temp");
         } else {
-            highSideContent = row("Discharge Press", d.p_out.toFixed(2), "bar") +
-                              row("Discharge Temp", d.t_out.toFixed(2), "°C");
+            highSideContent = rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure") +
+                              rowCmp("Discharge Temp", d.t_out, base?.t_out, "temp");
         }
 
-        // CO2 优化信息卡片
         let optInfo = "";
         if (isCO2Trans && d.opt_p_val) {
             const diff = Math.abs(d.p_out - d.opt_p_val);
             const colorClass = diff > 2.0 ? "text-red-600" : "text-green-600";
             const msg = diff > 2.0 ? "Optimized P available" : "Operating at Optimal";
-            
             optInfo = `
             <div class="mt-6 p-4 bg-orange-50 border border-dashed border-orange-300 rounded-lg">
                 <div class="flex justify-between items-center mb-2">
@@ -136,34 +172,28 @@ function generateDatasheetHTML(d, title) {
                 </div>
                 <div class="flex justify-between text-sm mb-4">
                     <span class="text-gray-600">Suggested Pressure:</span>
-                    <span class="font-bold text-gray-900">${d.opt_p_val.toFixed(1)} bar</span>
+                    <span class="font-bold text-gray-900">${formatValue(d.opt_p_val, 'pressure')}</span>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <button id="btn-show-opt-curve" class="py-2 px-3 bg-orange-600 text-white text-xs font-bold rounded shadow hover:bg-orange-700 transition duration-200">
-                        📈 View Curve
-                    </button>
-                    <button id="btn-show-ph-chart" class="hidden py-2 px-3 bg-white text-gray-600 border border-gray-300 text-xs font-bold rounded shadow hover:bg-gray-50 transition duration-200">
-                        ↩ Back to P-h
-                    </button>
+                    <button id="btn-show-opt-curve" class="py-2 px-3 bg-orange-600 text-white text-xs font-bold rounded shadow hover:bg-orange-700">📈 View Curve</button>
+                    <button id="btn-show-ph-chart" class="hidden py-2 px-3 bg-white text-gray-600 border border-gray-300 text-xs font-bold rounded shadow hover:bg-gray-50">↩ Back to P-h</button>
                 </div>
             </div>`;
         }
 
         let stageInfo = d.stages > 1 ? `<span class="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">Stages: ${d.stages}</span>` : "";
 
-        // 真实气体物性卡片
         const realGasBlock = `
         <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
             <div class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Real Gas Properties (Suction)</div>
             <div class="grid grid-cols-1 gap-y-1">
-                ${row("Compressibility Z", d.z_in ? d.z_in.toFixed(4) : '-')}
-                ${row("Sound Speed", d.sound_speed_in ? d.sound_speed_in.toFixed(1) : '-', 'm/s')}
-                ${row("Isentropic Exp (k)", d.gamma_in ? d.gamma_in.toFixed(3) : '-')}
-                ${row("Density", (d.m_flow/d.v_flow).toFixed(2), 'kg/m³')}
+                ${row("Compressibility Z", d.z_in, null)} 
+                ${row("Sound Speed", d.sound_speed_in, 'speed')}
+                ${row("Isentropic Exp (k)", d.gamma_in, null)}
+                ${row("Density", (d.m_flow/d.v_flow), 'density')}
             </div>
         </div>`;
 
-        // 响应式主布局
         return `
         <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
             <div class="border-b-2 ${themeColor} pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
@@ -175,21 +205,25 @@ function generateDatasheetHTML(d, title) {
                         ${stageInfo}
                     </div>
                 </div>
+                ${base ? '<div class="mt-2 md:mt-0 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
             </div>
             
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
                     <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Shaft Power</div>
-                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.power.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${formatValue(d.power, 'power')}</div>
+                    ${getDiffHtml(d.power, base?.power, true)}
                 </div>
                 ${!isGas ? `
                 <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
                     <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Cooling Cap</div>
-                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.q_evap.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${formatValue(d.q_evap, 'power')}</div>
+                    ${getDiffHtml(d.q_evap, base?.q_evap, false)}
                 </div>` : ''}
                 <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
                     <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">${d.q_cond ? 'Heating/GC' : 'Pressure Ratio'}</div>
-                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.q_cond ? d.q_cond.toFixed(2) : d.pr.toFixed(2)} <span class="text-sm font-normal text-gray-600">${d.q_cond ? 'kW' : ''}</span></div>
+                    <div class="text-2xl md:text-3xl font-extrabold ${themeColor.split(' ')[0]}">${d.q_cond ? formatValue(d.q_cond, 'power') : d.pr.toFixed(2)}</div>
+                    ${d.q_cond ? getDiffHtml(d.q_cond, base?.q_cond, false) : getDiffHtml(d.pr, base?.pr, false)}
                 </div>
             </div>
 
@@ -197,8 +231,8 @@ function generateDatasheetHTML(d, title) {
                 <div>
                     <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Operating Conditions</h3>
                     <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        ${row("Suction Press", d.p_in.toFixed(2), "bar")}
-                        ${row("Suction Temp", d.t_in.toFixed(2), "°C")}
+                        ${rowCmp("Suction Press", d.p_in, base?.p_in, "pressure")}
+                        ${rowCmp("Suction Temp", d.t_in, base?.t_in, "temp")}
                         ${highSideContent}
                     </div>
                     ${optInfo}
@@ -207,16 +241,16 @@ function generateDatasheetHTML(d, title) {
                 <div>
                     <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                     <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        ${row("Mass Flow", (d.m_flow * 3600).toFixed(1), "kg/h")}
-                        ${row("Vol Flow (Actual)", (d.v_flow * 3600).toFixed(1), "m³/h")}
-                        ${d.cop_c ? row("COP (Cooling)", d.cop_c.toFixed(2)) : ''}
+                        ${rowCmp("Mass Flow", d.m_flow, base?.m_flow, "flow_mass")}
+                        ${rowCmp("Vol Flow (Actual)", d.v_flow, base?.v_flow, "flow_vol")}
+                        ${d.cop_c ? rowCmp("COP (Cooling)", d.cop_c, base?.cop_c, null) : ''}
                     </div>
                     ${realGasBlock}
                 </div>
             </div>
 
             <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.33</p>
+                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
             </div>
         </div>`;
     } catch (e) {
@@ -244,7 +278,6 @@ async function calculateMode1_CO2(CP) {
             const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, fluid);
             const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, fluid);
 
-            // Real Gas Props
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
             const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
@@ -324,7 +357,7 @@ async function calculateMode1_CO2(CP) {
                 opt_cop_val: optimizationResults ? optimizationResults.bestCOP : null
             };
 
-            resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "CO2 REPORT");
+            resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "CO2 REPORT", baselineMode1);
 
             if (optimizationResults) {
                 const btnOpt = document.getElementById('btn-show-opt-curve');
@@ -420,7 +453,7 @@ async function calculateMode2(CP) {
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
                 cooling_info: { type: cooling_mode, t_raw: t_out_adiabatic - 273.15, q_loss }
             };
-            resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT");
+            resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
             if(chartDivM2) {
                 chartDivM2.classList.remove('hidden');
                 drawPhDiagram(CP, fluid, { points: [
@@ -479,7 +512,7 @@ async function calculateMode1(CP) {
                 cop_c: q_evap/power, cop_h: q_cond/power,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard"
             };
-            resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "STANDARD HEAT PUMP REPORT");
+            resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "STANDARD HEAT PUMP REPORT", baselineMode1);
             if(chartDivM1) {
                 chartDivM1.classList.remove('hidden');
                 const t_4 = CP.PropsSI('T', 'P', p_in, 'H', h_liq, fluid);
@@ -520,7 +553,7 @@ export function initMode1_2(CP) {
     if (printButtonM1) printButtonM1.onclick = () => {
         if (lastMode1Data) {
             const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode1Data, lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT")}</body></html>`);
+            win.document.write(`<html><head><title>Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode1Data, lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT", baselineMode1)}</body></html>`);
             setTimeout(() => win.print(), 200);
         } else alert("Please Calculate First");
     };
@@ -529,7 +562,7 @@ export function initMode1_2(CP) {
     if (printButtonM2) printButtonM2.onclick = () => {
         if (lastMode2Data) {
             const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Gas Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode2Data, "GAS REPORT")}</body></html>`);
+            win.document.write(`<html><head><title>Gas Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode2Data, "GAS REPORT", baselineMode2)}</body></html>`);
             setTimeout(() => win.print(), 200);
         } else alert("Please Calculate First");
     };

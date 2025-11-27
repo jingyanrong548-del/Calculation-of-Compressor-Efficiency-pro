@@ -1,30 +1,58 @@
 // =====================================================================
 // mode4_turbo.js: 模式五 (MVR 透平式 - 离心机)
-// 版本: v8.33 (Feature: Mobile Responsive Datasheet & Real Gas Props)
+// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, exportToExcel } from './utils.js';
+import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml } from './utils.js';
 
 let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5, exportButtonM5, chartDivM5, fluidSelectM5;
 let lastMode5Data = null;
+let baselineMode5 = null; // Baseline data for comparison
 
-// --- Helper: MVR Turbo Datasheet (Mobile Optimized) ---
-function generateTurboDatasheet(d) {
+// --- Global Event Listeners (New in v8.35) ---
+document.addEventListener('unit-change', () => {
+    if (lastMode5Data) {
+        resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data, baselineMode5);
+    }
+});
+
+document.addEventListener('pin-baseline', () => {
+    if (lastMode5Data && document.getElementById('tab-content-5').style.display !== 'none') {
+        baselineMode5 = { ...lastMode5Data };
+        resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data, baselineMode5);
+    }
+});
+
+// --- Helper: MVR Turbo Datasheet Generator (v8.35) ---
+function generateTurboDatasheet(d, base = null) {
     const themeColor = "text-teal-700 border-teal-600";
     const themeBg = "bg-teal-50";
     const themeBorder = "border-teal-100";
 
-    // 辅助行生成器
-    const row = (label, val, unit = "") => `
-        <div class="flex justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-            <span class="text-gray-500 text-sm font-medium">${label}</span>
-            <span class="font-mono font-bold text-gray-800 text-right">${val} <span class="text-xs text-gray-400 ml-1 font-sans">${unit}</span></span>
+    // Helper Row with Comparison
+    const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
+        const formatted = formatValue(valSI, type);
+        const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
+        return `
+        <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+            <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
+            <div class="text-right">
+                <div class="font-mono font-bold text-gray-800">${formatted}</div>
+                ${diff}
+            </div>
         </div>`;
+    };
 
-    let injHtml = d.is_desuperheat && d.m_water > 0 
-        ? `<span class="text-teal-600 font-bold">${(d.m_water * 3600).toFixed(1)} <span class="text-xs font-normal text-gray-500">kg/h</span></span>` 
-        : `<span class="text-gray-400 text-xs">Disabled</span>`;
+    // Injection Water Display
+    let injHtml = `<span class="text-gray-400 text-xs">Disabled</span>`;
+    if (d.is_desuperheat && d.m_water > 0) {
+        const val = d.m_water * 3600;
+        const baseVal = base?.m_water ? base.m_water * 3600 : null;
+        const fmt = formatValue(val, 'flow_mass');
+        const diff = base ? getDiffHtml(val, baseVal, false) : '';
+        injHtml = `<div class="flex flex-col items-center"><span class="text-teal-600 font-bold">${fmt}</span>${diff}</div>`;
+    }
 
     let stageInfo = d.stages > 1 ? `<span class="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">Stages: ${d.stages}</span>` : "";
 
@@ -33,10 +61,10 @@ function generateTurboDatasheet(d) {
     <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
         <div class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Real Gas Props (Suction)</div>
         <div class="grid grid-cols-1 gap-y-1">
-            ${row("Compressibility Z", d.z_in ? d.z_in.toFixed(4) : '-')}
-            ${row("Sound Speed", d.sound_speed_in ? d.sound_speed_in.toFixed(1) : '-', 'm/s')}
-            ${row("Isentropic Exp (k)", d.gamma_in ? d.gamma_in.toFixed(3) : '-')}
-            ${row("Density", (d.m_flow/d.v_flow_in).toFixed(2), 'kg/m³')}
+            ${rowCmp("Compressibility Z", d.z_in, base?.z_in, null)}
+            ${rowCmp("Sound Speed", d.sound_speed_in, base?.sound_speed_in, 'speed')}
+            ${rowCmp("Isentropic Exp (k)", d.gamma_in, base?.gamma_in, null)}
+            ${rowCmp("Density", (d.m_flow/d.v_flow_in), base ? (base.m_flow/base.v_flow_in) : null, 'density')}
         </div>
     </div>`;
 
@@ -51,6 +79,7 @@ function generateTurboDatasheet(d) {
                     ${stageInfo}
                 </div>
             </div>
+            ${base ? '<div class="mt-2 md:mt-0 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
             <div class="mt-2 md:mt-0 text-right">
                 <span class="text-xs font-bold text-gray-500 mr-2">Fluid:</span>
                 <span class="text-sm font-bold text-gray-800">${d.fluid}</span>
@@ -60,11 +89,13 @@ function generateTurboDatasheet(d) {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Evaporation</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${(d.m_flow * 3600).toFixed(1)} <span class="text-sm font-normal text-gray-600">kg/h</span></div>
+                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${formatValue(d.m_flow * 3600, 'flow_mass')}</div>
+                ${getDiffHtml(d.m_flow, base?.m_flow, false)}
             </div>
             <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm">
-                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Impeller Pwr</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${d.power.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Impeller Power</div>
+                <div class="text-2xl md:text-3xl font-extrabold text-teal-800">${formatValue(d.power, 'power')}</div>
+                ${getDiffHtml(d.power, base?.power, true)}
             </div>
             <div class="p-4 ${themeBg} border ${themeBorder} rounded-lg text-center shadow-sm flex flex-col justify-center items-center">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Injection</div>
@@ -76,16 +107,16 @@ function generateTurboDatasheet(d) {
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Suction Conditions</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-6">
-                    ${row("Suction Press", d.p_in.toFixed(3), "bar")}
-                    ${row("Sat. Temp", d.t_sat_in.toFixed(1), "°C")}
-                    ${row("Superheat", d.sh_in.toFixed(1), "K")}
-                    ${row("Vol Flow", (d.v_flow_in * 3600).toFixed(1), "m³/h")}
+                    ${rowCmp("Suction Press", d.p_in, base?.p_in, "pressure")}
+                    ${rowCmp("Sat. Temp", d.t_sat_in, base?.t_sat_in, "temp")}
+                    ${rowCmp("Superheat", d.sh_in, base?.sh_in, "delta_temp")}
+                    ${rowCmp("Vol Flow (Act)", d.v_flow_in * 3600, base?.v_flow_in ? base.v_flow_in*3600 : null, "flow_vol")}
                 </div>
 
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${row("Polytropic Eff.", (d.eff_poly * 100).toFixed(1), "%")}
-                    ${row("COP", d.cop.toFixed(2))}
+                    ${rowCmp("Polytropic Eff.", d.eff_poly * 100, base?.eff_poly ? base.eff_poly * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                    ${rowCmp("COP", d.cop, base?.cop, null)}
                 </div>
                 ${realGasBlock}
             </div>
@@ -93,22 +124,31 @@ function generateTurboDatasheet(d) {
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-teal-600 pl-3 mb-4 uppercase tracking-wide">Discharge & Thermal</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${row("Temp Lift (Sat)", d.dt.toFixed(1), "K")}
-                    ${row("Discharge Press", d.p_out.toFixed(3), "bar")}
-                    ${row("Dry Discharge T", d.t_out_dry.toFixed(1), "°C")}
+                    ${rowCmp("Temp Lift (Sat)", d.dt, base?.dt, "delta_temp")}
+                    ${rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure")}
+                    ${rowCmp("Dry Discharge T", d.t_out_dry, base?.t_out_dry, "temp")}
+                    
+                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
+                        <span class="text-gray-500 text-sm font-medium mt-0.5">Specific Power</span>
+                        <div class="text-right">
+                            <div class="font-mono font-bold text-gray-800">${(d.power / (d.m_flow*3.6)).toFixed(2)} <span class="text-xs text-gray-400 ml-1">kWh/t</span></div>
+                            ${base ? getDiffHtml((d.power / (d.m_flow*3.6)), (base.power / (base.m_flow*3.6)), true) : ''}
+                        </div>
+                    </div>
+
                     ${d.is_desuperheat ? `
                         <div class="mt-3 pt-2 border-t border-teal-100">
                             <div class="text-[10px] text-teal-600 font-bold uppercase mb-1">After Injection</div>
-                            ${row("Final Discharge T", d.t_out_final.toFixed(1), "°C")}
-                            ${row("Injection Temp", d.t_water.toFixed(1), "°C")}
+                            ${rowCmp("Final Discharge T", d.t_out_final, base?.t_out_final, "temp")}
+                            ${rowCmp("Injection Water T", d.t_water, base?.t_water, "temp")}
                         </div>
-                    ` : row("Desuperheating", "Disabled")}
+                    ` : rowCmp("Desuperheating", "Disabled", null, null)}
                 </div>
             </div>
         </div>
 
         <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.33</p>
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
         </div>
     </div>`;
 }
@@ -129,10 +169,8 @@ function getFlowRate(formData, density_in) {
     return { m_flow, v_flow_in };
 }
 
-// --- Setup AI Preset ---
+// --- Setup AI Preset (Fallback) ---
 function setupAiEff() {
-    // Note: Basic logic kept here, but main presets logic moved to ui.js in v8.33
-    // This is kept for fallback or specific local logic if needed
     const select = document.getElementById('ai_eff_m5');
     if (!select) return;
     select.addEventListener('change', () => {
@@ -248,7 +286,7 @@ async function calculateMode5(CP) {
 
             lastMode5Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in_bar, 
+                fluid, p_in: p_in/1e5, 
                 t_sat_in: t_sat_in - 273.15,
                 sh_in,
                 t_in: t_in_k - 273.15, 
@@ -258,11 +296,10 @@ async function calculateMode5(CP) {
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt, stages,
                 is_desuperheat, m_water, t_water,
-                // Real Gas Props
                 z_in, sound_speed_in, gamma_in
             };
 
-            resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data);
+            resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data, baselineMode5);
             
             if(chartDivM5) {
                 chartDivM5.classList.remove('hidden');
@@ -291,8 +328,7 @@ export function initMode5(CP) {
     fluidSelectM5 = document.getElementById('fluid_m5');
     
     if (calcFormM5) {
-        // Local listener is kept as fallback, though ui.js handles presets now.
-        setupAiEff(); 
+        setupAiEff();
         calcFormM5.addEventListener('submit', (e) => { e.preventDefault(); calculateMode5(CP); });
         if(fluidSelectM5) {
             fluidSelectM5.addEventListener('change', () => updateFluidInfo(fluidSelectM5, document.getElementById('fluid-info-m5'), CP));
@@ -303,7 +339,7 @@ export function initMode5(CP) {
         printButtonM5.onclick = () => {
             if (lastMode5Data) {
                 const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>MVR Turbo Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateTurboDatasheet(lastMode5Data)}</body></html>`);
+                win.document.write(`<html><head><title>MVR Turbo Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateTurboDatasheet(lastMode5Data, baselineMode5)}</body></html>`);
                 setTimeout(() => win.print(), 200);
             } else alert("Please Calculate First");
         };

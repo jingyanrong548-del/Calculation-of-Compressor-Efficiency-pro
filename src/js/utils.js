@@ -1,16 +1,154 @@
 // =====================================================================
-// utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化)
-// 版本: v8.32 (Feature: Z-Factor & Real Gas Properties Support)
+// utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
+// 版本: v8.35 (Phase 2 Step 1: Unit Infrastructure + Full Charts)
 // =====================================================================
 
 import * as echarts from 'echarts';
-// 必须确保项目已安装 xlsx: npm install xlsx
 import * as XLSX from 'xlsx';
 
+// =====================================================================
+// 1. Unit Conversion Infrastructure (New in v8.35)
+// =====================================================================
+
+export const UnitState = {
+    current: 'SI', // 'SI' or 'IMP'
+    toggle() {
+        this.current = this.current === 'SI' ? 'IMP' : 'SI';
+        return this.current;
+    },
+    isMetric() { return this.current === 'SI'; }
+};
+
+// Conversion Factors & Labels
+const CONVERSIONS = {
+    pressure: {
+        si: 'bar', imp: 'psi',
+        toImp: (v) => v * 14.5038,
+        digits: 2
+    },
+    temp: { // Absolute Temp
+        si: '°C', imp: '°F',
+        toImp: (v) => (v * 1.8) + 32,
+        digits: 1
+    },
+    delta_temp: { // Temperature Difference (Superheat, Subcooling, Lift)
+        si: 'K', imp: '°R', // or °F delta
+        toImp: (v) => v * 1.8,
+        digits: 1
+    },
+    flow_vol: {
+        si: 'm³/h', imp: 'CFM',
+        toImp: (v) => v * 0.588578,
+        digits: 1
+    },
+    flow_mass: {
+        si: 'kg/h', imp: 'lb/h',
+        toImp: (v) => v * 2.20462,
+        digits: 1
+    },
+    power: {
+        si: 'kW', imp: 'HP',
+        toImp: (v) => v * 1.34102,
+        digits: 2
+    },
+    spec_power: {
+        si: 'kW/(m³/min)', imp: 'kW/100cfm',
+        toImp: (v) => v * 1.699, 
+        digits: 2
+    },
+    density: {
+        si: 'kg/m³', imp: 'lb/ft³',
+        toImp: (v) => v * 0.062428,
+        digits: 3
+    },
+    enthalpy: {
+        si: 'kJ/kg', imp: 'Btu/lb',
+        toImp: (v) => v * 0.429923,
+        digits: 1
+    },
+    entropy: {
+        si: 'kJ/kg·K', imp: 'Btu/lb·°F',
+        toImp: (v) => v * 0.238846,
+        digits: 4
+    },
+    speed: {
+        si: 'm/s', imp: 'ft/s',
+        toImp: (v) => v * 3.28084,
+        digits: 1
+    }
+};
+
 /**
- * 数据持久化管理器
- * 负责将用户输入保存到 LocalStorage，并在刷新后恢复
+ * 格式化数值 (用于 UI 显示)
+ * @param {number} valueSI - 原始 SI 值
+ * @param {string} type - 物理量类型
+ * @param {number} overrideDigits - 可选，覆盖默认小数位
+ * @returns {string} "123.45 unit"
  */
+export function formatValue(valueSI, type, overrideDigits = null) {
+    if (valueSI === null || valueSI === undefined || valueSI === '') return '-';
+    
+    const def = CONVERSIONS[type];
+    if (!def) return Number(valueSI).toFixed(2); // Fallback
+
+    let val = valueSI;
+    let unit = def.si;
+    
+    if (!UnitState.isMetric()) {
+        val = def.toImp(valueSI);
+        unit = def.imp;
+    }
+
+    const digits = overrideDigits !== null ? overrideDigits : def.digits;
+    return `${val.toFixed(digits)} <span class="text-xs text-gray-400 ml-0.5">${unit}</span>`;
+}
+
+/**
+ * 获取纯数值 (用于 Excel 导出或图表数据)
+ */
+export function getConvertedValue(valueSI, type) {
+    if (valueSI === null || valueSI === undefined) return null;
+    const def = CONVERSIONS[type];
+    if (!def) return valueSI;
+    return UnitState.isMetric() ? valueSI : def.toImp(valueSI);
+}
+
+/**
+ * 获取单位字符串
+ */
+export function getUnitLabel(type) {
+    const def = CONVERSIONS[type];
+    if (!def) return '';
+    return UnitState.isMetric() ? def.si : def.imp;
+}
+
+/**
+ * 生成对比差异 HTML (用于方案对比)
+ */
+export function getDiffHtml(current, baseline, inverse = false) {
+    if (!baseline || baseline === 0) return '';
+    
+    const diffPct = ((current - baseline) / baseline) * 100;
+    const absDiff = Math.abs(diffPct);
+    if (absDiff < 0.01) return ''; 
+
+    let color = 'text-gray-500';
+    // Logic: Inverse=true (e.g. Power) means Negative diff is Good (Green)
+    const isGood = inverse ? (diffPct < 0) : (diffPct > 0);
+    color = isGood ? 'text-green-600' : 'text-red-600';
+    
+    const arrow = diffPct > 0 ? '▲' : '▼';
+    
+    return `<div class="text-[10px] ${color} font-bold mt-0.5 flex items-center justify-end">
+        <span class="mr-1">${arrow}</span>${Math.abs(diffPct).toFixed(1)}% vs Base
+    </div>`;
+}
+
+
+// =====================================================================
+// 2. Data Persistence (AutoSaveManager)
+// =====================================================================
+
 export class AutoSaveManager {
     static STORAGE_KEY = 'v8_26_calc_data';
     static TAB_KEY = 'v8_26_active_tab';
@@ -104,10 +242,10 @@ export class AutoSaveManager {
 }
 
 
-/**
- * 导出数据到 Excel
- * [Updated in v8.32] Add Real Gas Properties (Z, Speed of Sound, Gamma)
- */
+// =====================================================================
+// 3. Excel Export (Updated with Unit Conversion Support)
+// =====================================================================
+
 export function exportToExcel(data, filename) {
     if (!data) {
         alert("无数据可导出 (No data). 请先点击计算按钮生成结果。");
@@ -123,89 +261,62 @@ export function exportToExcel(data, filename) {
     try {
         const rows = [];
         rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
-        rows.push(["Date 日期", data.date || new Date().toLocaleDateString(), ""]);
-        rows.push(["Fluid 工质", data.fluid || "-", ""]);
-        if(data.ai_model) rows.push(["Model 模型", data.ai_model, ""]);
-        if(data.cycle_type) rows.push(["Cycle Type 循环类型", data.cycle_type, ""]);
         
-        // 优化建议 (A阶段)
-        if (data.opt_p_val) {
-             rows.push(["Optimal Pressure (Calc)", data.opt_p_val.toFixed(2), "bar"]);
-             rows.push(["Max Possible COP", data.opt_cop_val.toFixed(3), "-"]);
-        }
-        
-        rows.push(["", "", ""]); 
-
-        const addRow = (key, val, unit="") => {
-            if (val !== undefined && val !== null && val !== "") {
-                const num = parseFloat(val);
-                const displayVal = isNaN(num) ? val : Number(num.toFixed(4));
-                rows.push([key, displayVal, unit]);
+        const add = (k, v, type) => {
+            if (v !== undefined && v !== null) {
+                // Convert value based on current UnitState
+                const val = type ? getConvertedValue(v, type) : v;
+                const unit = type ? getUnitLabel(type) : '';
+                const displayVal = typeof val === 'number' ? Number(val.toFixed(4)) : val;
+                rows.push([k, displayVal, unit]);
             }
         };
 
-        rows.push(["--- OPERATING CONDITIONS 运行工况 ---", "", ""]);
-        addRow("Suction Pressure 吸气压力", data.p_in, "bar");
-        addRow("Suction Temp 吸气温度", data.t_in, "°C");
-        
-        // [New] Real Gas Properties
-        if (data.z_in) addRow("Compressibility Factor Z", data.z_in, "-");
-        if (data.sound_speed_in) addRow("Speed of Sound (Suction)", data.sound_speed_in, "m/s");
-        if (data.gamma_in) addRow("Isentropic Exponent k/γ", data.gamma_in, "-");
+        rows.push(["--- INFO ---", "", ""]);
+        add("Date", data.date);
+        add("Fluid", data.fluid);
+        add("Unit System", UnitState.current); 
 
-        if (data.t_gc_out !== undefined) {
-            addRow("Gas Cooler Exit Temp 气冷出口", data.t_gc_out, "°C");
-            if (data.p_out) addRow("High Side Pressure 高压侧压力", data.p_out, "bar");
-        } else {
-            if (data.p_out) addRow("Discharge Pressure 排气压力", data.p_out, "bar");
-            if (data.t_cond) addRow("Condensing Temp 冷凝温度", data.t_cond, "°C");
-        }
+        rows.push(["--- CONDITIONS ---", "", ""]);
+        add("Suction Pressure", data.p_in, 'pressure');
+        add("Suction Temp", data.t_in, 'temp');
+        if(data.z_in) add("Compressibility Z", data.z_in);
+        if(data.sound_speed_in) add("Speed of Sound", data.sound_speed_in, 'speed');
         
-        if(data.rpm) addRow("Speed 转速", data.rpm, "RPM");
-        if(data.m_flow) addRow("Mass Flow 质量流量", data.m_flow * 3600, "kg/h");
-        
-        if(data.stages) addRow("Stages 级数", data.stages, "");
-        if(data.intercool) addRow("Intercooling 级间冷却", data.intercool ? "Yes" : "No", "");
+        if (data.p_out) add("Discharge Pressure", data.p_out, 'pressure');
+        if (data.t_out) add("Discharge Temp", data.t_out, 'temp');
+        if (data.t_cond) add("Condensing Temp", data.t_cond, 'temp');
+        if (data.t_gc_out) add("Gas Cooler Exit", data.t_gc_out, 'temp');
 
-        rows.push(["", "", ""]);
-        rows.push(["--- PERFORMANCE 性能数据 ---", "", ""]);
-        if(data.power) addRow("Shaft Power 轴功率", data.power, "kW");
-        if(data.q_evap) addRow("Cooling Capacity 制冷量", data.q_evap, "kW");
-        if(data.q_cond) addRow("Heating/GC Load 制热/气冷负荷", data.q_cond, "kW");
-        
-        if(data.cop_c) addRow("COP (Cooling) 制冷系数", data.cop_c, "-");
-        if(data.cop_h) addRow("COP (Heating) 制热系数", data.cop_h, "-");
-        if(data.cop && !data.cop_c) addRow("COP 性能系数", data.cop, "-");
-        if(data.spec_power) addRow("Specific Power 比功率", data.spec_power, "kW/(m³/min)");
+        if (data.rpm) add("Speed", data.rpm, '');
+        add("Mass Flow", data.m_flow, 'flow_mass');
+        add("Vol Flow (Actual)", data.v_flow || data.v_flow_in, 'flow_vol');
 
-        if (data.cooling_info) {
-            rows.push(["", "", ""]);
-            rows.push(["--- THERMAL MANAGEMENT 热管理 ---", "", ""]);
-            let typeStr = data.cooling_info.type;
-            if (typeStr === 'surface') typeStr = "Surface Cooling (表面冷却)";
-            else if (typeStr === 'injection') typeStr = "Liquid Injection (喷液冷却)";
-            else if (typeStr === 'adiabatic') typeStr = "Adiabatic (绝热)";
-            addRow("Cooling Strategy 策略", typeStr, "");
-            if(data.cooling_info.q_loss > 0) addRow("Heat Removed 移除热量", data.cooling_info.q_loss, "kW");
-            if(data.cooling_info.m_inj > 0) addRow("Injection Flow 喷射流量", data.cooling_info.m_inj * 3600, "kg/h");
-            if(data.cooling_info.t_raw) addRow("Raw Discharge T 原始排温", data.cooling_info.t_raw, "°C");
-        }
+        rows.push(["--- PERFORMANCE ---", "", ""]);
+        add("Shaft Power", data.power, 'power');
+        if(data.spec_power) add("Specific Power", data.spec_power, 'spec_power');
+        if(data.q_evap) add("Cooling Capacity", data.q_evap, 'power'); 
+        if(data.q_cond) add("Heating Load", data.q_cond, 'power');
+        
+        add("COP", data.cop || data.cop_c);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 15 }]; 
+        ws['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 15 }]; 
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Datasheet");
-        
-        const finalName = `${filename}_${new Date().getTime()}.xlsx`;
-        XLSX.writeFile(wb, finalName);
-        console.log(`[Utils] Export success: ${finalName}`);
+        XLSX.writeFile(wb, `${filename}_${UnitState.current}.xlsx`);
 
     } catch (err) {
         console.error("[Utils] Export Error:", err);
         alert("导出 Excel 失败:\n" + err.message);
     }
 }
+
+
+// =====================================================================
+// 4. Chart Rendering (Full Logic Restored)
+// =====================================================================
 
 /**
  * 渲染状态点表格
@@ -235,18 +346,18 @@ export function renderStateTable(domId, points) {
     tableDiv.innerHTML = `
         <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
             <div class="bg-gray-100 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-sm font-bold text-gray-700">Cycle State Points (循环状态点)</h3>
+                <h3 class="text-sm font-bold text-gray-700">Cycle State Points (SI Units)</h3>
                 <span class="text-xs text-gray-500">Auto-generated</span>
             </div>
             <table class="min-w-full">
                 <thead class="bg-white text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                     <tr>
-                        <th class="py-2 px-4 text-center w-16">Pt 点</th>
-                        <th class="py-2 px-4 text-left">Location 位置</th>
-                        <th class="py-2 px-4 text-right">Pres. 压力 (bar)</th>
-                        <th class="py-2 px-4 text-right">Temp. 温度 (°C)</th>
-                        <th class="py-2 px-4 text-right">H 焓 (kJ/kg)</th>
-                        <th class="py-2 px-4 text-right">S 熵 (kJ/kg·K)</th>
+                        <th class="py-2 px-4 text-center w-16">Pt</th>
+                        <th class="py-2 px-4 text-left">Loc</th>
+                        <th class="py-2 px-4 text-right">P (bar)</th>
+                        <th class="py-2 px-4 text-right">T (°C)</th>
+                        <th class="py-2 px-4 text-right">H (kJ/kg)</th>
+                        <th class="py-2 px-4 text-right">S (kJ/kg·K)</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -258,13 +369,14 @@ export function renderStateTable(domId, points) {
 }
 
 /**
- * 绘制压焓图 (P-h Diagram)
+ * 绘制压焓图 (P-h Diagram) - 完整逻辑
  */
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
     if (!dom) return;
 
     dom.classList.remove('hidden');
+    // 如果之前有实例，先销毁或重用。
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
         existingChart.clear(); 
@@ -274,10 +386,12 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     chart.showLoading();
 
     try {
+        // 1. 获取临界参数
         const T_crit = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
         const P_crit = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
         const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid); 
         
+        // 绘图范围设定
         const T_start = T_min + 5; 
         const T_end = T_crit - 0.5; 
         const steps = 100;
@@ -287,6 +401,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         const lineVapor = [];
         let H_crit = 0;
 
+        // 2. 绘制饱和穹顶
         for (let i = 0; i <= steps; i++) {
             const T = T_start + i * stepSize;
             try {
@@ -297,9 +412,10 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                 const P_vap = CP.PropsSI('P', 'T', T, 'Q', 1, fluid);
                 const H_vap = CP.PropsSI('H', 'T', T, 'Q', 1, fluid);
                 lineVapor.push([H_vap / 1000.0, P_vap / 1e5]);
-            } catch (e) { }
+            } catch (e) { /* ignore */ }
         }
 
+        // 计算临界点坐标
         try {
             H_crit = CP.PropsSI('H', 'T', T_crit, 'P', P_crit, fluid) / 1000.0;
         } catch(e) {
@@ -311,6 +427,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         }
         const critPointData = [[H_crit, P_crit / 1e5]];
 
+        // 3. 处理循环点
         const cycleSeriesData = [];
         if (cycleData && cycleData.points) {
             cycleData.points.forEach(pt => {
@@ -323,11 +440,13 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     }
                 });
             });
+            // 闭合
             if (cycleSeriesData.length > 0) {
                 cycleSeriesData.push(cycleSeriesData[0]);
             }
         }
 
+        // 4. ECharts Option
         const option = {
             title: { 
                 text: `P-h Diagram: ${fluid}`, 
@@ -348,7 +467,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                         if (info) s += `T: ${info.t} °C`;
                         return s;
                     } else if (params.seriesName === 'Critical Point') {
-                         return `<b>Critical Point 临界点</b><br/>P: ${params.value[1].toFixed(2)} bar<br/>H: ${params.value[0].toFixed(1)} kJ/kg`;
+                         return `<b>Critical Point</b><br/>P: ${params.value[1].toFixed(2)} bar`;
                     }
                     return params.seriesName;
                 }
@@ -418,6 +537,13 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
 
         chart.hideLoading();
         chart.setOption(option);
+        
+        // 恢复表格显示
+        let tableDiv = dom.nextElementSibling;
+        if (tableDiv && tableDiv.classList.contains('state-table-container')) {
+            tableDiv.style.display = 'block';
+        }
+
         window.addEventListener('resize', () => chart.resize());
 
         if (cycleData && cycleData.points) {
@@ -432,7 +558,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
 }
 
 /**
- * 绘制 CO2 跨临界 COP 优化曲线 (From Stage A)
+ * 绘制 CO2 跨临界 COP 优化曲线
  */
 export function drawOptimizationCurve(domId, optimizationData, currentP) {
     const dom = document.getElementById(domId);
@@ -521,14 +647,11 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     } catch (err) {
         console.error("Draw Opt Curve Error:", err);
         chart.hideLoading();
-        dom.innerHTML = `<div class="p-4 text-center text-red-500">Error drawing chart: ${err.message}</div>`;
     }
 }
 
 /**
- * [New in v8.32] 绘制性能地图 (Flow vs Power/Pressure) (From Stage B)
- * @param {string} domId - 图表容器 ID
- * @param {Array} batchData - [{v_flow, power, spec_power, rpm}, ...]
+ * 绘制性能地图 (Flow vs Power/Pressure)
  */
 export function drawPerformanceMap(domId, batchData) {
     const dom = document.getElementById(domId);
@@ -539,10 +662,6 @@ export function drawPerformanceMap(domId, batchData) {
     if (chart) chart.clear();
     else chart = echarts.init(dom);
 
-    // Prepare Data
-    // X: Volume Flow (m3/h)
-    // Y1: Power (kW)
-    // Y2: Specific Power (kW/(m3/min))
     const xData = batchData.map(d => (d.v_flow * 3600).toFixed(1));
     const yPower = batchData.map(d => d.power.toFixed(2));
     const ySpecPower = batchData.map(d => d.spec_power.toFixed(2));
@@ -614,7 +733,6 @@ export function drawPerformanceMap(domId, batchData) {
 
     chart.setOption(option);
     
-    // 隐藏状态表，因为批量计算结果已经有了专门的表格
     let tableDiv = dom.nextElementSibling;
     if (tableDiv && tableDiv.classList.contains('state-table-container')) {
         tableDiv.style.display = 'none';

@@ -1,33 +1,66 @@
 // =====================================================================
 // mode2c_air.js: 模式三 (空压机) 核心逻辑
-// 版本: v8.33 (Feature: Mobile Responsive Datasheet)
+// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
 // =====================================================================
 
-import { exportToExcel, drawPerformanceMap } from './utils.js';
+import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml } from './utils.js';
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3, chartDivM3;
 let lastMode3Data = null; // Single run data
 let lastBatchData = null; // Batch run data
+let baselineMode3 = null; // Baseline data
 
-// --- Helper: Generate Single Point Datasheet (Mobile Optimized) ---
-function generateAirDatasheet(d) {
+// --- Global Event Listeners (New in v8.35) ---
+document.addEventListener('unit-change', () => {
+    if (lastMode3Data) {
+        resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data, baselineMode3);
+    }
+    if (lastBatchData) {
+        resultsDivM3.innerHTML = generateBatchTable(lastBatchData);
+    }
+});
+
+document.addEventListener('pin-baseline', () => {
+    if (lastMode3Data && document.getElementById('tab-content-3').style.display !== 'none') {
+        baselineMode3 = { ...lastMode3Data };
+        resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data, baselineMode3);
+    }
+});
+
+// --- Helper: Generate Single Point Datasheet (v8.35) ---
+function generateAirDatasheet(d, base = null) {
     const themeColor = "text-cyan-700 border-cyan-600";
     
-    // 辅助行生成器
-    const row = (label, val, unit = "") => `
-        <div class="flex justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-            <span class="text-gray-500 text-sm font-medium">${label}</span>
-            <span class="font-mono font-bold text-gray-800 text-right">${val} <span class="text-xs text-gray-400 ml-1 font-sans">${unit}</span></span>
+    // Helper Row with Comparison Support
+    const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
+        const formatted = formatValue(valSI, type);
+        const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
+        return `
+        <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+            <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
+            <div class="text-right">
+                <div class="font-mono font-bold text-gray-800">${formatted}</div>
+                ${diff}
+            </div>
         </div>`;
+    };
 
+    // Conditional Rows
     let coolingRow = "";
-    if (d.cooling_info.m_inj > 0) coolingRow = row("Injection Water", (d.cooling_info.m_inj * 3600).toFixed(2), "kg/h");
-    else if (d.q_jacket > 0) coolingRow = row("Jacket Heat Load", d.q_jacket.toFixed(2), "kW");
+    if (d.cooling_info.m_inj > 0) {
+        // Injection Water: Mass Flow
+        coolingRow = rowCmp("Injection Water", d.cooling_info.m_inj * 3600, base?.cooling_info?.m_inj ? base.cooling_info.m_inj * 3600 : null, "flow_mass");
+    } else if (d.q_jacket > 0) {
+        // Jacket Heat: Power
+        coolingRow = rowCmp("Jacket Heat Load", d.q_jacket, base?.q_jacket, "power");
+    }
 
     let afterCoolRow = "";
     if (d.q_aftercool > 0) {
-        afterCoolRow += row("Aftercooler Load", d.q_aftercool.toFixed(2), "kW");
-        if (d.m_condensate > 0) afterCoolRow += row("Condensate Rate", (d.m_condensate * 3600).toFixed(1), "kg/h");
+        afterCoolRow += rowCmp("Aftercooler Load", d.q_aftercool, base?.q_aftercool, "power");
+        if (d.m_condensate > 0) {
+            afterCoolRow += rowCmp("Condensate Rate", d.m_condensate * 3600, base?.m_condensate ? base.m_condensate * 3600 : null, "flow_mass");
+        }
     }
 
     return `
@@ -40,20 +73,24 @@ function generateAirDatasheet(d) {
                     <span class="text-xs text-gray-400">${d.date}</span>
                 </div>
             </div>
+            ${base ? '<div class="mt-2 md:mt-0 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Shaft Power</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${d.power.toFixed(2)} <span class="text-sm font-normal text-gray-600">kW</span></div>
+                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.power, 'power')}</div>
+                ${getDiffHtml(d.power, base?.power, true)}
             </div>
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Discharge Temp</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${d.t_out.toFixed(1)} <span class="text-sm font-normal text-gray-600">°C</span></div>
+                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.t_out, 'temp')}</div>
+                ${getDiffHtml(d.t_out, base?.t_out, true)}
             </div>
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">FAD (Actual)</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${(d.v_flow * 3600).toFixed(1)} <span class="text-sm font-normal text-gray-600">m³/h</span></div>
+                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.v_flow * 3600, 'flow_vol')}</div>
+                ${getDiffHtml(d.v_flow, base?.v_flow, false)}
             </div>
         </div>
 
@@ -61,23 +98,23 @@ function generateAirDatasheet(d) {
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Inlet Conditions</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-6">
-                    ${row("Ambient Press", d.p_in.toFixed(3), "bar")}
-                    ${row("Ambient Temp", d.t_in.toFixed(2), "°C")}
-                    ${row("Relative Humidity", d.rh_in_display.toFixed(1), "%")}
+                    ${rowCmp("Ambient Press", d.p_in, base?.p_in, "pressure")}
+                    ${rowCmp("Ambient Temp", d.t_in, base?.t_in, "temp")}
+                    ${rowCmp("Relative Humidity", d.rh_in_display, base?.rh_in_display, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
                 </div>
 
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${row("Isentropic Eff.", (d.eff_is * 100).toFixed(1), "%")}
-                    ${row("Volumetric Eff.", (d.eff_vol * 100).toFixed(1), "%")}
+                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
                 </div>
             </div>
 
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${row("Discharge Press", d.p_out.toFixed(3), "bar")}
-                    ${row("Specific Power", d.spec_power.toFixed(2), "kW/(m³/min)")}
+                    ${rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure")}
+                    ${rowCmp("Specific Power", d.spec_power, base?.spec_power, "spec_power", true)}
                     ${coolingRow}
                     ${afterCoolRow}
                 </div>
@@ -85,35 +122,35 @@ function generateAirDatasheet(d) {
         </div>
 
         <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.33</p>
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
         </div>
     </div>`;
 }
 
-// --- Helper: Generate Batch Result Table (Mobile Optimized) ---
+// --- Helper: Generate Batch Result Table (v8.35) ---
 function generateBatchTable(batchData) {
     const rows = batchData.map(d => `
         <tr class="hover:bg-cyan-50 border-b border-gray-100 last:border-0 transition-colors">
             <td class="py-3 px-3 text-center font-mono text-gray-600">${d.rpm}</td>
-            <td class="py-3 px-3 text-right font-bold text-cyan-700">${(d.v_flow*3600).toFixed(1)}</td>
-            <td class="py-3 px-3 text-right font-mono text-gray-800">${d.power.toFixed(1)}</td>
-            <td class="py-3 px-3 text-right font-mono text-gray-500 text-xs sm:text-sm">${d.spec_power.toFixed(2)}</td>
-            <td class="py-3 px-3 text-right font-mono text-blue-600">${d.t_out.toFixed(0)}</td>
+            <td class="py-3 px-3 text-right font-bold text-cyan-700">${formatValue(d.v_flow*3600, 'flow_vol').replace(/<[^>]*>/g, '')}</td>
+            <td class="py-3 px-3 text-right font-mono text-gray-800">${formatValue(d.power, 'power').replace(/<[^>]*>/g, '')}</td>
+            <td class="py-3 px-3 text-right font-mono text-gray-500 text-xs sm:text-sm">${formatValue(d.spec_power, 'spec_power').replace(/<[^>]*>/g, '')}</td>
+            <td class="py-3 px-3 text-right font-mono text-blue-600">${formatValue(d.t_out, 'temp').replace(/<[^>]*>/g, '')}</td>
         </tr>
     `).join('');
 
     return `
     <div class="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Batch Calculation Results</h3>
+            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Batch Results</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm whitespace-nowrap">
                 <thead class="bg-gray-100 text-gray-500 text-xs uppercase tracking-wider">
                     <tr>
                         <th class="py-3 px-3 text-center font-medium">RPM</th>
-                        <th class="py-3 px-3 text-right font-medium">Flow (m³/h)</th>
-                        <th class="py-3 px-3 text-right font-medium">Pwr (kW)</th>
+                        <th class="py-3 px-3 text-right font-medium">Flow</th>
+                        <th class="py-3 px-3 text-right font-medium">Power</th>
                         <th class="py-3 px-3 text-right font-medium">Spec.</th>
                         <th class="py-3 px-3 text-right font-medium">T_out</th>
                     </tr>
@@ -269,7 +306,6 @@ async function calculateMode3(CP) {
                     rpm = parseFloat(fd.get('rpm_m3'));
                     vol_disp = parseFloat(fd.get('vol_disp_m3'));
                 } else {
-                    // RPM calc for other modes
                     const v_disp_ref = 1000; 
                     let v_flow_target = 0;
                     if(mode === 'mass') {
@@ -284,9 +320,9 @@ async function calculateMode3(CP) {
                 }
 
                 lastMode3Data = calculateSinglePoint(CP, { ...commonParams, rpm, vol_disp });
-                lastBatchData = null; // Clear batch data
+                lastBatchData = null;
 
-                resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data);
+                resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data, baselineMode3);
                 if(chartDivM3) chartDivM3.classList.add('hidden'); 
             } else {
                 // --- Batch Run ---
@@ -317,8 +353,7 @@ async function calculateMode3(CP) {
 
             printButtonM3.onclick = () => {
                 const win = window.open('', '_blank');
-                // Use standard print layout or simplified
-                const content = lastBatchData ? generateBatchTable(lastBatchData) : generateAirDatasheet(lastMode3Data);
+                const content = lastBatchData ? generateBatchTable(lastBatchData) : generateAirDatasheet(lastMode3Data, baselineMode3);
                 win.document.write(`<html><head><title>Air Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${content}</body></html>`);
                 setTimeout(() => win.print(), 200);
             };
@@ -345,6 +380,5 @@ export function initMode3(CP) {
     
     if (calcFormM3) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });
-        // UI presets are now handled centrally in ui.js, so we removed the local change listener
     }
 }
