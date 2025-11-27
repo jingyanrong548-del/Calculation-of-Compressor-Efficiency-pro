@@ -30,8 +30,12 @@ document.addEventListener('pin-baseline', () => {
 
 // --- Helper: Generate Datasheet ---
 function generateAirDatasheet(d, base = null) {
-    const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
-        const formatted = formatValue(valSI, type);
+// [FIX] Added suffix parameter to handle '%' gracefully
+    const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
+        let formatted = formatValue(valSI, type);
+        // 如果有后缀，追加一个小的灰色 span
+        if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
+
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -104,12 +108,11 @@ function generateAirDatasheet(d, base = null) {
                     ${rowCmp("Relative Humidity", d.rh_in_display, base?.rh_in_display, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
                 </div>
 
-                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
+<h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
-                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null, false, '%')}
+                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null, false, '%')}
                 </div>
-            </div>
 
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Performance</h3>

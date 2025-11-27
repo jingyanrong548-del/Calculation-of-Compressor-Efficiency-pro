@@ -210,6 +210,7 @@ export class AutoSaveManager {
                 } else if (el.name && data[el.name] !== undefined) {
                     el.value = data[el.name];
                     el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true })); // <--- 新增这行，强制刷新物性文本
                 }
             });
         } catch (e) {

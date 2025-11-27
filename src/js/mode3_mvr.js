@@ -31,8 +31,10 @@ function generateMVRDatasheet(d, base = null) {
     const themeBorder = "border-purple-100";
 
     // Helper Row with Comparison
-    const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
-        const formatted = formatValue(valSI, type);
+const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
+        let formatted = formatValue(valSI, type);
+        if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`; // 新增
+
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -96,9 +98,9 @@ function generateMVRDatasheet(d, base = null) {
                 </div>
 
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
-                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
-                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+<div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null, false, '%')}
+                    ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null, false, '%')}
                 </div>
             </div>
             

@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷/CO2) & 模式二 (气体)
-// 版本: v8.43 (Fix: Robust Fluid Value Retrieval)
+// 版本: v8.45 (Fix: CO2 Opt Button & Mode 2 Display Units)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -78,6 +78,9 @@ function runCO2OptimizationSweep(CP, params) {
     const results = [];
     const p_start = 74e5, p_end = 140e5, step = 1e5;
     let bestCOP = -1, bestP = 0;
+
+    // Safety: Ensure we have valid numbers to start with
+    if (isNaN(eff_isen) || isNaN(vol_disp)) return { data: [], bestP: 0, bestCOP: 0 };
 
     for (let p_curr = p_start; p_curr <= p_end; p_curr += step) {
         try {
@@ -216,8 +219,8 @@ function generateDatasheetHTML(d, title, base = null) {
                 <div>
                     <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                     <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        ${rowCmp("Mass Flow", d.m_flow, base?.m_flow, "flow_mass")}
-                        ${rowCmp("Vol Flow (Actual)", d.v_flow, base?.v_flow, "flow_vol")}
+                        ${rowCmp("Mass Flow", d.m_flow * 3600, base?.m_flow ? base.m_flow * 3600 : null, "flow_mass")}
+                        ${rowCmp("Vol Flow (Actual)", d.v_flow * 3600, base?.v_flow ? base.v_flow * 3600 : null, "flow_vol")}
                         ${d.cop_c ? rowCmp("COP (Cooling)", d.cop_c, base?.cop_c, null) : ''}
                     </div>
                     ${realGasBlock}
@@ -225,7 +228,7 @@ function generateDatasheetHTML(d, title, base = null) {
             </div>
 
             <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.43</p>
+                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
             </div>
         </div>`;
     } catch (e) {
@@ -244,7 +247,6 @@ async function calculateMode1_CO2(CP) {
             const fluid = "R744"; 
             const cycleType = document.querySelector('input[name="cycle_type_m1_co2"]:checked')?.value || 'transcritical';
             
-            // [FIX] Ensure values are parsed correctly
             const t_evap = parseFloat(fd.get('T_evap_m1_co2'));
             const sh = parseFloat(fd.get('SH_m1_co2'));
             const p_in = CP.PropsSI('P', 'T', t_evap + 273.15, 'Q', 1, fluid);
@@ -263,25 +265,30 @@ async function calculateMode1_CO2(CP) {
 
             const eff_model = document.querySelector('input[name="eff_model_m1_co2"]:checked')?.value || 'fixed';
             
-            // Extract Params
-            const eff_isen_peak = parseFloat(fd.get('eff_isen_peak_m1_co2')); 
-            const clearance = parseFloat(fd.get('clearance_m1_co2'));
-            const n_index = parseFloat(fd.get('poly_index_m1_co2'));
-            const rpm = parseFloat(fd.get('rpm_m1_co2'));
-            const vol_disp = parseFloat(fd.get('vol_disp_m1_co2'));
+            // Extract Params (Helper for robust value retrieval)
+            const getVal = (name, def) => { const el = document.querySelector(`[name="${name}"]`); return el ? (parseFloat(el.value) || def) : def; };
+            const eff_isen_peak = getVal('eff_isen_peak_m1_co2', 0.7);
+            const clearance = getVal('clearance_m1_co2', 0.05);
+            const n_index = getVal('poly_index_m1_co2', 1.3);
+            const rpm = getVal('rpm_m1_co2', 4500);
+            const vol_disp = getVal('vol_disp_m1_co2', 15);
 
             if (cycleType === 'transcritical') {
-                const p_high = parseFloat(fd.get('p_high_m1_co2')) * 1e5;
+                const p_high_val = parseFloat(fd.get('p_high_m1_co2'));
+                // [Safety Check] Prevent 0 bar calculation which causes Infinity
+                if (!p_high_val || p_high_val < 30) throw new Error("High Side Pressure too low or invalid. Please click '推荐 P_opt' or enter a value > 74 bar.");
+                
+                const p_high = p_high_val * 1e5;
                 const t_gc_out = parseFloat(fd.get('T_gc_out_m1_co2'));
                 p_out = p_high;
                 t_out_point3_k = t_gc_out + 273.15;
                 h_point3 = CP.PropsSI('H', 'P', p_out, 'T', t_out_point3_k, fluid);
                 report_vals = { t_gc_out };
 
+                // Run Optimization just for the curve display if needed (Safe Run)
                 optimizationResults = runCO2OptimizationSweep(CP, {
-                    h_in, s_in, t_gc_out, eff_isen: eff_isen_peak, // Use peak for opt reference
-                    clearance, n_index,
-                    rpm, vol_disp, density_in: d_in, p_in
+                    h_in, s_in, t_gc_out, eff_isen: eff_isen_peak, 
+                    clearance, n_index, rpm, vol_disp, density_in: d_in, p_in
                 });
 
             } else {
@@ -344,7 +351,7 @@ async function calculateMode1_CO2(CP) {
 
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "CO2 REPORT", baselineMode1);
 
-            if (optimizationResults) {
+            if (optimizationResults && optimizationResults.bestP > 0) {
                 const btnOpt = document.getElementById('btn-show-opt-curve');
                 const btnPh = document.getElementById('btn-show-ph-chart');
                 if(btnOpt && btnPh) {
@@ -398,10 +405,6 @@ async function calculateMode2(CP) {
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM2);
-            // [FIX v8.43] Robust Fluid Retrieval
-            // Attempt 1: FormData
-            // Attempt 2: Direct DOM value (in case FormData fails due to disabled state)
-            // Attempt 3: Default 'Air' (last resort to prevent crash)
             let fluid = fd.get('fluid_m2');
             if (!fluid) {
                 const el = document.getElementById('fluid_m2');
@@ -476,7 +479,6 @@ async function calculateMode1(CP) {
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM1);
-            // [FIX v8.43] Robust Fluid Retrieval for Mode 1
             let fluid = fd.get('fluid_m1');
             if (!fluid) {
                 const el = document.getElementById('fluid_m1');
@@ -562,7 +564,6 @@ export function initMode1_2(CP) {
     calcFormM2 = document.getElementById('calc-form-2');
     btnOptP = document.getElementById('btn-opt-p-high');
 
-    // Added Missing Event Listener for Mode 1 Fluid Info (v8.39/v8.43 Fix)
     const fluidSelectM1 = document.getElementById('fluid_m1');
     if(fluidSelectM1) {
         fluidSelectM1.addEventListener('change', () => updateFluidInfo(fluidSelectM1, document.getElementById('fluid-info-m1'), CP));
@@ -595,6 +596,7 @@ export function initMode1_2(CP) {
             if(!CP_INSTANCE) return;
             const btn = btnOptP;
             btn.textContent = "⏳...";
+            
             setTimeout(() => {
                 try {
                     const fd = new FormData(calcFormM1_CO2);
@@ -607,19 +609,30 @@ export function initMode1_2(CP) {
                     const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in_k, 'R744');
                     const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in_k, 'R744');
 
+                    // [FIX] Directly retrieve DOM values (even if disabled)
+                    const getVal = (id, def) => {
+                        const el = document.getElementById(id);
+                        return el ? (parseFloat(el.value) || def) : def;
+                    };
+
                     const res = runCO2OptimizationSweep(CP, {
                         h_in, s_in, t_gc_out,
-                        eff_isen: parseFloat(fd.get('eff_isen_peak_m1_co2')),
-                        clearance: parseFloat(fd.get('clearance_m1_co2')),
-                        n_index: parseFloat(fd.get('poly_index_m1_co2')),
-                        rpm: parseFloat(fd.get('rpm_m1_co2')),
-                        vol_disp: parseFloat(fd.get('vol_disp_m1_co2')),
+                        eff_isen: getVal('eff_isen_peak_m1_co2', 0.7), 
+                        clearance: getVal('clearance_m1_co2', 0.05),
+                        n_index: getVal('poly_index_m1_co2', 1.3),
+                        rpm: getVal('rpm_m1_co2', 4500), // Fallback if hidden
+                        vol_disp: getVal('vol_disp_m1_co2', 15),
                         density_in: d_in, p_in
                     });
                     
-                    document.getElementById('p_high_m1_co2').value = res.bestP.toFixed(1);
+                    if (res && res.bestP > 30) {
+                         document.getElementById('p_high_m1_co2').value = res.bestP.toFixed(1);
+                    } else {
+                         throw new Error("Optimization yielded no result");
+                    }
+
                 } catch(e) {
-                    console.error("Quick opt failed", e);
+                    console.warn("Optimizer fallback:", e);
                     const t = parseFloat(document.getElementById('T_gc_out_m1_co2').value);
                     if (!isNaN(t)) document.getElementById('p_high_m1_co2').value = (2.75 * t - 6.5).toFixed(1);
                 } finally {
