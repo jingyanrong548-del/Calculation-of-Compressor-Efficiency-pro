@@ -4,7 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.32 (Batch Performance Map)</title>
+    <title>无油压缩机性能计算器 v8.34 (PWA & Case Mgr)</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f766e">
+    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+
     <link rel="stylesheet" href="/src/css/style.css">
     <style>
         .sub-tab-btn.active {
@@ -36,8 +41,17 @@
     <div class="container mx-auto max-w-7xl p-4">
 
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md no-print">
-            <h1 class="text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-lg text-gray-600 mt-2">v8.32 (Batch Performance Map)</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
+            <p class="text-sm md:text-lg text-gray-600 mt-2">v8.34 (Case Management & PWA)</p>
+
+            <div class="mt-4 flex justify-center space-x-4 border-t border-gray-100 pt-4">
+                <button id="btn-open-save" class="flex items-center px-4 py-2 bg-teal-50 text-teal-700 rounded-md hover:bg-teal-100 border border-teal-200 transition text-sm font-bold shadow-sm">
+                    💾 保存工况 (Save)
+                </button>
+                <button id="btn-open-load" class="flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 border border-blue-200 transition text-sm font-bold shadow-sm">
+                    📂 加载工况 (Load)
+                </button>
+            </div>
         </header>
 
         <div class="bg-white rounded-lg shadow-md no-print">
@@ -927,6 +941,37 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div id="save-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 animate-fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">保存当前工况 (Save Case)</h3>
+            <div class="mb-4">
+                <label class="block text-sm text-gray-600 mb-1">工况名称 (Case Name)</label>
+                <input type="text" id="save-case-name" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. Design Point A">
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button id="btn-cancel-save" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">取消 (Cancel)</button>
+                <button id="btn-confirm-save" class="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 font-bold">保存 (Save)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="load-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh] animate-fade-in">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800">加载工况 (Load Case)</h3>
+                <button id="btn-close-load" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 bg-gray-50">
+                <div id="case-list-container" class="space-y-2">
+                    <div class="text-center text-gray-400 py-8">暂无保存的工况 (No saved cases)</div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-200 bg-white text-right">
+                <span class="text-xs text-gray-400 mr-2">Data stored in LocalStorage</span>
             </div>
         </div>
     </div>

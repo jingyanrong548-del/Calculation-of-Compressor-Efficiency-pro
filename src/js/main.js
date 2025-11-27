@@ -2,7 +2,7 @@ console.log("🚀 Main.js is attempting to load...");
 
 import '../css/style.css';
 // =====================================================================
-// main.js: Application Entry Point (v8.26 Persistence Enabled)
+// main.js: Application Entry Point (v8.34 PWA Enabled)
 // =====================================================================
 
 import { loadCoolProp, updateFluidInfo } from './coolprop_loader.js';
@@ -10,9 +10,24 @@ import { initMode1_2 } from './mode2_predict.js';
 import { initMode3 } from './mode2c_air.js';
 import { initMode4 } from './mode3_mvr.js';
 import { initMode5 } from './mode4_turbo.js';
-import { AutoSaveManager } from './utils.js'; // [New] 导入自动保存管理器
-import './ui.js'; // Load UI interactions
+import { AutoSaveManager } from './utils.js';
+import './ui.js'; // Load UI interactions (includes Case Management logic)
 
+// --- 1. PWA Service Worker Registration ---
+// 仅在浏览器支持且在非开发环境（或需要测试离线功能时）生效
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('✅ PWA ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(err => {
+                console.log('❌ PWA ServiceWorker registration failed: ', err);
+            });
+    });
+}
+
+// --- 2. App Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
 
     const buttons = [
@@ -40,21 +55,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Start Loading
+    // Start Loading WASM
     loadCoolProp()
         .then((CP) => {
             console.log("%c CoolProp WASM Loaded Successfully ", "background: #059669; color: #fff");
 
-            // 1. Initialize Calculation Modules
+            // Initialize Calculation Modules
             try {
                 initMode1_2(CP);
                 initMode3(CP);
                 initMode4(CP);
                 initMode5(CP);
                 
-                // [New] 2. Initialize AutoSave Manager
-                // 必须在所有 initMode 之后调用，以确保 UI 事件监听器已挂载
-                // 这样恢复 checkbox 状态时才能触发相应的 display:block/none 联动
+                // Initialize AutoSave (Last State Persistence)
+                // Delayed slightly to ensure UI listeners are attached
                 setTimeout(() => {
                     AutoSaveManager.init();
                 }, 100); 
@@ -64,16 +78,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Error initializing calculation modules. Check console.");
             }
 
-            // 3. Unlock Buttons
+            // Unlock Buttons & Restore Text
             buttons.forEach(btn => {
                 if (btn) {
-                    btn.textContent = btn.id.includes('co2') ? "Calculate CO₂" : "Calculate (计算)";
+                    // Restore specific Chinese labels
+                    if(btn.id === 'calc-button-1') btn.textContent = "计算常规热泵";
+                    else if(btn.id === 'calc-button-1-co2') btn.textContent = "🔥 计算 CO2 (R744) 循环";
+                    else if(btn.id === 'calc-button-2') btn.textContent = "计算气体压缩";
+                    else if(btn.id === 'calc-button-3') btn.textContent = "计算空压机";
+                    else if(btn.id === 'calc-button-4') btn.textContent = "计算喷水量";
+                    else if(btn.id === 'calc-button-5') btn.textContent = "计算透平 MVR";
+                    else btn.textContent = "Calculate";
+
                     btn.disabled = false;
                     btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             });
             
-            // 4. Update Default Fluid Info (Initial State)
+            // Update Default Fluid Info
             fluidInfos.forEach(fi => {
                 if (fi.select && fi.info) {
                     updateFluidInfo(fi.select, fi.info, CP);
@@ -84,7 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch((err) => {
             console.error("CRITICAL ERROR:", err);
             
-            // Visual Error Feedback
             buttons.forEach(btn => {
                 if (btn) {
                     btn.textContent = "Library Load Failed";
@@ -92,8 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // Show Alert
-            const msg = "无法加载 CoolProp 物性库。\n请检查:\n1. public/coolprop.wasm 文件是否存在\n2. 终端是否有构建错误 (.jsx 错误)";
+            const msg = "无法加载 CoolProp 物性库 (WASM Load Failed)。\n请检查网络连接，或确保 coolprop.wasm 文件存在。";
             alert(msg);
         });
 
