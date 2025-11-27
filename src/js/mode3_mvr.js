@@ -1,6 +1,6 @@
 // =====================================================================
 // mode3_mvr.js: 模式四 (MVR 容积式 - 罗茨/螺杆)
-// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
+// 版本: v8.45 (Stable: SH=0 Fix, SEC, Suffix UI)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -8,9 +8,32 @@ import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml } from './utils.
 
 let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4, exportButtonM4, chartDivM4, fluidSelectM4;
 let lastMode4Data = null;
-let baselineMode4 = null; // Baseline data for comparison
+let baselineMode4 = null;
 
-// --- Global Event Listeners (New in v8.35) ---
+// --- Helper: Robust Fluid State (SH=0 Guardkeeper) ---
+// 解决当用户输入 SH=0 时，(P,T) 状态点位于饱和线上导致的计算不收敛问题
+function getFluidState(CP, fluid, p, t_sat, sh) {
+    if (Math.abs(sh) < 0.001) {
+        // SH is effectively 0 -> Force Saturated Vapor (Q=1)
+        return {
+            h: CP.PropsSI('H', 'P', p, 'Q', 1, fluid),
+            s: CP.PropsSI('S', 'P', p, 'Q', 1, fluid),
+            d: CP.PropsSI('D', 'P', p, 'Q', 1, fluid),
+            t: t_sat
+        };
+    } else {
+        // Normal Superheated State -> Use (P, T)
+        const t_val = t_sat + sh;
+        return {
+            h: CP.PropsSI('H', 'P', p, 'T', t_val, fluid),
+            s: CP.PropsSI('S', 'P', p, 'T', t_val, fluid),
+            d: CP.PropsSI('D', 'P', p, 'T', t_val, fluid),
+            t: t_val
+        };
+    }
+}
+
+// --- Global Event Listeners ---
 document.addEventListener('unit-change', () => {
     if (lastMode4Data) {
         resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
@@ -24,17 +47,17 @@ document.addEventListener('pin-baseline', () => {
     }
 });
 
-// --- Helper: MVR Datasheet Generator (v8.35) ---
+// --- Helper: MVR Datasheet Generator ---
 function generateMVRDatasheet(d, base = null) {
     const themeColor = "text-purple-700 border-purple-600";
     const themeBg = "bg-purple-50";
     const themeBorder = "border-purple-100";
 
-    // Helper Row with Comparison
-const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
+    // [FIX] Updated rowCmp to support 'suffix' argument for clean UI (no overlapping %)
+    const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
-        if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`; // 新增
-
+        if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
+        
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -48,25 +71,22 @@ const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
 
     let injHtml = `<span class="text-gray-400 text-xs">Disabled</span>`;
     if (d.is_desuperheat && d.m_water > 0) {
-        // Injection Water Flow
         const val = d.m_water * 3600;
-        const baseVal = base?.m_water ? base.m_water * 3600 : null;
         const fmt = formatValue(val, 'flow_mass');
-        const diff = base ? getDiffHtml(val, baseVal, false) : '';
-        injHtml = `<div class="flex flex-col items-center"><span class="text-purple-600 font-bold">${fmt}</span>${diff}</div>`;
+        injHtml = `<div class="flex flex-col items-center"><span class="text-purple-600 font-bold">${fmt}</span></div>`;
     }
 
     return `
-    <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
         <div class="border-b-2 border-purple-600 pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
             <div>
-                <h2 class="text-xl md:text-2xl font-bold text-purple-800 leading-tight">MVR DATASHEET</h2>
+                <h2 class="text-2xl font-bold text-purple-800 leading-tight">MVR DATASHEET</h2>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <span class="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-bold">Volumetric</span>
                     <span class="text-xs text-gray-400">${d.date}</span>
                 </div>
             </div>
-            ${base ? '<div class="mt-2 md:mt-0 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
+            ${base ? '<div class="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">Comparison Active</div>' : ''}
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -98,47 +118,41 @@ const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
                 </div>
 
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
-<div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null, false, '%')}
                     ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null, false, '%')}
                 </div>
             </div>
             
             <div>
-                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Machine & Thermal</h3>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-purple-600 pl-3 mb-4 uppercase tracking-wide">Economy & Thermal</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
-                        <span class="text-gray-500 text-sm font-medium mt-0.5">Operating Speed</span>
-                        <span class="font-mono font-bold text-gray-800">${d.rpm} <span class="text-xs text-gray-400 ml-1">RPM</span></span>
-                    </div>
+                    ${rowCmp("Specific Energy (SEC)", d.sec, base?.sec, "sec", true)}
+                    ${rowCmp("Latent Heat (In)", d.latent_heat, base?.latent_heat, "enthalpy")}
+                    
+                    <div class="my-2 border-t border-gray-200"></div>
+                    
                     ${rowCmp("Suction Vol Flow", d.v_flow_in * 3600, base?.v_flow_in ? base.v_flow_in * 3600 : null, "flow_vol")}
                     ${rowCmp("Discharge Temp (Dry)", d.t_out_dry, base?.t_out_dry, "temp")}
                     
-                    <div class="flex justify-between items-start py-2 border-b border-gray-100">
-                        <span class="text-gray-500 text-sm font-medium mt-0.5">Specific Power</span>
-                        <div class="text-right">
-                            <div class="font-mono font-bold text-gray-800">${(d.power / (d.m_flow*3.6)).toFixed(2)} <span class="text-xs text-gray-400 ml-1">kWh/t</span></div>
-                        </div>
-                    </div>
-
                     ${d.is_desuperheat ? `
-                    <div class="mt-3 pt-2 border-t border-purple-100">
-                        <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">After Injection</div>
-                        ${rowCmp("Final Discharge T", d.t_out_final, base?.t_out_final, "temp")}
-                    </div>
+                        <div class="mt-3 pt-2 border-t border-purple-100">
+                            <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">After Injection</div>
+                            ${rowCmp("Final Discharge T", d.t_out_final, base?.t_out_final, "temp")}
+                        </div>
                     ` : ''}
                 </div>
             </div>
         </div>
 
         <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
         </div>
     </div>
     `;
 }
 
-// --- Helper: Flow Calculation (Logic from v8.30) ---
+// --- Helper: Flow Calculation ---
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m4');
     let m_flow = 0, v_flow_in = 0, rpm = 0;
@@ -176,21 +190,21 @@ async function calculateMode4(CP) {
             const p_in = parseFloat(formData.get('p_in_m4')) * 1e5;
             const sh_in = parseFloat(formData.get('SH_in_m4')) || 0;
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
-            const t_in = t_sat_in + sh_in;
             
-            const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in, fluid);
-            const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in, fluid);
-            const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in, fluid);
+            // [FIX] Use Guardkeeper for Suction State
+            const stateIn = getFluidState(CP, fluid, p_in, t_sat_in, sh_in);
 
             const dt = parseFloat(formData.get('delta_T_m4'));
             const p_out = CP.PropsSI('P', 'T', t_sat_in + dt, 'Q', 1, fluid);
             
-            const { m_flow, v_flow_in, rpm } = getFlowRate(formData, d_in);
+            const { m_flow, v_flow_in, rpm } = getFlowRate(formData, stateIn.d);
 
             const eff_is = parseFloat(formData.get('eff_isen_m4'))/100;
-            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
-            const w_real = (h_out_is - h_in) / eff_is;
-            const h_out_dry = h_in + w_real;
+            
+            // Calculate Discharge (Isentropic -> Real)
+            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', stateIn.s, fluid);
+            const w_real = (h_out_is - stateIn.h) / eff_is;
+            const h_out_dry = stateIn.h + w_real;
             const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
             
             const power = w_real * m_flow / 1000.0; // kW
@@ -208,7 +222,14 @@ async function calculateMode4(CP) {
             if (is_desuperheat) {
                 const t_target_k = t_sat_out + target_sh;
                 if (t_out_dry > t_target_k) {
-                    const h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
+                    // [FIX] SH=0 Guard Logic for Injection Target
+                    let h_target;
+                    if (Math.abs(target_sh) < 0.001) {
+                        h_target = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
+                    } else {
+                        h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
+                    }
+
                     const h_water_in = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
                     const num = m_flow * (h_out_dry - h_target);
                     const den = h_target - h_water_in;
@@ -220,6 +241,16 @@ async function calculateMode4(CP) {
                 }
             }
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
+            
+            // [NEW] Latent Heat & SEC Calculation
+            const h_gas = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
+            const h_liq = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
+            const latent = h_gas - h_liq;
+
+            // SEC (kWh/ton) = Power (kW) / (Tons/hour)
+            // m_flow is kg/s. Tons/hour = m_flow * 3600 / 1000 = m_flow * 3.6
+            const tons_per_hour = m_flow * 3.6;
+            const sec = (tons_per_hour > 0) ? (power / tons_per_hour) : 0;
 
             lastMode4Data = {
                 date: new Date().toLocaleDateString(),
@@ -230,7 +261,8 @@ async function calculateMode4(CP) {
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
                 power, m_flow, v_flow_in, 
-                is_desuperheat, m_water, t_water
+                is_desuperheat, m_water, t_water,
+                sec, latent_heat: latent
             };
 
             resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
@@ -238,8 +270,8 @@ async function calculateMode4(CP) {
             if(chartDivM4) {
                 chartDivM4.classList.remove('hidden');
                 const points = [
-                    { name: '1', desc: 'Suc', p: p_in, t: t_in, h: h_in, s: s_in },
-                    { name: '2', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: s_in }
+                    { name: '1', desc: 'Suc', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
+                    { name: '2', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: stateIn.s } // Isentropic path
                 ];
                 if (m_water > 0) points.push({ name: '3', desc: 'Fin', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
                 drawPhDiagram(CP, fluid, { points }, 'chart-m4');
@@ -266,7 +298,6 @@ export function initMode4(CP) {
     fluidSelectM4 = document.getElementById('fluid_m4');
     
     if (calcFormM4) {
-        // Note: AI Preset logic moved to ui.js, kept here as fallback if ui.js fails to load
         const aiSelect = document.getElementById('ai_eff_m4');
         if(aiSelect) {
             aiSelect.addEventListener('change', () => {

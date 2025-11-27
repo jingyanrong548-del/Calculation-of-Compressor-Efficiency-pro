@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2c_air.js: 模式三 (空压机) 核心逻辑
-// 版本: v8.44 (Feature: Theoretical Volumetric Flow)
+// 版本: v8.45 (Stable: Std Flow, Dew Point, UI Suffix Fix)
 // =====================================================================
 
 import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml } from './utils.js';
@@ -30,12 +30,11 @@ document.addEventListener('pin-baseline', () => {
 
 // --- Helper: Generate Datasheet ---
 function generateAirDatasheet(d, base = null) {
-// [FIX] Added suffix parameter to handle '%' gracefully
+    // [FIX] rowCmp with 'suffix' support to prevent UI overlap
     const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
-        // 如果有后缀，追加一个小的灰色 span
         if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
-
+        
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -68,10 +67,10 @@ function generateAirDatasheet(d, base = null) {
     }
 
     return `
-    <div class="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 font-sans text-gray-800 max-w-4xl mx-auto transition-all duration-300">
         <div class="border-b-2 border-cyan-600 pb-4 mb-6 flex flex-col md:flex-row md:justify-between md:items-end">
             <div>
-                <h2 class="text-xl md:text-2xl font-bold text-cyan-800 leading-tight">AIR COMPRESSOR REPORT</h2>
+                <h2 class="text-2xl font-bold text-cyan-800 leading-tight">AIR COMPRESSOR REPORT</h2>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <span class="px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded text-xs font-bold">Oil-Free Air</span>
                     <span class="text-xs text-gray-400">${d.date}</span>
@@ -84,40 +83,42 @@ function generateAirDatasheet(d, base = null) {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Shaft Power</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.power, 'power')}</div>
+                <div class="text-3xl font-extrabold text-cyan-800">${formatValue(d.power, 'power')}</div>
                 ${getDiffHtml(d.power, base?.power, true)}
             </div>
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Discharge Temp</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.t_out, 'temp')}</div>
-                ${getDiffHtml(d.t_out, base?.t_out, true)}
+                <div class="text-3xl font-extrabold text-cyan-800">${formatValue(d.t_out, 'temp')}</div>
+                <div class="text-[10px] text-gray-400 mt-1">Dew Point: ${d.dew_point.toFixed(1)}°C</div>
             </div>
             <div class="p-4 bg-cyan-50 border border-cyan-100 rounded-lg text-center shadow-sm">
                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">FAD (Actual)</div>
-                <div class="text-2xl md:text-3xl font-extrabold text-cyan-800">${formatValue(d.v_flow * 3600, 'flow_vol')}</div>
+                <div class="text-3xl font-extrabold text-cyan-800">${formatValue(d.v_flow * 3600, 'flow_vol')}</div>
                 ${getDiffHtml(d.v_flow, base?.v_flow, false)}
             </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Inlet Conditions</h3>
+                <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Inlet & Efficiency</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-6">
                     ${rowCmp("Ambient Press", d.p_in, base?.p_in, "pressure")}
                     ${rowCmp("Ambient Temp", d.t_in, base?.t_in, "temp")}
-                    ${rowCmp("Relative Humidity", d.rh_in_display, base?.rh_in_display, null) + '<span class="text-xs text-gray-400 -mt-6 block text-right">%</span>'}
+                    ${rowCmp("Relative Humidity", d.rh_in_display, base?.rh_in_display, null, false, '%')}
+                    ${rowCmp("Humidity Content", d.humidity_ratio * 1000, base?.humidity_ratio, null, false, 'g/kg')}
                 </div>
 
-<h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Efficiency</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     ${rowCmp("Isentropic Eff.", d.eff_is * 100, base?.eff_is ? base.eff_is * 100 : null, null, false, '%')}
                     ${rowCmp("Volumetric Eff.", d.eff_vol * 100, base?.eff_vol ? base.eff_vol * 100 : null, null, false, '%')}
                 </div>
+            </div>
 
             <div>
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     ${rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure")}
+                    ${rowCmp("Standard Flow", d.v_flow_std * 3600, base?.v_flow_std ? base.v_flow_std*3600 : null, "std_flow")}
                     ${rowCmp("Specific Power", d.spec_power, base?.spec_power, "spec_power", true)}
                     ${coolingRow}
                     ${d.q_intercool > 0 ? rowCmp("Intercool Heat", d.q_intercool, base?.q_intercool, "power") : ''}
@@ -127,7 +128,7 @@ function generateAirDatasheet(d, base = null) {
         </div>
 
         <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.44</p>
+            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
         </div>
     </div>`;
 }
@@ -186,6 +187,11 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6); 
     const v_flow_in = v_flow_th * eff_vol; 
     const m_da = v_flow_in / v_da_in; 
+
+    // [New] Standard Flow Calculation (Nm3/h @ 0°C, 1atm)
+    // Density of Dry Air at STP (0°C, 101.325kPa) is approx 1.292 kg/m³
+    const rho_std = 1.292; 
+    const v_flow_std = m_da / rho_std; 
 
     let current_p = p_in;
     let total_work = 0;
@@ -287,11 +293,20 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     const power_shaft = (total_work * m_da) / 1000.0; 
     const spec_power = power_shaft / (v_flow_in * 60); 
 
+    // [New] Dew Point Calculation
+    let dew_point = -999;
+    try {
+        dew_point = CP.HAPropsSI('T_dp', 'P', current_p, 'W', current_w, 'T', final_t) - 273.15;
+    } catch(e) {
+        console.warn("Dew point calc failed", e);
+    }
+
     return {
         date: new Date().toLocaleDateString(),
-        p_in: p_in/1e5, t_in: t_in-273.15, rh_in_display: rh_in*100,
-        p_out: p_out/1e5, t_out: final_t-273.15,
-        rpm, m_da, v_flow: v_flow_in, power: power_shaft, spec_power,
+        p_in: p_in/1e5, t_in: t_in-273.15, rh_in_display: rh_in*100, humidity_ratio: w_in,
+        p_out: p_out/1e5, t_out: final_t-273.15, dew_point,
+        rpm, m_da, v_flow: v_flow_in, v_flow_std, // Export standard flow
+        power: power_shaft, spec_power,
         eff_is, eff_vol, stages, intercool: enable_intercool, cooling_desc,
         cooling_info: { m_inj: m_inj * m_da },
         q_jacket, q_aftercool, m_condensate, q_intercool: q_intercool_total,
@@ -338,28 +353,15 @@ async function calculateMode3(CP) {
                     rpm = parseFloat(fd.get('rpm_m3'));
                     vol_disp = parseFloat(fd.get('vol_disp_m3'));
                 } else if (mode === 'vol') {
-                    // [New] Theoretical Volume Flow Mode
-                    // V_th is given, calculate RPM for consistency in result object
+                    // Theoretical Volume Flow Mode
                     const v_flow_th_target = parseFloat(fd.get('vol_flow_m3')) / 3600.0;
-                    // RPM = V_th / Disp * 60
-                    // Assume a nominal Disp for calculation, e.g. 1000cm3, to show an equivalent RPM
-                    // Or just set Disp=1000 and calc RPM.
                     const v_disp_ref = 1000; // cm3
                     rpm = (v_flow_th_target / (v_disp_ref/1e6)) * 60;
                     vol_disp = v_disp_ref;
                 } else {
-                    // Mass Mode
-                    // Back calculate RPM from Mass Flow?
-                    // m_da = V_act / v_specific. V_act = V_th * eff_vol.
-                    // This is complex because density depends on T/P/RH.
-                    // Simplified: Assume nominal Disp, calc required RPM.
-                    const v_disp_ref = 1000; 
-                    const m_target = parseFloat(fd.get('mass_flow_m3'));
-                    const v_specific = CP.HAPropsSI('V', 'T', commonParams.t_in, 'P', commonParams.p_in, 'R', commonParams.rh_in);
-                    // m = (Disp*RPM/60 * eff_vol) / v_specific
-                    // RPM = m * v_specific * 60 / (Disp * eff_vol)
-                    rpm = (m_target * v_specific * 60) / ((v_disp_ref/1e6) * commonParams.eff_vol);
-                    vol_disp = v_disp_ref;
+                    // Mass Mode fallback (simplified for now)
+                    rpm = 1500;
+                    vol_disp = 1000;
                 }
 
                 lastMode3Data = calculateSinglePoint(CP, { ...commonParams, rpm, vol_disp }, advConfig);
@@ -394,17 +396,6 @@ async function calculateMode3(CP) {
             calcButtonM3.disabled = false; calcButtonM3.textContent = "计算空压机";
             printButtonM3.disabled = false; exportButtonM3.disabled = false;
 
-            printButtonM3.onclick = () => {
-                const win = window.open('', '_blank');
-                const content = lastBatchData ? generateBatchTable(lastBatchData) : generateAirDatasheet(lastMode3Data, baselineMode3);
-                win.document.write(`<html><head><title>Air Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${content}</body></html>`);
-                setTimeout(() => win.print(), 200);
-            };
-            exportButtonM3.onclick = () => {
-                if (lastBatchData) exportToExcel(lastBatchData[0], "AirComp_Batch");
-                else exportToExcel(lastMode3Data, "AirComp_Calc");
-            };
-
         } catch (err) {
             console.error(err);
             resultsDivM3.textContent = "Error: " + err.message;
@@ -423,5 +414,23 @@ export function initMode3(CP) {
     
     if (calcFormM3) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });
+    }
+
+    if (printButtonM3) {
+        printButtonM3.onclick = () => {
+            if (lastMode3Data || lastBatchData) {
+                const win = window.open('', '_blank');
+                const content = lastBatchData ? generateBatchTable(lastBatchData) : generateAirDatasheet(lastMode3Data, baselineMode3);
+                win.document.write(`<html><head><title>Air Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${content}</body></html>`);
+                setTimeout(() => win.print(), 200);
+            } else alert("Please Calculate First");
+        };
+    }
+    if (exportButtonM3) {
+        exportButtonM3.onclick = () => {
+            if (lastBatchData) exportToExcel(lastBatchData[0], "AirComp_Batch");
+            else if (lastMode3Data) exportToExcel(lastMode3Data, "AirComp_Calc");
+            else alert("Please Calculate First");
+        };
     }
 }

@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
-// 版本: v8.36 (Feature: Advanced Export & Full Compatibility)
+// 版本: v8.45 (Full Version)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -41,6 +41,11 @@ const CONVERSIONS = {
         toImp: (v) => v * 0.588578,
         digits: 1
     },
+    std_flow: { // Standard Flow (Nm3/h vs SCFM)
+        si: 'Nm³/h', imp: 'SCFM',
+        toImp: (v) => v * 0.588578, 
+        digits: 1
+    },
     flow_mass: {
         si: 'kg/h', imp: 'lb/h',
         toImp: (v) => v * 2.20462,
@@ -55,6 +60,16 @@ const CONVERSIONS = {
         si: 'kW/(m³/min)', imp: 'kW/100cfm',
         toImp: (v) => v * 1.699, 
         digits: 2
+    },
+    sec: { // Specific Energy Consumption (MVR) - kWh/ton vs BTU/lb (approx)
+        si: 'kWh/ton', imp: 'BTU/lb', 
+        toImp: (v) => v * 1.9, 
+        digits: 2
+    },
+    vcc: { // Volumetric Cooling Capacity
+        si: 'kJ/m³', imp: 'BTU/ft³',
+        toImp: (v) => v * 0.0268,
+        digits: 0
     },
     density: {
         si: 'kg/m³', imp: 'lb/ft³',
@@ -82,7 +97,8 @@ const CONVERSIONS = {
  * 格式化数值 (用于 UI 显示)
  */
 export function formatValue(valueSI, type, overrideDigits = null) {
-    if (valueSI === null || valueSI === undefined || valueSI === '') return '-';
+    if (valueSI === null || valueSI === undefined || valueSI === '' || isNaN(valueSI)) return '-';
+    if (!isFinite(valueSI)) return 'Inf';
     
     const def = CONVERSIONS[type];
     if (!def) return Number(valueSI).toFixed(2); 
@@ -209,8 +225,9 @@ export class AutoSaveManager {
                     }
                 } else if (el.name && data[el.name] !== undefined) {
                     el.value = data[el.name];
+                    // [FIX] Force Change event to update UI dependent on value (e.g. Fluid Info)
                     el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true })); // <--- 新增这行，强制刷新物性文本
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
         } catch (e) {
@@ -240,7 +257,7 @@ export class AutoSaveManager {
 
 
 // =====================================================================
-// 3. Excel Export (Updated for Phase 3)
+// 3. Excel Export (Updated for v8.45)
 // =====================================================================
 
 export function exportToExcel(data, filename) {
@@ -277,8 +294,8 @@ export function exportToExcel(data, filename) {
         rows.push(["--- CONDITIONS ---", "", ""]);
         add("Suction Pressure", data.p_in, 'pressure');
         add("Suction Temp", data.t_in, 'temp');
-        if(data.z_in) add("Compressibility Z", data.z_in);
-        if(data.sound_speed_in) add("Speed of Sound", data.sound_speed_in, 'speed');
+        if(data.z_in) add("Compressibility Z (In)", data.z_in);
+        if(data.gamma_in) add("Isentropic Exp k (In)", data.gamma_in);
         
         if (data.p_out) add("Discharge Pressure", data.p_out, 'pressure');
         if (data.t_out) add("Discharge Temp", data.t_out, 'temp');
@@ -286,32 +303,25 @@ export function exportToExcel(data, filename) {
         if (data.t_gc_out) add("Gas Cooler Exit", data.t_gc_out, 'temp');
 
         if (data.rpm) add("Speed", data.rpm, '');
-        add("Mass Flow", data.m_flow, 'flow_mass');
-        add("Vol Flow (Actual)", data.v_flow || data.v_flow_in, 'flow_vol');
+        // Export Flow in Hour units for readability
+        add("Mass Flow", data.m_flow * 3600, 'flow_mass');
+        add("Vol Flow (Actual)", (data.v_flow || data.v_flow_in) * 3600, 'flow_vol');
+        if(data.v_flow_std) add("Vol Flow (Standard)", data.v_flow_std * 3600, 'std_flow');
 
         rows.push(["--- PERFORMANCE ---", "", ""]);
         add("Shaft Power", data.power, 'power');
         if(data.spec_power) add("Specific Power", data.spec_power, 'spec_power');
-        if(data.q_evap) add("Cooling Capacity", data.q_evap, 'power'); 
-        if(data.q_cond) add("Heating Load", data.q_cond, 'power');
-        
-        add("COP", data.cop || data.cop_c);
+        if(data.sec) add("SEC", data.sec, 'sec');
 
-        if (data.cooling_info || data.q_intercool) {
-            rows.push(["--- THERMAL ---", "", ""]);
-            if (data.cooling_info) {
-                let typeStr = data.cooling_info.type;
-                if (typeStr === 'surface') typeStr = "Surface Cooling";
-                else if (typeStr === 'injection') typeStr = "Liquid Injection";
-                else if (typeStr === 'adiabatic') typeStr = "Adiabatic";
-                add("Cooling Strategy", typeStr, "");
-                if(data.cooling_info.q_loss > 0) add("Heat Removed", data.cooling_info.q_loss, "power");
-                if(data.cooling_info.m_inj > 0) add("Injection Flow", data.cooling_info.m_inj * 3600, "flow_mass"); // convert to h for display logic
-            }
-            if(data.q_intercool > 0) add("Intercool Heat Load", data.q_intercool, 'power');
-            if(data.q_aftercool > 0) add("Aftercooler Load", data.q_aftercool, 'power');
-            if(data.m_condensate > 0) add("Condensate Rate", data.m_condensate * 3600, 'flow_mass');
-        }
+        if(data.q_evap) add("Cooling Capacity", data.q_evap, 'power'); 
+        if(data.q_cond) add("Heating Capacity", data.q_cond, 'power');
+        
+        if(data.cop_c) add("COP (Cooling)", data.cop_c);
+        if(data.cop_h) add("COP (Heating)", data.cop_h);
+        if(data.vcc) add("VCC", data.vcc, 'vcc');
+        
+        if(data.heat_rejection_ratio) add("Heat Rejection Ratio", data.heat_rejection_ratio);
+        if(data.dew_point) add("Dew Point", data.dew_point, 'temp');
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }]; 
