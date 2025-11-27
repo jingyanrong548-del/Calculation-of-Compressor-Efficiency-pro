@@ -1,6 +1,6 @@
 // =====================================================================
 // mode2_predict.js: 模式一 (制冷/CO2) & 模式二 (气体)
-// 版本: v8.35 (Feature: Unit Conversion & Baseline Comparison)
+// 版本: v8.43 (Fix: Robust Fluid Value Retrieval)
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
@@ -21,7 +21,7 @@ let calcButtonM1, resultsDivM1, calcFormM1, printButtonM1, exportButtonM1, chart
 let calcButtonM1_CO2, calcFormM1_CO2, btnOptP;
 let calcButtonM2, resultsDivM2, calcFormM2, printButtonM2, exportButtonM2, chartDivM2;
 
-// --- Global Event Listeners for Unit/Baseline (New in v8.35) ---
+// --- Global Event Listeners ---
 document.addEventListener('unit-change', () => {
     if (lastMode1Data) {
         const title = lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "STANDARD HEAT PUMP REPORT";
@@ -33,21 +33,18 @@ document.addEventListener('unit-change', () => {
 });
 
 document.addEventListener('pin-baseline', () => {
-    // Pin Mode 1
     if (lastMode1Data && document.getElementById('tab-content-1').style.display !== 'none') {
         baselineMode1 = { ...lastMode1Data };
         const title = lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "STANDARD HEAT PUMP REPORT";
         resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, title, baselineMode1);
     }
-    // Pin Mode 2
     if (lastMode2Data && document.getElementById('tab-content-2').style.display !== 'none') {
         baselineMode2 = { ...lastMode2Data };
         resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
     }
 });
 
-
-// --- Helper: 流量计算 ---
+// --- Helper: Flow Calculation ---
 function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
     const mode = formData.get(`flow_mode_${modeSuffix}`);
     let m_flow = 0, v_flow_in = 0;
@@ -73,7 +70,7 @@ function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
     return { m_flow, v_flow_in };
 }
 
-// --- Helper: CO2 跨临界寻优算法 ---
+// --- Helper: CO2 Opt Algo ---
 function runCO2OptimizationSweep(CP, params) {
     const { h_in, s_in, t_gc_out, eff_isen, clearance, n_index, rpm, vol_disp, density_in, p_in } = params;
     const fluid = 'R744';
@@ -102,7 +99,7 @@ function runCO2OptimizationSweep(CP, params) {
     return { data: results, bestP, bestCOP };
 }
 
-// --- Helper: Datasheet Generator (v8.35 with Units & Comparison) ---
+// --- Helper: Datasheet Generator ---
 function generateDatasheetHTML(d, title, base = null) {
     try {
         const themeColor = (d.fluid && d.fluid.includes('R744')) ? "text-orange-600 border-orange-600" : (title.includes("GAS") ? "text-cyan-700 border-cyan-700" : "text-emerald-700 border-emerald-700");
@@ -111,28 +108,6 @@ function generateDatasheetHTML(d, title, base = null) {
         const isGas = title.includes("GAS");
         const isCO2Trans = d.fluid === 'R744' && d.cycle_type === 'Transcritical';
         
-        // Enhanced Row Generator with Unit Conversion & Comparison
-        const row = (label, valSI, type) => {
-            const formatted = formatValue(valSI, type);
-            // Calculate Diff if baseline exists
-            let diffHtml = "";
-            if (base) {
-                // Map current value key to baseline key (assuming same structure)
-                // Note: valSI is passed directly, but we need the key to find it in base.
-                // Since we pass valSI directly, we can't easily lookup in base without key.
-                // REFACTOR: Pass key instead of value, or handle specific known keys.
-            }
-            // Simplified approach: formatValue returns string. 
-            return `
-            <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                <span class="text-gray-500 text-sm font-medium mt-0.5">${label}</span>
-                <div class="text-right">
-                    <div class="font-mono font-bold text-gray-800">${formatted}</div>
-                </div>
-            </div>`;
-        };
-
-        // Special Row for Comparison (Need explicit base value)
         const rowCmp = (label, valSI, baseSI, type, inverse = false) => {
             const formatted = formatValue(valSI, type);
             const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
@@ -187,10 +162,10 @@ function generateDatasheetHTML(d, title, base = null) {
         <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
             <div class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">Real Gas Properties (Suction)</div>
             <div class="grid grid-cols-1 gap-y-1">
-                ${row("Compressibility Z", d.z_in, null)} 
-                ${row("Sound Speed", d.sound_speed_in, 'speed')}
-                ${row("Isentropic Exp (k)", d.gamma_in, null)}
-                ${row("Density", (d.m_flow/d.v_flow), 'density')}
+                ${rowCmp("Compressibility Z", d.z_in, base?.z_in, null)} 
+                ${rowCmp("Sound Speed", d.sound_speed_in, base?.sound_speed_in, 'speed')}
+                ${rowCmp("Isentropic Exp (k)", d.gamma_in, base?.gamma_in, null)}
+                ${rowCmp("Density", (d.m_flow/d.v_flow), base ? (base.m_flow/base.v_flow) : null, 'density')}
             </div>
         </div>`;
 
@@ -250,12 +225,11 @@ function generateDatasheetHTML(d, title, base = null) {
             </div>
 
             <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.35</p>
+                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.43</p>
             </div>
         </div>`;
     } catch (e) {
-        console.error("HTML Gen Error:", e);
-        return `<div class="p-4 bg-red-50 text-red-600 rounded border border-red-200 text-center">Report Generation Error: ${e.message}</div>`;
+        return `<div class="p-4 bg-red-50 text-red-600 rounded border border-red-200 text-center">Error: ${e.message}</div>`;
     }
 }
 
@@ -269,7 +243,8 @@ async function calculateMode1_CO2(CP) {
             const fd = new FormData(calcFormM1_CO2);
             const fluid = "R744"; 
             const cycleType = document.querySelector('input[name="cycle_type_m1_co2"]:checked')?.value || 'transcritical';
-
+            
+            // [FIX] Ensure values are parsed correctly
             const t_evap = parseFloat(fd.get('T_evap_m1_co2'));
             const sh = parseFloat(fd.get('SH_m1_co2'));
             const p_in = CP.PropsSI('P', 'T', t_evap + 273.15, 'Q', 1, fluid);
@@ -286,8 +261,10 @@ async function calculateMode1_CO2(CP) {
             let report_vals = {};
             let optimizationResults = null;
 
-            const eff_isen = parseFloat(fd.get('eff_isen_peak_m1_co2')); 
-            const pr_des = parseFloat(fd.get('pr_design_m1_co2'));
+            const eff_model = document.querySelector('input[name="eff_model_m1_co2"]:checked')?.value || 'fixed';
+            
+            // Extract Params
+            const eff_isen_peak = parseFloat(fd.get('eff_isen_peak_m1_co2')); 
             const clearance = parseFloat(fd.get('clearance_m1_co2'));
             const n_index = parseFloat(fd.get('poly_index_m1_co2'));
             const rpm = parseFloat(fd.get('rpm_m1_co2'));
@@ -302,7 +279,7 @@ async function calculateMode1_CO2(CP) {
                 report_vals = { t_gc_out };
 
                 optimizationResults = runCO2OptimizationSweep(CP, {
-                    h_in, s_in, t_gc_out, eff_isen,
+                    h_in, s_in, t_gc_out, eff_isen: eff_isen_peak, // Use peak for opt reference
                     clearance, n_index,
                     rpm, vol_disp, density_in: d_in, p_in
                 });
@@ -320,8 +297,16 @@ async function calculateMode1_CO2(CP) {
             }
 
             const pr_act = p_out / p_in;
-            let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr_act, 1.0/n_index) - 1.0));
-            eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
+            let eff_isen, eff_vol;
+
+            if (eff_model === 'fixed') {
+                eff_isen = parseFloat(fd.get('eff_isen_m1_co2')) / 100.0;
+                eff_vol = parseFloat(fd.get('vol_eff_m1_co2')) / 100.0;
+            } else {
+                eff_isen = eff_isen_peak;
+                eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr_act, 1.0/n_index) - 1.0));
+                eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
+            }
             
             let { m_flow, v_flow_in } = getFlowRate(fd, 'm1_co2', d_in, eff_vol);
 
@@ -350,7 +335,7 @@ async function calculateMode1_CO2(CP) {
                 z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power: power_shaft, q_evap, q_cond,
                 cop_c: q_evap/power_shaft, cop_h: q_cond/power_shaft,
-                eff_isen, eff_vol, eff_note: `AI-CO2 (${cycleType})`,
+                eff_isen, eff_vol, eff_note: `AI-CO2 (${cycleType} / ${eff_model})`,
                 cooling_info: { type: cool_mode, t_raw: t_out_raw_k - 273.15, q_loss, m_inj },
                 opt_curve_data: optimizationResults ? optimizationResults.data : null,
                 opt_p_val: optimizationResults ? optimizationResults.bestP : null,
@@ -409,10 +394,21 @@ async function calculateMode1_CO2(CP) {
 async function calculateMode2(CP) {
     if (!CP) return;
     calcButtonM2.disabled = true; calcButtonM2.textContent = "计算中...";
+    
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM2);
-            const fluid = fd.get('fluid_m2');
+            // [FIX v8.43] Robust Fluid Retrieval
+            // Attempt 1: FormData
+            // Attempt 2: Direct DOM value (in case FormData fails due to disabled state)
+            // Attempt 3: Default 'Air' (last resort to prevent crash)
+            let fluid = fd.get('fluid_m2');
+            if (!fluid) {
+                const el = document.getElementById('fluid_m2');
+                fluid = el ? el.value : 'Air';
+            }
+            if (!fluid) fluid = 'Air';
+
             const p_in = parseFloat(fd.get('p_in_m2')) * 1e5;
             const t_in = parseFloat(fd.get('T_in_m2')) + 273.15;
             const p_out = parseFloat(fd.get('p_out_m2')) * 1e5;
@@ -433,6 +429,7 @@ async function calculateMode2(CP) {
             const h_out_adiabatic = h_in + w_real;
             const t_out_adiabatic = CP.PropsSI('T','P', p_out, 'H', h_out_adiabatic, fluid);
             const power = w_real * m_flow / 1000.0;
+            
             const coolRadio = document.querySelector('input[name="cooling_mode_m2"]:checked');
             const cooling_mode = coolRadio ? coolRadio.value : 'adiabatic';
             let t_out_final = t_out_adiabatic;
@@ -450,9 +447,11 @@ async function calculateMode2(CP) {
                 p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out: t_out_final-273.15,
                 z_in, sound_speed_in, gamma_in,
                 m_flow, v_flow: v_flow_in, power, pr: p_out/p_in,
-                eff_isen, eff_vol: vol_eff, eff_note: "Standard",
+                eff_isen, eff_vol: vol_eff, 
+                eff_note: "Standard",
                 cooling_info: { type: cooling_mode, t_raw: t_out_adiabatic - 273.15, q_loss }
             };
+
             resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
             if(chartDivM2) {
                 chartDivM2.classList.remove('hidden');
@@ -461,6 +460,7 @@ async function calculateMode2(CP) {
                     { name: '2', desc: 'Dis', p: p_out, t: t_out_final, h: CP.PropsSI('H','P',p_out,'T',t_out_final,fluid), s: CP.PropsSI('S','P',p_out,'T',t_out_final,fluid) }
                 ]}, 'chart-m2');
             }
+
         } catch(e) { resultsDivM2.textContent = "Error: " + e.message; } 
         finally {
             calcButtonM2.disabled = false; calcButtonM2.textContent = "计算气体压缩";
@@ -476,13 +476,21 @@ async function calculateMode1(CP) {
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM1);
-            const fluid = fd.get('fluid_m1');
+            // [FIX v8.43] Robust Fluid Retrieval for Mode 1
+            let fluid = fd.get('fluid_m1');
+            if (!fluid) {
+                const el = document.getElementById('fluid_m1');
+                fluid = el ? el.value : 'R134a';
+            }
+            if (!fluid) fluid = 'R134a';
+
             const t_evap = parseFloat(fd.get('T_evap_m1'));
             const p_in = CP.PropsSI('P','T', t_evap+273.15, 'Q', 1, fluid);
             const vol_eff = parseFloat(fd.get('vol_eff_m1'))/100;
+            
             const t_in_k = t_evap + parseFloat(fd.get('SH_m1')) + 273.15;
             const d_in = CP.PropsSI('D','P', p_in, 'T', t_in_k, fluid);
-            
+
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in_k, fluid);
             const sound_speed_in = CP.PropsSI('A', 'P', p_in, 'T', t_in_k, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in_k, fluid);
@@ -498,20 +506,23 @@ async function calculateMode1(CP) {
             const w_real = (h_out_is - h_in) / eff_isen;
             const h_out = h_in + w_real;
             const t_out_k = CP.PropsSI('T','P', p_out, 'H', h_out, fluid);
+            
             const t_liq_k = t_cond + 273.15 - sc;
             const h_liq = CP.PropsSI('H','P', p_out, 'T', t_liq_k, fluid);
+            
             const q_evap = (h_in - h_liq) * m_flow / 1000.0; 
             const q_cond = (h_out - h_liq) * m_flow / 1000.0; 
             const power = w_real * m_flow / 1000.0;
-            
+
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
                 p_in: p_in/1e5, t_in: t_in_k-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
                 t_cond, sc, m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
-                z_in, sound_speed_in, gamma_in,
                 cop_c: q_evap/power, cop_h: q_cond/power,
-                eff_isen, eff_vol: vol_eff, eff_note: "Standard"
+                eff_isen, eff_vol: vol_eff, eff_note: "Standard",
+                z_in, sound_speed_in, gamma_in
             };
+
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "STANDARD HEAT PUMP REPORT", baselineMode1);
             if(chartDivM1) {
                 chartDivM1.classList.remove('hidden');
@@ -523,6 +534,7 @@ async function calculateMode1(CP) {
                     { name: '4', desc: 'Exp', p: p_in, t: t_4, h: h_liq, s: CP.PropsSI('S','P',p_in,'H',h_liq,fluid) }
                 ]}, 'chart-m1');
             }
+
         } catch (e) { resultsDivM1.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`; }
         finally {
             calcButtonM1.disabled = false; calcButtonM1.textContent = "计算常规热泵";
@@ -549,6 +561,12 @@ export function initMode1_2(CP) {
     calcFormM1_CO2 = document.getElementById('calc-form-1-co2');
     calcFormM2 = document.getElementById('calc-form-2');
     btnOptP = document.getElementById('btn-opt-p-high');
+
+    // Added Missing Event Listener for Mode 1 Fluid Info (v8.39/v8.43 Fix)
+    const fluidSelectM1 = document.getElementById('fluid_m1');
+    if(fluidSelectM1) {
+        fluidSelectM1.addEventListener('change', () => updateFluidInfo(fluidSelectM1, document.getElementById('fluid-info-m1'), CP));
+    }
 
     if (printButtonM1) printButtonM1.onclick = () => {
         if (lastMode1Data) {

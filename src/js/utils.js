@@ -1,13 +1,13 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
-// 版本: v8.35 (Phase 2 Step 1: Unit Infrastructure + Full Charts)
+// 版本: v8.36 (Feature: Advanced Export & Full Compatibility)
 // =====================================================================
 
 import * as echarts from 'echarts';
 import * as XLSX from 'xlsx';
 
 // =====================================================================
-// 1. Unit Conversion Infrastructure (New in v8.35)
+// 1. Unit Conversion Infrastructure
 // =====================================================================
 
 export const UnitState = {
@@ -31,8 +31,8 @@ const CONVERSIONS = {
         toImp: (v) => (v * 1.8) + 32,
         digits: 1
     },
-    delta_temp: { // Temperature Difference (Superheat, Subcooling, Lift)
-        si: 'K', imp: '°R', // or °F delta
+    delta_temp: { // Temperature Difference
+        si: 'K', imp: '°R', 
         toImp: (v) => v * 1.8,
         digits: 1
     },
@@ -80,16 +80,12 @@ const CONVERSIONS = {
 
 /**
  * 格式化数值 (用于 UI 显示)
- * @param {number} valueSI - 原始 SI 值
- * @param {string} type - 物理量类型
- * @param {number} overrideDigits - 可选，覆盖默认小数位
- * @returns {string} "123.45 unit"
  */
 export function formatValue(valueSI, type, overrideDigits = null) {
     if (valueSI === null || valueSI === undefined || valueSI === '') return '-';
     
     const def = CONVERSIONS[type];
-    if (!def) return Number(valueSI).toFixed(2); // Fallback
+    if (!def) return Number(valueSI).toFixed(2); 
 
     let val = valueSI;
     let unit = def.si;
@@ -123,7 +119,7 @@ export function getUnitLabel(type) {
 }
 
 /**
- * 生成对比差异 HTML (用于方案对比)
+ * 生成对比差异 HTML
  */
 export function getDiffHtml(current, baseline, inverse = false) {
     if (!baseline || baseline === 0) return '';
@@ -133,7 +129,7 @@ export function getDiffHtml(current, baseline, inverse = false) {
     if (absDiff < 0.01) return ''; 
 
     let color = 'text-gray-500';
-    // Logic: Inverse=true (e.g. Power) means Negative diff is Good (Green)
+    // Inverse=true (e.g. Power) means Negative diff is Good (Green)
     const isGood = inverse ? (diffPct < 0) : (diffPct > 0);
     color = isGood ? 'text-green-600' : 'text-red-600';
     
@@ -243,12 +239,12 @@ export class AutoSaveManager {
 
 
 // =====================================================================
-// 3. Excel Export (Updated with Unit Conversion Support)
+// 3. Excel Export (Updated for Phase 3)
 // =====================================================================
 
 export function exportToExcel(data, filename) {
     if (!data) {
-        alert("无数据可导出 (No data). 请先点击计算按钮生成结果。");
+        alert("No data to export. (请先计算)");
         return;
     }
 
@@ -264,7 +260,6 @@ export function exportToExcel(data, filename) {
         
         const add = (k, v, type) => {
             if (v !== undefined && v !== null) {
-                // Convert value based on current UnitState
                 const val = type ? getConvertedValue(v, type) : v;
                 const unit = type ? getUnitLabel(type) : '';
                 const displayVal = typeof val === 'number' ? Number(val.toFixed(4)) : val;
@@ -276,6 +271,7 @@ export function exportToExcel(data, filename) {
         add("Date", data.date);
         add("Fluid", data.fluid);
         add("Unit System", UnitState.current); 
+        if(data.is_advanced) add("Config Mode", "Advanced Multi-Stage");
 
         rows.push(["--- CONDITIONS ---", "", ""]);
         add("Suction Pressure", data.p_in, 'pressure');
@@ -300,8 +296,24 @@ export function exportToExcel(data, filename) {
         
         add("COP", data.cop || data.cop_c);
 
+        if (data.cooling_info || data.q_intercool) {
+            rows.push(["--- THERMAL ---", "", ""]);
+            if (data.cooling_info) {
+                let typeStr = data.cooling_info.type;
+                if (typeStr === 'surface') typeStr = "Surface Cooling";
+                else if (typeStr === 'injection') typeStr = "Liquid Injection";
+                else if (typeStr === 'adiabatic') typeStr = "Adiabatic";
+                add("Cooling Strategy", typeStr, "");
+                if(data.cooling_info.q_loss > 0) add("Heat Removed", data.cooling_info.q_loss, "power");
+                if(data.cooling_info.m_inj > 0) add("Injection Flow", data.cooling_info.m_inj * 3600, "flow_mass"); // convert to h for display logic
+            }
+            if(data.q_intercool > 0) add("Intercool Heat Load", data.q_intercool, 'power');
+            if(data.q_aftercool > 0) add("Aftercooler Load", data.q_aftercool, 'power');
+            if(data.m_condensate > 0) add("Condensate Rate", data.m_condensate * 3600, 'flow_mass');
+        }
+
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 15 }]; 
+        ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }]; 
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Datasheet");
@@ -315,7 +327,7 @@ export function exportToExcel(data, filename) {
 
 
 // =====================================================================
-// 4. Chart Rendering (Full Logic Restored)
+// 4. Chart Rendering
 // =====================================================================
 
 /**
@@ -369,14 +381,13 @@ export function renderStateTable(domId, points) {
 }
 
 /**
- * 绘制压焓图 (P-h Diagram) - 完整逻辑
+ * 绘制压焓图 (P-h Diagram)
  */
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
     if (!dom) return;
 
     dom.classList.remove('hidden');
-    // 如果之前有实例，先销毁或重用。
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
         existingChart.clear(); 
@@ -386,12 +397,10 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     chart.showLoading();
 
     try {
-        // 1. 获取临界参数
         const T_crit = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
         const P_crit = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
         const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid); 
         
-        // 绘图范围设定
         const T_start = T_min + 5; 
         const T_end = T_crit - 0.5; 
         const steps = 100;
@@ -401,7 +410,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         const lineVapor = [];
         let H_crit = 0;
 
-        // 2. 绘制饱和穹顶
         for (let i = 0; i <= steps; i++) {
             const T = T_start + i * stepSize;
             try {
@@ -412,10 +420,9 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                 const P_vap = CP.PropsSI('P', 'T', T, 'Q', 1, fluid);
                 const H_vap = CP.PropsSI('H', 'T', T, 'Q', 1, fluid);
                 lineVapor.push([H_vap / 1000.0, P_vap / 1e5]);
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         }
 
-        // 计算临界点坐标
         try {
             H_crit = CP.PropsSI('H', 'T', T_crit, 'P', P_crit, fluid) / 1000.0;
         } catch(e) {
@@ -427,7 +434,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         }
         const critPointData = [[H_crit, P_crit / 1e5]];
 
-        // 3. 处理循环点
         const cycleSeriesData = [];
         if (cycleData && cycleData.points) {
             cycleData.points.forEach(pt => {
@@ -440,13 +446,11 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     }
                 });
             });
-            // 闭合
             if (cycleSeriesData.length > 0) {
                 cycleSeriesData.push(cycleSeriesData[0]);
             }
         }
 
-        // 4. ECharts Option
         const option = {
             title: { 
                 text: `P-h Diagram: ${fluid}`, 
@@ -538,7 +542,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         chart.hideLoading();
         chart.setOption(option);
         
-        // 恢复表格显示
         let tableDiv = dom.nextElementSibling;
         if (tableDiv && tableDiv.classList.contains('state-table-container')) {
             tableDiv.style.display = 'block';
