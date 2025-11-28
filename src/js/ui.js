@@ -1,6 +1,6 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑
-// 版本: v8.43 (Fix: Initialization Order Error)
+// 版本: v8.49 (Feature: Dynamic Labels for IHX Context)
 // =====================================================================
 
 import { CaseStorage } from './storage.js';
@@ -255,6 +255,50 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCo2EffModelToggle();
 
     // -----------------------------------------------------------------
+    // [NEW] 4.1 Dynamic Labels for IHX Context
+    // -----------------------------------------------------------------
+    function setupDynamicLabels() {
+        // Standard Heat Pump
+        const ihxStd = document.getElementById('enable_ihx_m1');
+        const lblShStd = document.getElementById('lbl_sh_m1');
+        const lblScStd = document.getElementById('lbl_sc_m1');
+
+        if(ihxStd && lblShStd && lblScStd) {
+            const updateStd = () => {
+                if(ihxStd.checked) {
+                    lblShStd.textContent = "Evap SH (K)";
+                    lblScStd.textContent = "Cond SC (K)";
+                } else {
+                    lblShStd.textContent = "SH (K)";
+                    lblScStd.textContent = "SC (K)";
+                }
+            };
+            ihxStd.addEventListener('change', updateStd);
+            updateStd(); // Init
+        }
+
+        // CO2 Heat Pump
+        const ihxCo2 = document.getElementById('enable_ihx_m1_co2');
+        const lblShCo2 = document.getElementById('lbl_sh_m1_co2');
+        const lblScCo2 = document.getElementById('lbl_sc_m1_co2');
+
+        if(ihxCo2 && lblShCo2 && lblScCo2) {
+            const updateCo2 = () => {
+                if(ihxCo2.checked) {
+                    lblShCo2.textContent = "Evap SH (K)";
+                    lblScCo2.textContent = "Cond SC (K)";
+                } else {
+                    lblShCo2.textContent = "SH (K)";
+                    lblScCo2.textContent = "Subcool (K)";
+                }
+            };
+            ihxCo2.addEventListener('change', updateCo2);
+            updateCo2(); // Init
+        }
+    }
+    setupDynamicLabels();
+
+    // -----------------------------------------------------------------
     // 5. Multi-Stage Advanced Logic (Mode 3)
     // -----------------------------------------------------------------
     function setupStageConfigM3() {
@@ -262,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnStageConfig = document.getElementById('btn-open-stage-config');
 
         if (inputStagesM3 && btnStageConfig) {
-            // [FIX v8.43] Defined helper FIRST
             const resetConfigVisuals = () => {
                 if(btnStageConfig) {
                     btnStageConfig.classList.remove('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
@@ -280,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     btnStageConfig.disabled = true;
                     btnStageConfig.classList.add('opacity-50', 'cursor-not-allowed');
-                    resetConfigVisuals(); // Safe to call now
+                    resetConfigVisuals(); 
                 }
             };
 
@@ -496,6 +539,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCheckboxToggle('enable_desuperheat_m4', 'desuperheat-inputs-m4');
     setupCheckboxToggle('enable_desuperheat_m5', 'desuperheat-inputs-m5');
     setupCheckboxToggle('enable_dynamic_eff_m1', 'dynamic-eff-inputs-m1');
+    // Note: IHX Toggles are handled in main.js via simple script injection or can be moved here. 
+    // Since we added setupDynamicLabels above, we can rely on that for labels, 
+    // but we still need the visibility toggle. Let's add it here to be safe and consistent.
+    setupCheckboxToggle('enable_ihx_m1', 'ihx-inputs-m1');
+    setupCheckboxToggle('enable_ihx_m1_co2', 'ihx-inputs-m1_co2');
 
     window.refreshAllToggles = () => {
         document.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]').forEach(el => {

@@ -15,15 +15,15 @@ import './ui.js'; // Load UI interactions (includes Case Management logic)
 
 // --- 1. PWA Service Worker Registration ---
 // 仅在浏览器支持且在非开发环境（或需要测试离线功能时）生效
+// --- 1. PWA Service Worker (强制注销模式 - 用于开发调试) ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('✅ PWA ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(err => {
-                console.log('❌ PWA ServiceWorker registration failed: ', err);
-            });
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister(); // <--- 强制注销所有 SW
+                console.log("🧹 Service Worker 已强制注销，请再次刷新页面！");
+            }
+        });
     });
 }
 

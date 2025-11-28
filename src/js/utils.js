@@ -1,6 +1,6 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
-// 版本: v8.45 (Full Version)
+// 版本: v8.49 (Stable: Fixed Chart Interaction & Units)
 // =====================================================================
 
 import * as echarts from 'echarts';
@@ -26,7 +26,7 @@ const CONVERSIONS = {
         toImp: (v) => v * 14.5038,
         digits: 2
     },
-    temp: { // Absolute Temp
+    temp: { // Absolute Temp (Input is Celsius)
         si: '°C', imp: '°F',
         toImp: (v) => (v * 1.8) + 32,
         digits: 1
@@ -61,7 +61,7 @@ const CONVERSIONS = {
         toImp: (v) => v * 1.699, 
         digits: 2
     },
-    sec: { // Specific Energy Consumption (MVR) - kWh/ton vs BTU/lb (approx)
+    sec: { // Specific Energy Consumption (MVR)
         si: 'kWh/ton', imp: 'BTU/lb', 
         toImp: (v) => v * 1.9, 
         digits: 2
@@ -145,7 +145,6 @@ export function getDiffHtml(current, baseline, inverse = false) {
     if (absDiff < 0.01) return ''; 
 
     let color = 'text-gray-500';
-    // Inverse=true (e.g. Power) means Negative diff is Good (Green)
     const isGood = inverse ? (diffPct < 0) : (diffPct > 0);
     color = isGood ? 'text-green-600' : 'text-red-600';
     
@@ -225,7 +224,6 @@ export class AutoSaveManager {
                     }
                 } else if (el.name && data[el.name] !== undefined) {
                     el.value = data[el.name];
-                    // [FIX] Force Change event to update UI dependent on value (e.g. Fluid Info)
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                 }
@@ -257,7 +255,7 @@ export class AutoSaveManager {
 
 
 // =====================================================================
-// 3. Excel Export (Updated for v8.45)
+// 3. Excel Export
 // =====================================================================
 
 export function exportToExcel(data, filename) {
@@ -268,7 +266,6 @@ export function exportToExcel(data, filename) {
 
     if (!XLSX || !XLSX.utils) {
         alert("错误: 缺少 'xlsx' 库。\n请在 VS Code 终端运行: npm install xlsx\n然后重启开发服务器。");
-        console.error("XLSX library not found.");
         return;
     }
 
@@ -303,10 +300,19 @@ export function exportToExcel(data, filename) {
         if (data.t_gc_out) add("Gas Cooler Exit", data.t_gc_out, 'temp');
 
         if (data.rpm) add("Speed", data.rpm, '');
-        // Export Flow in Hour units for readability
         add("Mass Flow", data.m_flow * 3600, 'flow_mass');
         add("Vol Flow (Actual)", (data.v_flow || data.v_flow_in) * 3600, 'flow_vol');
         if(data.v_flow_std) add("Vol Flow (Standard)", data.v_flow_std * 3600, 'std_flow');
+
+        // IHX Export
+        if (data.ihx && data.ihx.enabled) {
+            rows.push(["--- IHX (Internal Heat Exchanger) ---", "", ""]);
+            add("IHX Effectiveness", data.ihx.eff * 100, null);
+            add("IHX Load", data.ihx.q_ihx, 'power');
+            add("Suction Temp (After IHX)", data.ihx.t_1b - 273.15, 'temp');
+            add("Liquid Temp (After IHX)", data.ihx.t_3b - 273.15, 'temp');
+            add("Subcool Gain", data.ihx.t_drop_liq, 'delta_temp');
+        }
 
         rows.push(["--- PERFORMANCE ---", "", ""]);
         add("Shaft Power", data.power, 'power');
@@ -341,9 +347,6 @@ export function exportToExcel(data, filename) {
 // 4. Chart Rendering
 // =====================================================================
 
-/**
- * 渲染状态点表格
- */
 export function renderStateTable(domId, points) {
     const chartDiv = document.getElementById(domId);
     if (!chartDiv) return;
@@ -391,9 +394,6 @@ export function renderStateTable(domId, points) {
     `;
 }
 
-/**
- * 绘制压焓图 (P-h Diagram)
- */
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
     if (!dom) return;
@@ -533,14 +533,15 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     type: 'line',
                     data: cycleSeriesData,
                     symbol: 'circle',
-                    symbolSize: 8,
+                    // [FIX] Increased size for better hover interaction
+                    symbolSize: 10,
                     smooth: false,
                     label: { 
                         show: true, 
                         formatter: '{@name}', 
                         position: 'right', 
                         fontWeight: 'bold', 
-                        fontSize: 12,
+                        fontSize: 12, // Restored visibility
                         color: '#000',
                         distance: 5
                     },
@@ -571,9 +572,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     }
 }
 
-/**
- * 绘制 CO2 跨临界 COP 优化曲线
- */
 export function drawOptimizationCurve(domId, optimizationData, currentP) {
     const dom = document.getElementById(domId);
     if (!dom) return;
@@ -664,9 +662,6 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     }
 }
 
-/**
- * 绘制性能地图 (Flow vs Power/Pressure)
- */
 export function drawPerformanceMap(domId, batchData) {
     const dom = document.getElementById(domId);
     if (!dom) return;
