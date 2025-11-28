@@ -1,10 +1,10 @@
 // =====================================================================
 // utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
-// 版本: v8.49 (Stable: Fixed Chart Interaction & Units)
+// 版本: v8.52 (Optimization: Dynamic Import for XLSX)
 // =====================================================================
 
 import * as echarts from 'echarts';
-import * as XLSX from 'xlsx';
+// [Optimization] XLSX removed from static import to reduce initial bundle size
 
 // =====================================================================
 // 1. Unit Conversion Infrastructure
@@ -115,9 +115,6 @@ export function formatValue(valueSI, type, overrideDigits = null) {
     return `${val.toFixed(digits)} <span class="text-xs text-gray-400 ml-0.5">${unit}</span>`;
 }
 
-/**
- * 获取纯数值 (用于 Excel 导出或图表数据)
- */
 export function getConvertedValue(valueSI, type) {
     if (valueSI === null || valueSI === undefined) return null;
     const def = CONVERSIONS[type];
@@ -125,31 +122,21 @@ export function getConvertedValue(valueSI, type) {
     return UnitState.isMetric() ? valueSI : def.toImp(valueSI);
 }
 
-/**
- * 获取单位字符串
- */
 export function getUnitLabel(type) {
     const def = CONVERSIONS[type];
     if (!def) return '';
     return UnitState.isMetric() ? def.si : def.imp;
 }
 
-/**
- * 生成对比差异 HTML
- */
 export function getDiffHtml(current, baseline, inverse = false) {
     if (!baseline || baseline === 0) return '';
-    
     const diffPct = ((current - baseline) / baseline) * 100;
     const absDiff = Math.abs(diffPct);
     if (absDiff < 0.01) return ''; 
-
     let color = 'text-gray-500';
     const isGood = inverse ? (diffPct < 0) : (diffPct > 0);
     color = isGood ? 'text-green-600' : 'text-red-600';
-    
     const arrow = diffPct > 0 ? '▲' : '▼';
-    
     return `<div class="text-[10px] ${color} font-bold mt-0.5 flex items-center justify-end">
         <span class="mr-1">${arrow}</span>${Math.abs(diffPct).toFixed(1)}% vs Base
     </div>`;
@@ -255,17 +242,23 @@ export class AutoSaveManager {
 
 
 // =====================================================================
-// 3. Excel Export
+// 3. Excel Export (Optimization: Dynamic Import)
 // =====================================================================
 
-export function exportToExcel(data, filename) {
+export async function exportToExcel(data, filename) {
     if (!data) {
         alert("No data to export. (请先计算)");
         return;
     }
 
-    if (!XLSX || !XLSX.utils) {
-        alert("错误: 缺少 'xlsx' 库。\n请在 VS Code 终端运行: npm install xlsx\n然后重启开发服务器。");
+    let XLSX;
+    try {
+        // [Optimization] Load XLSX only when needed
+        const module = await import('xlsx');
+        XLSX = module.default || module;
+    } catch (err) {
+        console.error("Failed to load XLSX:", err);
+        alert("Error loading Excel library. Please check network or npm install xlsx.");
         return;
     }
 
@@ -304,7 +297,6 @@ export function exportToExcel(data, filename) {
         add("Vol Flow (Actual)", (data.v_flow || data.v_flow_in) * 3600, 'flow_vol');
         if(data.v_flow_std) add("Vol Flow (Standard)", data.v_flow_std * 3600, 'std_flow');
 
-        // IHX Export
         if (data.ihx && data.ihx.enabled) {
             rows.push(["--- IHX (Internal Heat Exchanger) ---", "", ""]);
             add("IHX Effectiveness", data.ihx.eff * 100, null);
@@ -533,7 +525,6 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     type: 'line',
                     data: cycleSeriesData,
                     symbol: 'circle',
-                    // [FIX] Increased size for better hover interaction
                     symbolSize: 10,
                     smooth: false,
                     label: { 
@@ -541,7 +532,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                         formatter: '{@name}', 
                         position: 'right', 
                         fontWeight: 'bold', 
-                        fontSize: 12, // Restored visibility
+                        fontSize: 12,
                         color: '#000',
                         distance: 5
                     },
