@@ -59,7 +59,7 @@ function generateTurboDatasheet(d, base = null) {
     const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
         if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
-        
+
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -115,7 +115,7 @@ function generateTurboDatasheet(d, base = null) {
                     ${rowCmp("Suction Press", d.p_in, base?.p_in, "pressure")}
                     ${rowCmp("Sat. Temp", d.t_sat_in, base?.t_sat_in, "temp")}
                     ${rowCmp("Superheat", d.sh_in, base?.sh_in, "delta_temp")}
-                    ${rowCmp("Vol Flow (Act)", d.v_flow_in * 3600, base?.v_flow_in ? base.v_flow_in*3600 : null, "flow_vol")}
+                    ${rowCmp("Vol Flow (Act)", d.v_flow_in * 3600, base?.v_flow_in ? base.v_flow_in * 3600 : null, "flow_vol")}
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
@@ -187,22 +187,22 @@ async function calculateMode5(CP) {
         try {
             const formData = new FormData(calcFormM5);
             const fluid = formData.get('fluid_m5');
-            
+
             const p_in_bar = parseFloat(formData.get('p_in_m5')) || 1.013;
             const sh_in = parseFloat(formData.get('SH_in_m5')) || 0;
             const dt = parseFloat(formData.get('delta_T_m5')) || 8;
             const eff_poly = (parseFloat(formData.get('eff_poly_m5')) || 80) / 100.0;
             const stages = parseInt(formData.get('stages_m5') || 1);
-            
+
             const is_desuperheat = document.getElementById('enable_desuperheat_m5').checked;
             const t_water = parseFloat(formData.get('T_water_in_m5')) || 30;
             const target_sh = parseFloat(formData.get('target_superheat_m5')) || 0;
 
             const p_in = p_in_bar * 1e5;
-            
+
             // 1. Determine Temp & Props (SH=0 Guard)
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
-            
+
             // [FIX] Use Guardkeeper
             const stateIn = getFluidState(CP, fluid, p_in, t_sat_in, sh_in);
 
@@ -213,36 +213,36 @@ async function calculateMode5(CP) {
 
             const pr_total = p_out / p_in;
             const pr_stage = Math.pow(pr_total, 1.0 / stages);
-            
+
             let current_p = p_in;
             let current_h = stateIn.h;
             let current_s = stateIn.s;
             let total_work = 0;
 
-            for(let i=0; i < stages; i++) {
+            for (let i = 0; i < stages; i++) {
                 let next_p = current_p * pr_stage;
-                if(i === stages - 1) next_p = p_out;
+                if (i === stages - 1) next_p = p_out;
 
                 let h_out_is = CP.PropsSI('H', 'P', next_p, 'S', current_s, fluid);
                 let dh_is = h_out_is - current_h;
                 let dh_real = dh_is / eff_poly; // Approx polytropic using Isentropic Delta / PolyEff
-                
+
                 current_h = current_h + dh_real;
                 total_work += dh_real;
-                
+
                 current_p = next_p;
                 current_s = CP.PropsSI('S', 'P', current_p, 'H', current_h, fluid);
             }
 
             const h_out_dry = current_h;
             const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
-            
+
             const power = total_work * m_flow / 1000.0;
-            
+
             // Latent & SEC
             const h_gas = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
             const h_liq = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
-            const latent = h_gas - h_liq; 
+            const latent = h_gas - h_liq; // 这里保持 J/kg 用于 COP 计算
             const cop = power > 0 ? (m_flow * latent / 1000.0) / power : 0;
 
             const tons_per_hour = m_flow * 3.6;
@@ -257,11 +257,11 @@ async function calculateMode5(CP) {
                 if (t_out_dry > t_target_k) {
                     // [FIX] SH=0 Target Guard
                     let h_target;
-                    if(Math.abs(target_sh) < 0.001) h_target = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
+                    if (Math.abs(target_sh) < 0.001) h_target = CP.PropsSI('H', 'P', p_out, 'Q', 1, fluid);
                     else h_target = CP.PropsSI('H', 'P', p_out, 'T', t_target_k, fluid);
 
                     const h_water_in = CP.PropsSI('H', 'T', t_water + 273.15, 'P', p_out, 'Water');
-                    
+
                     const num = m_flow * (h_out_dry - h_target);
                     const den = h_target - h_water_in;
                     if (den > 0) {
@@ -277,9 +277,9 @@ async function calculateMode5(CP) {
                 { name: 'In', desc: 'Suc', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
                 { name: 'Dry', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: current_s }
             ];
-            if(m_water > 0) points.push({ name: 'Fin', desc: 'Cooled', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
+            if (m_water > 0) points.push({ name: 'Fin', desc: 'Cooled', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
 
-            lastMode5Data = {
+           lastMode5Data = {
                 date: new Date().toLocaleDateString(),
                 fluid, p_in: p_in/1e5, 
                 t_sat_in: t_sat_in - 273.15,
@@ -290,13 +290,14 @@ async function calculateMode5(CP) {
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt, stages,
                 is_desuperheat, m_water, t_water,
-                sec, latent_heat: latent,
+                sec, 
+                latent_heat: latent / 1000.0, // <--- 修复: 除以 1000 转换为 kJ/kg
                 z_in: stateIn.z, sound_speed_in: stateIn.a
             };
 
             resultsDivM5.innerHTML = generateTurboDatasheet(lastMode5Data, baselineMode5);
-            
-            if(chartDivM5) {
+
+            if (chartDivM5) {
                 chartDivM5.classList.remove('hidden');
                 drawPhDiagram(CP, fluid, { points }, 'chart-m5');
             }
@@ -307,8 +308,8 @@ async function calculateMode5(CP) {
         } finally {
             calcButtonM5.textContent = "计算透平 MVR";
             calcButtonM5.disabled = false;
-            if(printButtonM5) printButtonM5.disabled = false;
-            if(exportButtonM5) exportButtonM5.disabled = false;
+            if (printButtonM5) printButtonM5.disabled = false;
+            if (exportButtonM5) exportButtonM5.disabled = false;
         }
     }, 50);
 }
@@ -321,7 +322,7 @@ export function initMode5(CP) {
     exportButtonM5 = document.getElementById('export-button-5');
     chartDivM5 = document.getElementById('chart-m5');
     fluidSelectM5 = document.getElementById('fluid_m5');
-    
+
     if (calcFormM5) {
         const select = document.getElementById('ai_eff_m5');
         if (select) {
@@ -333,7 +334,7 @@ export function initMode5(CP) {
             });
         }
         calcFormM5.addEventListener('submit', (e) => { e.preventDefault(); calculateMode5(CP); });
-        if(fluidSelectM5) {
+        if (fluidSelectM5) {
             fluidSelectM5.addEventListener('change', () => updateFluidInfo(fluidSelectM5, document.getElementById('fluid-info-m5'), CP));
         }
     }

@@ -262,7 +262,8 @@ async function calculateMode4(CP) {
                 t_out_final: t_out_final - 273.15,
                 power, m_flow, v_flow_in, 
                 is_desuperheat, m_water, t_water,
-                sec, latent_heat: latent
+                sec, 
+                latent_heat: latent / 1000.0 // <--- 修复: 除以 1000 转换为 kJ/kg
             };
 
             resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
