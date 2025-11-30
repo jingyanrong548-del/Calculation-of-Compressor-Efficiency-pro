@@ -321,6 +321,15 @@ export async function exportToExcel(data, filename) {
         if(data.heat_rejection_ratio) add("Heat Rejection Ratio", data.heat_rejection_ratio);
         if(data.dew_point) add("Dew Point", data.dew_point, 'temp');
 
+        // 添加空行分隔
+        rows.push(["", "", ""]);
+        rows.push(["", "", ""]);
+        
+        // 添加作者和免责声明
+        rows.push(["Created by", "荆炎荣 (Jing Yanrong)", ""]);
+        rows.push(["Disclaimer", "本计算结果仅供参考，不作为最终设计依据。", ""]);
+        rows.push(["", "Simulation results are for reference only.", ""]);
+
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }]; 
 

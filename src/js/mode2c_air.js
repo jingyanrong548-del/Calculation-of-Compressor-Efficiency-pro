@@ -7,9 +7,9 @@ import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml } from './u
 import { stageConfigMgr } from './stage_config.js';
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3, chartDivM3;
-let lastMode3Data = null; 
-let lastBatchData = null; 
-let baselineMode3 = null; 
+let lastMode3Data = null;
+let lastBatchData = null;
+let baselineMode3 = null;
 
 // --- Global Event Listeners ---
 document.addEventListener('unit-change', () => {
@@ -34,7 +34,7 @@ function generateAirDatasheet(d, base = null) {
     const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
         if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
-        
+
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -118,7 +118,7 @@ function generateAirDatasheet(d, base = null) {
                 <h3 class="text-xs font-bold text-gray-900 border-l-4 border-cyan-600 pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
                     ${rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure")}
-                    ${rowCmp("Standard Flow", d.v_flow_std * 3600, base?.v_flow_std ? base.v_flow_std*3600 : null, "std_flow")}
+                    ${rowCmp("Standard Flow", d.v_flow_std * 3600, base?.v_flow_std ? base.v_flow_std * 3600 : null, "std_flow")}
                     ${rowCmp("Specific Power", d.spec_power, base?.spec_power, "spec_power", true)}
                     ${coolingRow}
                     ${d.q_intercool > 0 ? rowCmp("Intercool Heat", d.q_intercool, base?.q_intercool, "power") : ''}
@@ -127,17 +127,26 @@ function generateAirDatasheet(d, base = null) {
             </div>
         </div>
 
-        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
+<div class="mt-8 pt-4 border-t border-gray-100 text-center">
+            <div class="flex flex-col items-center justify-center space-y-1">
+                <p class="text-xs font-bold text-gray-600">
+                    <span class="opacity-75">Created by:</span> 荆炎荣 (Jing Yanrong)
+                </p>
+                <p class="text-[10px] text-gray-400 max-w-lg leading-tight">
+                    免责声明：本计算结果基于理论模型，仅供方案参考，不作为最终设备选型依据。<br>
+                    Disclaimer: Simulation results are for reference only. Please verify with official manufacturer data.
+                </p>
+                <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.52</p>
+            </div>
         </div>
-    </div>`;
+    </div>`; // 结束 return 字符串
 }
 
 function generateBatchTable(batchData) {
     const rows = batchData.map(d => `
         <tr class="hover:bg-cyan-50 border-b border-gray-100 last:border-0 transition-colors">
             <td class="py-3 px-3 text-center font-mono text-gray-600">${d.rpm}</td>
-            <td class="py-3 px-3 text-right font-bold text-cyan-700">${formatValue(d.v_flow*3600, 'flow_vol').replace(/<[^>]*>/g, '')}</td>
+            <td class="py-3 px-3 text-right font-bold text-cyan-700">${formatValue(d.v_flow * 3600, 'flow_vol').replace(/<[^>]*>/g, '')}</td>
             <td class="py-3 px-3 text-right font-mono text-gray-800">${formatValue(d.power, 'power').replace(/<[^>]*>/g, '')}</td>
             <td class="py-3 px-3 text-right font-mono text-gray-500 text-xs sm:text-sm">${formatValue(d.spec_power, 'spec_power').replace(/<[^>]*>/g, '')}</td>
             <td class="py-3 px-3 text-right font-mono text-blue-600">${formatValue(d.t_out, 'temp').replace(/<[^>]*>/g, '')}</td>
@@ -169,8 +178,8 @@ function generateBatchTable(batchData) {
 
 // --- Core Calculation Logic (Single Point) ---
 function calculateSinglePoint(CP, inputs, advConfig = null) {
-    const { 
-        p_in, t_in, rh_in, p_out, eff_is, eff_vol, 
+    const {
+        p_in, t_in, rh_in, p_out, eff_is, eff_vol,
         cooling_type, stages, enable_intercool,
         rpm, vol_disp,
         jacket_pct, t_target_inj, t_water_inj,
@@ -184,14 +193,14 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     let current_w = w_in;
 
     // Flow Rate Calculation (Using m_da = mass of dry air)
-    const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6); 
-    const v_flow_in = v_flow_th * eff_vol; 
-    const m_da = v_flow_in / v_da_in; 
+    const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6);
+    const v_flow_in = v_flow_th * eff_vol;
+    const m_da = v_flow_in / v_da_in;
 
     // [New] Standard Flow Calculation (Nm3/h @ 0°C, 1atm)
     // Density of Dry Air at STP (0°C, 101.325kPa) is approx 1.292 kg/m³
-    const rho_std = 1.292; 
-    const v_flow_std = m_da / rho_std; 
+    const rho_std = 1.292;
+    const v_flow_std = m_da / rho_std;
 
     let current_p = p_in;
     let total_work = 0;
@@ -201,7 +210,7 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     let cooling_desc = "Adiabatic";
 
     const useAdv = advConfig && Array.isArray(advConfig) && advConfig.length === stages;
-    const pr_stage_simple = Math.pow(p_out/p_in, 1.0/stages);
+    const pr_stage_simple = Math.pow(p_out / p_in, 1.0 / stages);
 
     for (let i = 0; i < stages; i++) {
         let next_p;
@@ -216,11 +225,11 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
         let work_real = (h_out_isen - current_h) / eff_is;
         let h_out_real = current_h + work_real;
         let t_out_adiabatic = CP.HAPropsSI('T', 'P', next_p, 'H', h_out_real, 'W', current_w);
-        
+
         if (cooling_type === 'jacket') {
             const q_rem = work_real * jacket_pct;
             h_out_real -= q_rem;
-            q_jacket += q_rem * m_da / 1000.0; 
+            q_jacket += q_rem * m_da / 1000.0;
             cooling_desc = "Jacket Cooling";
             t_out_adiabatic = CP.HAPropsSI('T', 'P', next_p, 'H', h_out_real, 'W', current_w);
         } else if (cooling_type === 'injection') {
@@ -231,7 +240,7 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
                 const h_f = CP.PropsSI('H', 'T', t_water_inj, 'Q', 0, 'Water');
                 const delta_h_water = h_g - h_f;
                 const m_w = dh_needed / delta_h_water;
-                m_inj += m_w * m_da; 
+                m_inj += m_w * m_da;
                 current_w += m_w;
                 h_out_real = h_out_real + m_w * h_f;
                 t_out_adiabatic = t_target_inj;
@@ -250,12 +259,12 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
             let p_next_in;
 
             if (useAdv) {
-                const conf = advConfig[i]; 
+                const conf = advConfig[i];
                 p_next_in = (conf.p_out - conf.dp_intercool) * 1e5;
                 if (conf.t_intercool_out !== null && !isNaN(conf.t_intercool_out)) {
                     t_next_in = conf.t_intercool_out + 273.15;
                 } else {
-                    t_next_in = final_t; 
+                    t_next_in = final_t;
                 }
                 const h_next_in = CP.HAPropsSI('H', 'T', t_next_in, 'P', p_next_in, 'W', current_w);
                 q_intercool_total += (current_h - h_next_in) * m_da / 1000.0;
@@ -265,7 +274,7 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
             } else {
                 if (enable_intercool) {
                     t_next_in = t_in;
-                    p_next_in = current_p; 
+                    p_next_in = current_p;
                     const h_next_in = CP.HAPropsSI('H', 'T', t_next_in, 'P', p_next_in, 'W', current_w);
                     q_intercool_total += (current_h - h_next_in) * m_da / 1000.0;
                     current_h = h_next_in;
@@ -290,27 +299,27 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
         q_aftercool = (current_h - enthalpy_leaving_streams) * m_da / 1000.0;
     }
 
-    const power_shaft = (total_work * m_da) / 1000.0; 
-    const spec_power = power_shaft / (v_flow_in * 60); 
+    const power_shaft = (total_work * m_da) / 1000.0;
+    const spec_power = power_shaft / (v_flow_in * 60);
 
     // [New] Dew Point Calculation
     let dew_point = -999;
     try {
         dew_point = CP.HAPropsSI('T_dp', 'P', current_p, 'W', current_w, 'T', final_t) - 273.15;
-    } catch(e) {
+    } catch (e) {
         console.warn("Dew point calc failed", e);
     }
 
     return {
         date: new Date().toLocaleDateString(),
-        p_in: p_in/1e5, t_in: t_in-273.15, rh_in_display: rh_in*100, humidity_ratio: w_in,
-        p_out: p_out/1e5, t_out: final_t-273.15, dew_point,
+        p_in: p_in / 1e5, t_in: t_in - 273.15, rh_in_display: rh_in * 100, humidity_ratio: w_in,
+        p_out: p_out / 1e5, t_out: final_t - 273.15, dew_point,
         rpm, m_da, v_flow: v_flow_in, v_flow_std, // Export standard flow
         power: power_shaft, spec_power,
         eff_is, eff_vol, stages, intercool: enable_intercool, cooling_desc,
         cooling_info: { m_inj: m_inj * m_da },
         q_jacket, q_aftercool, m_condensate, q_intercool: q_intercool_total,
-        is_advanced: useAdv 
+        is_advanced: useAdv
     };
 }
 
@@ -322,7 +331,7 @@ async function calculateMode3(CP) {
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM3);
-            
+
             const commonParams = {
                 p_in: parseFloat(fd.get('p_in_m3')) * 1e5,
                 t_in: parseFloat(fd.get('T_in_m3')) + 273.15,
@@ -333,7 +342,7 @@ async function calculateMode3(CP) {
                 cooling_type: fd.get('cooling_type_m3'),
                 stages: parseInt(fd.get('stages_m3') || 1),
                 enable_intercool: document.getElementById('enable_intercool_m3').checked,
-                jacket_pct: parseFloat(fd.get('jacket_heat_percent_m3') || 15)/100,
+                jacket_pct: parseFloat(fd.get('jacket_heat_percent_m3') || 15) / 100,
                 t_target_inj: parseFloat(fd.get('target_t_out_m3')) + 273.15,
                 t_water_inj: parseFloat(fd.get('T_inject_water_m3')) + 273.15,
                 enable_ac: fd.get('enable_cooler_calc_m3') === 'on',
@@ -356,7 +365,7 @@ async function calculateMode3(CP) {
                     // Theoretical Volume Flow Mode
                     const v_flow_th_target = parseFloat(fd.get('vol_flow_m3')) / 3600.0;
                     const v_disp_ref = 1000; // cm3
-                    rpm = (v_flow_th_target / (v_disp_ref/1e6)) * 60;
+                    rpm = (v_flow_th_target / (v_disp_ref / 1e6)) * 60;
                     vol_disp = v_disp_ref;
                 } else {
                     // Mass Mode fallback (simplified for now)
@@ -365,41 +374,45 @@ async function calculateMode3(CP) {
                 }
 
                 lastMode3Data = calculateSinglePoint(CP, { ...commonParams, rpm, vol_disp }, advConfig);
-                lastBatchData = null; 
+                lastBatchData = null;
 
                 resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data, baselineMode3);
-                if(chartDivM3) chartDivM3.classList.add('hidden'); 
+                if (chartDivM3) chartDivM3.classList.add('hidden');
             } else {
                 // --- Batch Run ---
                 const rpmStart = parseFloat(fd.get('rpm_start_m3'));
                 const rpmEnd = parseFloat(fd.get('rpm_end_m3'));
                 const rpmStep = parseFloat(fd.get('rpm_step_m3'));
                 const volDisp = parseFloat(fd.get('vol_disp_m3_batch'));
-                
+
                 const batchResults = [];
                 for (let r = rpmStart; r <= rpmEnd; r += rpmStep) {
                     const res = calculateSinglePoint(CP, { ...commonParams, rpm: r, vol_disp: volDisp }, advConfig);
                     batchResults.push(res);
                 }
-                
+
                 lastBatchData = batchResults;
                 lastMode3Data = null;
 
                 resultsDivM3.innerHTML = generateBatchTable(batchResults);
-                
-                if(chartDivM3) {
+
+                if (chartDivM3) {
                     chartDivM3.classList.remove('hidden');
                     drawPerformanceMap('chart-m3', batchResults);
                 }
             }
 
-            calcButtonM3.disabled = false; calcButtonM3.textContent = "计算空压机";
-            printButtonM3.disabled = false; exportButtonM3.disabled = false;
+            // 【确认此处】: 必须包含以下三行解锁逻辑
+            calcButtonM3.disabled = false;
+            calcButtonM3.textContent = "计算空压机";
+            if (printButtonM3) printButtonM3.disabled = false;  // <--- 修复点
+            if (exportButtonM3) exportButtonM3.disabled = false; // <--- 修复点
 
         } catch (err) {
             console.error(err);
             resultsDivM3.textContent = "Error: " + err.message;
             calcButtonM3.disabled = false;
+            // 出错时不解锁导出按钮，防止导出空数据
         }
     }, 10);
 }
@@ -411,7 +424,7 @@ export function initMode3(CP) {
     printButtonM3 = document.getElementById('print-button-3');
     exportButtonM3 = document.getElementById('export-button-3');
     chartDivM3 = document.getElementById('chart-m3');
-    
+
     if (calcFormM3) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });
     }

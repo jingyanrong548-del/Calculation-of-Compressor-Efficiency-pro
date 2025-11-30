@@ -145,11 +145,20 @@ function generateMVRDatasheet(d, base = null) {
             </div>
         </div>
 
-        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
+<div class="mt-8 pt-4 border-t border-gray-100 text-center">
+            <div class="flex flex-col items-center justify-center space-y-1">
+                <p class="text-xs font-bold text-gray-600">
+                    <span class="opacity-75">Created by:</span> 荆炎荣 (Jing Yanrong)
+                </p>
+                <p class="text-[10px] text-gray-400 max-w-lg leading-tight">
+                    免责声明：本计算结果基于理论模型，仅供方案参考，不作为最终设备选型依据。<br>
+                    Disclaimer: Simulation results are for reference only. Please verify with official manufacturer data.
+                </p>
+                <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.52</p>
+            </div>
         </div>
     </div>
-    `;
+    `; // 结束 return 字符串
 }
 
 // --- Helper: Flow Calculation ---

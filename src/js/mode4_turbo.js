@@ -155,10 +155,19 @@ function generateTurboDatasheet(d, base = null) {
             </div>
         </div>
 
-        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-            <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.45</p>
+<div class="mt-8 pt-4 border-t border-gray-100 text-center">
+            <div class="flex flex-col items-center justify-center space-y-1">
+                <p class="text-xs font-bold text-gray-600">
+                    <span class="opacity-75">Created by:</span> 荆炎荣 (Jing Yanrong)
+                </p>
+                <p class="text-[10px] text-gray-400 max-w-lg leading-tight">
+                    免责声明：本计算结果基于理论模型，仅供方案参考，不作为最终设备选型依据。<br>
+                    Disclaimer: Simulation results are for reference only. Please verify with official manufacturer data.
+                </p>
+                <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.52</p>
+            </div>
         </div>
-    </div>`;
+    </div>`; // 结束 return 字符串
 }
 
 // --- Helper: Flow Calculation ---
@@ -279,18 +288,18 @@ async function calculateMode5(CP) {
             ];
             if (m_water > 0) points.push({ name: 'Fin', desc: 'Cooled', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
 
-           lastMode5Data = {
+            lastMode5Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in/1e5, 
+                fluid, p_in: p_in / 1e5,
                 t_sat_in: t_sat_in - 273.15,
                 sh_in,
                 m_flow, v_flow_in, dt, eff_poly,
-                p_out: p_out/1e5, power, cop,
+                p_out: p_out / 1e5, power, cop,
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
                 dt_sat: dt, stages,
                 is_desuperheat, m_water, t_water,
-                sec, 
+                sec,
                 latent_heat: latent / 1000.0, // <--- 修复: 除以 1000 转换为 kJ/kg
                 z_in: stateIn.z, sound_speed_in: stateIn.a
             };

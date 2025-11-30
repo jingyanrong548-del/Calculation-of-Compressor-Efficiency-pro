@@ -74,7 +74,7 @@ function calculateIHX(CP, fluid, p_low, h_1a, t_1a, p_high, h_3a, t_3a, effectiv
             h_1b, t_1b, s_1b,
             h_3b, t_3b,
             dh: dh_actual,
-            q_ihx: 0, 
+            q_ihx: 0,
             t_1b_display: t_1b - 273.15,
             t_3b_display: t_3b - 273.15
         };
@@ -112,15 +112,15 @@ function getFlowRate(formData, modeSuffix, density_in, overrideVolEff = null) {
     const mode = formData.get(`flow_mode_${modeSuffix}`);
     let m_flow = 0, v_flow_in = 0;
 
-    const vol_eff_val = overrideVolEff !== null 
-        ? overrideVolEff 
+    const vol_eff_val = overrideVolEff !== null
+        ? overrideVolEff
         : parseFloat(formData.get(`vol_eff_${modeSuffix}`) || '100') / 100.0;
 
     if (mode === 'rpm') {
         const rpm = parseFloat(formData.get(`rpm_${modeSuffix}`));
-        const vol_disp = parseFloat(formData.get(`vol_disp_${modeSuffix}`)) / 1e6; 
+        const vol_disp = parseFloat(formData.get(`vol_disp_${modeSuffix}`)) / 1e6;
         const v_flow_th = (rpm / 60.0) * vol_disp;
-        v_flow_in = v_flow_th * vol_eff_val; 
+        v_flow_in = v_flow_th * vol_eff_val;
         m_flow = v_flow_in * density_in;
     } else if (mode === 'mass') {
         m_flow = parseFloat(formData.get(`mass_flow_${modeSuffix}`));
@@ -149,13 +149,13 @@ function runCO2OptimizationSweep(CP, params) {
             const h_out_is = CP.PropsSI('H', 'P', p_curr, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
             const pr = p_curr / p_in;
-            let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0/n_index) - 1.0));
+            let eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0 / n_index) - 1.0));
             eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
             const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6);
             const m_flow_calc = v_flow_th * eff_vol * density_in;
             const h_gc_out = CP.PropsSI('H', 'T', t_gc_out_k, 'P', p_curr, fluid);
-            const q_evap = m_flow_calc * (h_in - h_gc_out) / 1000.0; 
-            const power = w_real * m_flow_calc / 1000.0; 
+            const q_evap = m_flow_calc * (h_in - h_gc_out) / 1000.0;
+            const power = w_real * m_flow_calc / 1000.0;
             const cop = q_evap / power;
             results.push({ p: p_curr / 1e5, cop: cop });
             if (cop > bestCOP) { bestCOP = cop; bestP = p_curr / 1e5; }
@@ -172,10 +172,10 @@ function generateDatasheetHTML(d, title, base = null) {
         const themeBorder = (d.fluid && d.fluid.includes('R744')) ? "border-orange-200" : "border-gray-200";
         const isGas = title.includes("GAS");
         const isCO2Trans = d.fluid === 'R744' && d.cycle_type === 'Transcritical';
-        
+
         const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
             let formatted = formatValue(valSI, type);
-            if(suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
+            if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
             const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
             return `
             <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -190,14 +190,14 @@ function generateDatasheetHTML(d, title, base = null) {
         let highSideContent = "";
         if (d.cycle_type === 'Subcritical') {
             highSideContent = rowCmp("Condensing Temp", d.t_cond, base?.t_cond, "temp") +
-                              rowCmp("Cond SC (Static)", d.static_sc, base?.static_sc, "delta_temp") +
-                              rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure");
+                rowCmp("Cond SC (Static)", d.static_sc, base?.static_sc, "delta_temp") +
+                rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure");
         } else if (d.cycle_type === 'Transcritical') {
             highSideContent = rowCmp("Gas Cooler Press", d.p_out, base?.p_out, "pressure") +
-                              rowCmp("Gas Cooler Exit", d.t_gc_out, base?.t_gc_out, "temp");
+                rowCmp("Gas Cooler Exit", d.t_gc_out, base?.t_gc_out, "temp");
         } else {
             highSideContent = rowCmp("Discharge Press", d.p_out, base?.p_out, "pressure") +
-                              rowCmp("Pressure Ratio", d.pr, base?.pr, null);
+                rowCmp("Pressure Ratio", d.pr, base?.pr, null);
         }
 
         let ihxBlock = "";
@@ -206,7 +206,7 @@ function generateDatasheetHTML(d, title, base = null) {
             <div class="bg-indigo-50 rounded-lg p-3 border border-indigo-100 mb-6">
                 <div class="text-xs font-bold text-indigo-700 uppercase mb-2 flex justify-between items-center">
                     <span>Internal Heat Exchanger</span>
-                    <span class="bg-indigo-200 px-1.5 py-0.5 rounded text-[10px]">Eff: ${(d.ihx.eff*100).toFixed(0)}%</span>
+                    <span class="bg-indigo-200 px-1.5 py-0.5 rounded text-[10px]">Eff: ${(d.ihx.eff * 100).toFixed(0)}%</span>
                 </div>
                 ${rowCmp("IHX Load", d.ihx.q_ihx, base?.ihx?.q_ihx, "power")}
                 
@@ -269,7 +269,7 @@ function generateDatasheetHTML(d, title, base = null) {
         let extraParams = '';
         if (d.vcc) extraParams += rowCmp("VCC (Vol. Cap)", d.vcc, base?.vcc, 'vcc');
         if (d.heat_rejection_ratio) extraParams += rowCmp("Heat Rejection Ratio", d.heat_rejection_ratio, base?.heat_rejection_ratio, null);
-        if (d.flash_gas) extraParams += rowCmp("Flash Gas Quality", d.flash_gas * 100, base?.flash_gas ? base.flash_gas*100 : null, null, false, '%');
+        if (d.flash_gas) extraParams += rowCmp("Flash Gas Quality", d.flash_gas * 100, base?.flash_gas ? base.flash_gas * 100 : null, null, false, '%');
 
         const realGasBlock = `
         <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
@@ -332,7 +332,7 @@ function generateDatasheetHTML(d, title, base = null) {
                 <div>
                     <h3 class="text-xs font-bold text-gray-900 border-l-4 ${themeColor.split(' ')[0]} pl-3 mb-4 uppercase tracking-wide">Performance</h3>
                     <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        ${rowCmp("Vol Flow (Act)", d.v_flow * 3600, base?.v_flow ? base.v_flow*3600 : null, "flow_vol")}
+                        ${rowCmp("Vol Flow (Act)", d.v_flow * 3600, base?.v_flow ? base.v_flow * 3600 : null, "flow_vol")}
                         ${d.q_evap ? rowCmp("Cooling Capacity", d.q_evap, base?.q_evap, "power") : ''}
                         ${d.q_cond ? rowCmp("Heating Capacity", d.q_cond, base?.q_cond, "power") : ''}
                         ${extraParams}
@@ -341,10 +341,19 @@ function generateDatasheetHTML(d, title, base = null) {
                 </div>
             </div>
 
-            <div class="mt-8 pt-4 border-t border-gray-100 text-center">
-                <p class="text-[10px] text-gray-400">Calculation of Compressor Efficiency Pro v8.51</p>
+<div class="mt-8 pt-4 border-t border-gray-100 text-center">
+                <div class="flex flex-col items-center justify-center space-y-1">
+                    <p class="text-xs font-bold text-gray-600">
+                        <span class="opacity-75">Created by:</span> 荆炎荣 (Jing Yanrong)
+                    </p>
+                    <p class="text-[10px] text-gray-400 max-w-lg leading-tight">
+                        免责声明：本计算结果基于理论模型，仅供方案参考，不作为最终设备选型依据。<br>
+                        Disclaimer: Simulation results are for reference only. Please verify with official manufacturer data.
+                    </p>
+                    <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.52</p>
+                </div>
             </div>
-        </div>`;
+        </div>`; // 结束 return 字符串
     } catch (e) {
         return `<div class="p-4 bg-red-50 text-red-600 rounded border border-red-200 text-center">Error: ${e.message}</div>`;
     }
@@ -353,25 +362,25 @@ function generateDatasheetHTML(d, title, base = null) {
 // --- Calculation: Mode 1 (CO2) ---
 async function calculateMode1_CO2(CP) {
     if (!CP) return;
-    calcButtonM1_CO2.disabled = true; 
+    calcButtonM1_CO2.disabled = true;
     calcButtonM1_CO2.textContent = "计算中...";
 
     setTimeout(() => {
         try {
             const fd = new FormData(calcFormM1_CO2);
-            const fluid = "R744"; 
+            const fluid = "R744";
             const cycleType = document.querySelector('input[name="cycle_type_m1_co2"]:checked')?.value || 'transcritical';
-            
+
             const t_evap = parseFloat(fd.get('T_evap_m1_co2'));
             const sh = parseFloat(fd.get('SH_m1_co2'));
             const p_in = CP.PropsSI('P', 'T', t_evap + 273.15, 'Q', 1, fluid);
-            
+
             const state1a = getFluidState(CP, fluid, p_in, t_evap + 273.15, sh);
 
             let p_out, t_out_point3a_k, h_point3a;
             let report_vals = {};
             let t_gc_out = null, t_cond = null, sc = null, total_sc = null;
-            
+
             const getVal = (name, def) => { const el = document.querySelector(`[name="${name}"]`); return el ? (parseFloat(el.value) || def) : def; };
             const eff_isen_peak = getVal('eff_isen_peak_m1_co2', 0.7);
             const clearance = getVal('clearance_m1_co2', 0.05);
@@ -384,7 +393,7 @@ async function calculateMode1_CO2(CP) {
             if (cycleType === 'transcritical') {
                 const p_high = parseFloat(fd.get('p_high_m1_co2')) * 1e5;
                 if (!p_high || p_high < 30e5) throw new Error("High Side Pressure too low.");
-                
+
                 t_gc_out = parseFloat(fd.get('T_gc_out_m1_co2'));
                 p_out = p_high;
                 t_out_point3a_k = t_gc_out + 273.15;
@@ -392,7 +401,7 @@ async function calculateMode1_CO2(CP) {
                 report_vals = { t_gc_out };
 
                 optimizationResults = runCO2OptimizationSweep(CP, {
-                    h_in: state1a.h, s_in: state1a.s, t_gc_out, eff_isen: eff_isen_peak, 
+                    h_in: state1a.h, s_in: state1a.s, t_gc_out, eff_isen: eff_isen_peak,
                     clearance, n_index,
                     rpm, vol_disp, density_in: state1a.d, p_in
                 });
@@ -406,7 +415,7 @@ async function calculateMode1_CO2(CP) {
                 } catch (e) { throw new Error(`Condensing Temp ${t_cond}°C too high for Subcritical`); }
                 t_out_point3a_k = t_cond_k - sc;
                 h_point3a = CP.PropsSI('H', 'P', p_out, 'T', t_out_point3a_k, fluid);
-                report_vals = { t_cond, static_sc: sc }; 
+                report_vals = { t_cond, static_sc: sc };
                 total_sc = sc;
             }
 
@@ -421,7 +430,7 @@ async function calculateMode1_CO2(CP) {
                 eff_vol = parseFloat(fd.get('vol_eff_m1_co2')) / 100.0;
             } else {
                 eff_isen = eff_isen_peak;
-                eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0/n_index) - 1.0));
+                eff_vol = 0.98 * (1.0 - clearance * (Math.pow(pr, 1.0 / n_index) - 1.0));
                 eff_vol = Math.max(0.1, Math.min(0.99, eff_vol));
             }
 
@@ -437,15 +446,15 @@ async function calculateMode1_CO2(CP) {
                 const ihxVal = document.querySelector('input[name="ihx_eff_m1_co2"]');
                 const ihx_eff = ihxVal ? (parseFloat(ihxVal.value) / 100.0) : 0.6;
                 ihxResult = calculateIHX(CP, fluid, p_in, state1a.h, state1a.t, p_out, h_point3a, t_out_point3a_k, ihx_eff);
-                
+
                 if (ihxResult && ihxResult.enabled) {
                     compInlet.h = ihxResult.h_1b; compInlet.t = ihxResult.t_1b; compInlet.s = ihxResult.s_1b;
                     valveInlet.h = ihxResult.h_3b; valveInlet.t = ihxResult.t_3b;
                     const d_1b = CP.PropsSI('D', 'P', p_in, 'H', compInlet.h, fluid);
-                    const flowRes = getFlowRate(fd, 'm1_co2', d_1b, eff_vol); 
+                    const flowRes = getFlowRate(fd, 'm1_co2', d_1b, eff_vol);
                     m_flow = flowRes.m_flow; v_flow_in = flowRes.v_flow_in;
                     ihxResult.q_ihx = ihxResult.dh * m_flow / 1000.0;
-                    
+
                     if (cycleType === 'subcritical') {
                         const t_sat_cond = CP.PropsSI('T', 'P', p_out, 'Q', 0, fluid);
                         total_sc = t_sat_cond - valveInlet.t;
@@ -458,24 +467,24 @@ async function calculateMode1_CO2(CP) {
             const w_real = (h_out_is - compInlet.h) / eff_isen;
             const h_out = compInlet.h + w_real;
             const t_out_k = CP.PropsSI('T', 'P', p_out, 'H', h_out, fluid);
-            
+
             const power = w_real * m_flow / 1000.0;
             const q_evap = (state1a.h - valveInlet.h) * m_flow / 1000.0;
             const q_cond = (h_out - h_point3a) * m_flow / 1000.0;
             const flash_gas = CP.PropsSI('Q', 'P', p_in, 'H', valveInlet.h, fluid);
-            const vcc = (state1a.h - valveInlet.h) * state1a.d; 
+            const vcc = (state1a.h - valveInlet.h) * state1a.d;
 
-            const t_sat_out_k = cycleType === 'subcritical' ? CP.PropsSI('T','P',p_out,'Q',1,fluid) : 0;
+            const t_sat_out_k = cycleType === 'subcritical' ? CP.PropsSI('T', 'P', p_out, 'Q', 1, fluid) : 0;
             const sh_out = cycleType === 'subcritical' ? (t_out_k - t_sat_out_k) : 0;
-            
+
             const z_out = CP.PropsSI('Z', 'P', p_out, 'H', h_out, fluid);
             const gamma_out = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_out, 'H', h_out, fluid);
 
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
                 cycle_type: cycleType === 'transcritical' ? 'Transcritical' : 'Subcritical',
-                p_in: p_in/1e5, t_in: state1a.t - 273.15,
-                p_out: p_out/1e5, t_out: t_out_k - 273.15, sh_out,
+                p_in: p_in / 1e5, t_in: state1a.t - 273.15,
+                p_out: p_out / 1e5, t_out: t_out_k - 273.15, sh_out,
                 pr: pr, ...report_vals,
                 t_sat_evap: t_evap,
                 static_sh: sh,
@@ -483,10 +492,10 @@ async function calculateMode1_CO2(CP) {
                 total_sc: total_sc,
                 z_in: state1a.z, gamma_in: state1a.k, d_in: state1a.d, sound_speed_in: state1a.a,
                 z_out, gamma_out,
-                m_flow, v_flow: v_flow_in, power, 
+                m_flow, v_flow: v_flow_in, power,
                 q_evap, q_cond,
-                cop_c: q_evap/power, cop_h: q_cond/power,
-                heat_rejection_ratio: q_cond/q_evap, vcc, flash_gas,
+                cop_c: q_evap / power, cop_h: q_cond / power,
+                heat_rejection_ratio: q_cond / q_evap, vcc, flash_gas,
                 eff_isen, eff_vol: eff_vol, eff_note: `AI-CO2 (${cycleType})`,
                 ihx: ihxResult,
                 opt_curve_data: optimizationResults ? optimizationResults.data : null,
@@ -498,10 +507,10 @@ async function calculateMode1_CO2(CP) {
             if (optimizationResults && optimizationResults.bestP > 0) {
                 const btnOpt = document.getElementById('btn-show-opt-curve');
                 const btnPh = document.getElementById('btn-show-ph-chart');
-                if(btnOpt && btnPh) {
+                if (btnOpt && btnPh) {
                     btnOpt.onclick = () => {
                         console.log("Opt Curve Clicked"); // Debug
-                        drawOptimizationCurve('chart-m1', optimizationResults.data, p_out/1e5);
+                        drawOptimizationCurve('chart-m1', optimizationResults.data, p_out / 1e5);
                         btnOpt.style.display = 'none';
                         btnPh.style.display = 'block';
                     };
@@ -513,33 +522,44 @@ async function calculateMode1_CO2(CP) {
                 }
             }
 
-            if(chartDivM1) { chartDivM1.classList.remove('hidden'); drawPh(); }
+            if (chartDivM1) { chartDivM1.classList.remove('hidden'); drawPh(); }
 
             function drawPh() {
-                const h_4 = h_point3a; 
+                const h_4 = h_point3a;
                 let points = [];
-                if(ihxResult && ihxResult.enabled) {
+                if (ihxResult && ihxResult.enabled) {
                     points = [
                         { name: '1a', desc: 'EvapOut', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
                         { name: '1b', desc: 'CmpIn', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
-                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S','P',p_out,'H',h_out,fluid) },
-                        { name: '3a', desc: 'GCOut', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S','P',p_out,'H',h_point3a,fluid) },
-                        { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S','P',p_out,'H',valveInlet.h,fluid) },
-                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T','P',p_in,'H',valveInlet.h,fluid), h: valveInlet.h, s: CP.PropsSI('S','P',p_in,'H',valveInlet.h,fluid) }
+                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                        { name: '3a', desc: 'GCOut', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                        { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
+                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
                     ];
                 } else {
                     points = [
                         { name: '1', desc: 'Suc', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S','P',p_out,'H',h_out,fluid) },
-                        { name: '3', desc: 'Out', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S','P',p_out,'H',h_point3a,fluid) },
-                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T','P',p_in,'H',h_point3a,fluid), h: h_point3a, s: CP.PropsSI('S','P',p_in,'H',h_point3a,fluid) }
+                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                        { name: '3', desc: 'Out', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
                     ];
                 }
                 drawPhDiagram(CP, fluid, { points }, 'chart-m1');
             }
 
-        } catch (e) { resultsDivM1.innerHTML = `<div class="p-4 text-red-600">Error: ${e.message}</div>`; }
-        finally { calcButtonM1_CO2.disabled = false; calcButtonM1_CO2.textContent = "🔥 计算 CO2 (R744) 循环"; }
+            if (chartDivM1) { chartDivM1.classList.remove('hidden'); drawPh(); }
+
+            // 【新增修复】: 解锁打印和导出按钮
+            if (printButtonM1) printButtonM1.disabled = false;
+            if (exportButtonM1) exportButtonM1.disabled = false;
+
+        } catch (e) {
+            resultsDivM1.innerHTML = `<div class="p-4 text-red-600">Error: ${e.message}</div>`;
+        }
+        finally {
+            calcButtonM1_CO2.disabled = false;
+            calcButtonM1_CO2.textContent = "🔥 计算 CO2 (R744) 循环";
+        }
     }, 50);
 }
 
@@ -554,19 +574,19 @@ async function calculateMode1(CP) {
 
             const t_evap = parseFloat(fd.get('T_evap_m1'));
             const sh = parseFloat(fd.get('SH_m1'));
-            const p_in = CP.PropsSI('P','T', t_evap+273.15, 'Q', 1, fluid);
-            const vol_eff = parseFloat(fd.get('vol_eff_m1'))/100;
-            
+            const p_in = CP.PropsSI('P', 'T', t_evap + 273.15, 'Q', 1, fluid);
+            const vol_eff = parseFloat(fd.get('vol_eff_m1')) / 100;
+
             // [FIX] Naming state1a
             const state1a = getFluidState(CP, fluid, p_in, t_evap + 273.15, sh);
-            
+
             const t_cond = parseFloat(fd.get('T_cond_m1'));
             const sc = parseFloat(fd.get('SC_m1'));
-            const eff_isen = parseFloat(fd.get('eff_isen_m1'))/100;
-            const p_out = CP.PropsSI('P','T', t_cond+273.15, 'Q', 1, fluid);
-            
+            const eff_isen = parseFloat(fd.get('eff_isen_m1')) / 100;
+            const p_out = CP.PropsSI('P', 'T', t_cond + 273.15, 'Q', 1, fluid);
+
             const t_liq_k = t_cond + 273.15 - sc;
-            const h_point3a = CP.PropsSI('H','P', p_out, 'T', t_liq_k, fluid);
+            const h_point3a = CP.PropsSI('H', 'P', p_out, 'T', t_liq_k, fluid);
 
             // IHX Calculation
             let compInlet = { h: state1a.h, s: state1a.s, t: state1a.t };
@@ -575,7 +595,7 @@ async function calculateMode1(CP) {
             const ihxEl = document.getElementById('enable_ihx_m1');
             const enable_ihx = ihxEl ? ihxEl.checked : false;
             let ihxResult = null;
-            let total_sc = sc; 
+            let total_sc = sc;
 
             let { m_flow, v_flow_in } = getFlowRate(fd, 'm1', state1a.d, vol_eff);
 
@@ -583,30 +603,30 @@ async function calculateMode1(CP) {
                 const ihxVal = document.querySelector('input[name="ihx_eff_m1"]');
                 const ihx_eff = ihxVal ? (parseFloat(ihxVal.value) / 100.0) : 0.6;
                 ihxResult = calculateIHX(CP, fluid, p_in, state1a.h, state1a.t, p_out, h_point3a, t_liq_k, ihx_eff);
-                
+
                 if (ihxResult && ihxResult.enabled) {
                     compInlet.h = ihxResult.h_1b; compInlet.t = ihxResult.t_1b; compInlet.s = ihxResult.s_1b;
                     valveInlet.h = ihxResult.h_3b; valveInlet.t = ihxResult.t_3b;
                     const d_1b = CP.PropsSI('D', 'P', p_in, 'H', compInlet.h, fluid);
-                    const flowRes = getFlowRate(fd, 'm1', d_1b, vol_eff); 
+                    const flowRes = getFlowRate(fd, 'm1', d_1b, vol_eff);
                     m_flow = flowRes.m_flow; v_flow_in = flowRes.v_flow_in;
                     ihxResult.q_ihx = ihxResult.dh * m_flow / 1000.0;
-                    
+
                     const t_sat_cond = CP.PropsSI('T', 'P', p_out, 'Q', 0, fluid);
                     total_sc = t_sat_cond - valveInlet.t;
                 }
             }
-            
-            const h_out_is = CP.PropsSI('H','P', p_out, 'S', compInlet.s, fluid);
+
+            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', compInlet.s, fluid);
             const w_real = (h_out_is - compInlet.h) / eff_isen;
             const h_out = compInlet.h + w_real;
-            const t_out_k = CP.PropsSI('T','P', p_out, 'H', h_out, fluid);
-            
-            const q_evap = (state1a.h - valveInlet.h) * m_flow / 1000.0; 
-            const q_cond = (h_out - h_point3a) * m_flow / 1000.0; 
+            const t_out_k = CP.PropsSI('T', 'P', p_out, 'H', h_out, fluid);
+
+            const q_evap = (state1a.h - valveInlet.h) * m_flow / 1000.0;
+            const q_cond = (h_out - h_point3a) * m_flow / 1000.0;
             const power = w_real * m_flow / 1000.0;
 
-            const t_sat_out_k = CP.PropsSI('T','P',p_out,'Q',1,fluid);
+            const t_sat_out_k = CP.PropsSI('T', 'P', p_out, 'Q', 1, fluid);
             const sh_out = t_out_k - t_sat_out_k;
 
             const vcc = (state1a.h - valveInlet.h) * state1a.d;
@@ -617,7 +637,7 @@ async function calculateMode1(CP) {
 
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in/1e5, t_in: state1a.t-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
+                p_in: p_in / 1e5, t_in: state1a.t - 273.15, p_out: p_out / 1e5, t_out: t_out_k - 273.15,
                 sh_out,
                 t_cond,
                 static_sc: sc,
@@ -625,40 +645,47 @@ async function calculateMode1(CP) {
                 t_sat_evap: t_evap,
                 static_sh: sh,
                 total_sh: compInlet.t - (t_evap + 273.15),
-                m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
-                cop_c: q_evap/power, cop_h: q_cond/power,
-                heat_rejection_ratio: q_cond/q_evap, vcc, flash_gas,
+                m_flow, v_flow: v_flow_in, power, q_evap, q_cond,
+                cop_c: q_evap / power, cop_h: q_cond / power,
+                heat_rejection_ratio: q_cond / q_evap, vcc, flash_gas,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
                 z_in: state1a.z, gamma_in: state1a.k, d_in: state1a.d, sound_speed_in: state1a.a,
-                z_out, gamma_out, pr: p_out/p_in,
+                z_out, gamma_out, pr: p_out / p_in,
                 ihx: ihxResult
             };
 
             resultsDivM1.innerHTML = generateDatasheetHTML(lastMode1Data, "STANDARD HEAT PUMP REPORT", baselineMode1);
-            
+
             let points = [];
             if (ihxResult && ihxResult.enabled) {
                 points = [
                     { name: '1a', desc: 'EvapOut', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
                     { name: '1b', desc: 'CmpIn', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
-                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S','P',p_out,'H',h_out,fluid) },
-                    { name: '3a', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S','P',p_out,'H',h_point3a,fluid) },
-                    { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S','P',p_out,'H',valveInlet.h,fluid) },
-                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T','P',p_in,'H',valveInlet.h,fluid), h: valveInlet.h, s: CP.PropsSI('S','P',p_in,'H',valveInlet.h,fluid) }
+                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                    { name: '3a', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                    { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
+                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
                 ];
             } else {
                 points = [
                     { name: '1', desc: 'Suc', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S','P',p_out,'H',h_out,fluid) },
-                    { name: '3', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S','P',p_out,'H',h_point3a,fluid) },
-                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T','P',p_in,'H',h_point3a,fluid), h: h_point3a, s: CP.PropsSI('S','P',p_in,'H',h_point3a,fluid) }
+                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                    { name: '3', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
                 ];
             }
-            if(chartDivM1) { chartDivM1.classList.remove('hidden'); drawPhDiagram(CP, fluid, { points }, 'chart-m1'); }
+            if (chartDivM1) { chartDivM1.classList.remove('hidden'); drawPhDiagram(CP, fluid, { points }, 'chart-m1'); }
 
-        } catch (e) { resultsDivM1.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`; }
+            // 【新增修复】: 解锁打印和导出按钮
+            if (printButtonM1) printButtonM1.disabled = false;
+            if (exportButtonM1) exportButtonM1.disabled = false;
+
+        } catch (e) {
+            resultsDivM1.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+        }
         finally {
-            calcButtonM1.disabled = false; calcButtonM1.textContent = "计算常规热泵";
+            calcButtonM1.disabled = false;
+            calcButtonM1.textContent = "计算常规热泵";
         }
     }, 10);
 }
@@ -680,23 +707,23 @@ async function calculateMode2(CP) {
             const p_in = parseFloat(fd.get('p_in_m2')) * 1e5;
             const t_in = parseFloat(fd.get('T_in_m2')) + 273.15;
             const p_out = parseFloat(fd.get('p_out_m2')) * 1e5;
-            const eff_isen = parseFloat(fd.get('eff_isen_m2'))/100;
-            const vol_eff = parseFloat(fd.get('vol_eff_m2'))/100;
-            
+            const eff_isen = parseFloat(fd.get('eff_isen_m2')) / 100;
+            const vol_eff = parseFloat(fd.get('vol_eff_m2')) / 100;
+
             const z_in = CP.PropsSI('Z', 'P', p_in, 'T', t_in, fluid);
             const gamma_in = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_in, 'T', t_in, fluid);
-            const d_in = CP.PropsSI('D','P', p_in, 'T', t_in, fluid);
+            const d_in = CP.PropsSI('D', 'P', p_in, 'T', t_in, fluid);
             const a_in = CP.PropsSI('A', 'P', p_in, 'T', t_in, fluid);
-            
+
             let { m_flow, v_flow_in } = getFlowRate(fd, 'm2', d_in, vol_eff);
-            const h_in = CP.PropsSI('H','P', p_in, 'T', t_in, fluid);
-            const s_in = CP.PropsSI('S','P', p_in, 'T', t_in, fluid);
-            const h_out_is = CP.PropsSI('H','P', p_out, 'S', s_in, fluid);
+            const h_in = CP.PropsSI('H', 'P', p_in, 'T', t_in, fluid);
+            const s_in = CP.PropsSI('S', 'P', p_in, 'T', t_in, fluid);
+            const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', s_in, fluid);
             const w_real = (h_out_is - h_in) / eff_isen;
             const h_out_adiabatic = h_in + w_real;
-            const t_out_adiabatic = CP.PropsSI('T','P', p_out, 'H', h_out_adiabatic, fluid);
+            const t_out_adiabatic = CP.PropsSI('T', 'P', p_out, 'H', h_out_adiabatic, fluid);
             const power = w_real * m_flow / 1000.0;
-            
+
             const z_out = CP.PropsSI('Z', 'P', p_out, 'T', t_out_adiabatic, fluid);
             const gamma_out = CP.PropsSI('isentropic_expansion_coefficient', 'P', p_out, 'T', t_out_adiabatic, fluid);
 
@@ -706,7 +733,7 @@ async function calculateMode2(CP) {
             let q_loss = 0;
             if (cooling_mode === 'target_t') {
                 const t_target = parseFloat(fd.get('target_t_out_m2')) + 273.15;
-                if(t_target < t_out_adiabatic) {
+                if (t_target < t_out_adiabatic) {
                     t_out_final = t_target;
                     const h_cooled = CP.PropsSI('H', 'P', p_out, 'T', t_target, fluid);
                     q_loss = m_flow * (h_out_adiabatic - h_cooled) / 1000.0;
@@ -714,28 +741,30 @@ async function calculateMode2(CP) {
             }
             lastMode2Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in/1e5, t_in: t_in-273.15, p_out: p_out/1e5, t_out: t_out_final-273.15, sh_out: 0,
+                p_in: p_in / 1e5, t_in: t_in - 273.15, p_out: p_out / 1e5, t_out: t_out_final - 273.15, sh_out: 0,
                 z_in, gamma_in, d_in, sound_speed_in: a_in, z_out, gamma_out,
-                m_flow, v_flow: v_flow_in, power, pr: p_out/p_in,
-                eff_isen, eff_vol: vol_eff, 
+                m_flow, v_flow: v_flow_in, power, pr: p_out / p_in,
+                eff_isen, eff_vol: vol_eff,
                 eff_note: "Standard",
                 cooling_info: { type: cooling_mode, t_raw: t_out_adiabatic - 273.15, q_loss }
             };
 
             resultsDivM2.innerHTML = generateDatasheetHTML(lastMode2Data, "GAS COMPRESSOR REPORT", baselineMode2);
-            if(chartDivM2) {
+            if (chartDivM2) {
                 chartDivM2.classList.remove('hidden');
-                drawPhDiagram(CP, fluid, { points: [
-                    { name: '1', desc: 'Suc', p: p_in, t: t_in, h: h_in, s: s_in },
-                    { name: '2', desc: 'Dis', p: p_out, t: t_out_final, h: CP.PropsSI('H','P',p_out,'T',t_out_final,fluid), s: CP.PropsSI('S','P',p_out,'T',t_out_final,fluid) }
-                ]}, 'chart-m2');
+                drawPhDiagram(CP, fluid, {
+                    points: [
+                        { name: '1', desc: 'Suc', p: p_in, t: t_in, h: h_in, s: s_in },
+                        { name: '2', desc: 'Dis', p: p_out, t: t_out_final, h: CP.PropsSI('H', 'P', p_out, 'T', t_out_final, fluid), s: CP.PropsSI('S', 'P', p_out, 'T', t_out_final, fluid) }
+                    ]
+                }, 'chart-m2');
             }
 
-        } catch(e) { resultsDivM2.textContent = "Error: " + e.message; } 
+        } catch (e) { resultsDivM2.textContent = "Error: " + e.message; }
         finally {
             calcButtonM2.disabled = false; calcButtonM2.textContent = "计算气体压缩";
-            if(printButtonM2) printButtonM2.disabled = false;
-            if(exportButtonM2) exportButtonM2.disabled = false;
+            if (printButtonM2) printButtonM2.disabled = false;
+            if (exportButtonM2) exportButtonM2.disabled = false;
         }
     }, 10);
 }
@@ -759,7 +788,7 @@ export function initMode1_2(CP) {
     btnOptP = document.getElementById('btn-opt-p-high');
 
     const fluidSelectM1 = document.getElementById('fluid_m1');
-    if(fluidSelectM1) {
+    if (fluidSelectM1) {
         fluidSelectM1.addEventListener('change', () => updateFluidInfo(fluidSelectM1, document.getElementById('fluid-info-m1'), CP));
     }
 
@@ -782,12 +811,12 @@ export function initMode1_2(CP) {
     if (exportButtonM2) exportButtonM2.onclick = () => { if (lastMode2Data) exportToExcel(lastMode2Data, "Mode2_Gas_Result"); };
 
     if (calcFormM1) calcFormM1.addEventListener('submit', (e) => { e.preventDefault(); calculateMode1(CP); });
-    
+
     if (calcFormM1_CO2) {
         calcFormM1_CO2.addEventListener('submit', (e) => { e.preventDefault(); calculateMode1_CO2(CP); });
-        
-        if(btnOptP) btnOptP.addEventListener('click', () => {
-            if(!CP_INSTANCE) return;
+
+        if (btnOptP) btnOptP.addEventListener('click', () => {
+            if (!CP_INSTANCE) return;
             const btn = btnOptP;
             btn.textContent = "⏳...";
             setTimeout(() => {
@@ -812,9 +841,9 @@ export function initMode1_2(CP) {
                         vol_disp: getVal('vol_disp_m1_co2', 15),
                         density_in: stateIn.d, p_in
                     });
-                    
+
                     if (res && res.bestP > 30) document.getElementById('p_high_m1_co2').value = res.bestP.toFixed(1);
-                } catch(e) {
+                } catch (e) {
                     const t = parseFloat(document.getElementById('T_gc_out_m1_co2').value);
                     if (!isNaN(t)) document.getElementById('p_high_m1_co2').value = (2.75 * t - 6.5).toFixed(1);
                 } finally {
@@ -825,19 +854,19 @@ export function initMode1_2(CP) {
 
         const radios = document.querySelectorAll(`input[name="flow_mode_m1_co2"]`);
         radios.forEach(r => r.addEventListener('change', () => {
-             const val = document.querySelector(`input[name="flow_mode_m1_co2"]:checked`).value;
-             const rpmDiv = document.getElementById('flow-inputs-rpm-m1_co2');
-             const massDiv = document.getElementById('flow-inputs-mass-m1_co2');
-             const volDiv = document.getElementById('flow-inputs-vol-m1_co2');
-             if(rpmDiv) rpmDiv.style.display = (val === 'rpm') ? 'grid' : 'none';
-             if(massDiv) massDiv.style.display = (val === 'mass') ? 'block' : 'none';
-             if(volDiv) volDiv.style.display = (val === 'vol') ? 'block' : 'none';
+            const val = document.querySelector(`input[name="flow_mode_m1_co2"]:checked`).value;
+            const rpmDiv = document.getElementById('flow-inputs-rpm-m1_co2');
+            const massDiv = document.getElementById('flow-inputs-mass-m1_co2');
+            const volDiv = document.getElementById('flow-inputs-vol-m1_co2');
+            if (rpmDiv) rpmDiv.style.display = (val === 'rpm') ? 'grid' : 'none';
+            if (massDiv) massDiv.style.display = (val === 'mass') ? 'block' : 'none';
+            if (volDiv) volDiv.style.display = (val === 'vol') ? 'block' : 'none';
         }));
     }
-    
+
     if (calcFormM2) {
         calcFormM2.addEventListener('submit', (e) => { e.preventDefault(); calculateMode2(CP); });
         const fluidSelectM2 = document.getElementById('fluid_m2');
-        if(fluidSelectM2) fluidSelectM2.addEventListener('change', () => updateFluidInfo(fluidSelectM2, document.getElementById('fluid-info-m2'), CP));
+        if (fluidSelectM2) fluidSelectM2.addEventListener('change', () => updateFluidInfo(fluidSelectM2, document.getElementById('fluid-info-m2'), CP));
     }
 }
