@@ -4,22 +4,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.49 (Dynamic Labels)</title>
-    
+    <title>无油压缩机性能计算器 v8.49 (Restored)</title>
+
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f766e">
     <link rel="apple-touch-icon" href="/pwa-192x192.png">
 
     <link rel="stylesheet" href="/src/css/style.css">
     <style>
-        .sub-tab-btn.active { background-color: #059669; color: white; border-color: #059669; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        .modal-backdrop { background-color: rgba(0, 0, 0, 0.5); }
-        .toggle-checkbox:checked { right: 0; border-color: #0f766e; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #0f766e; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        optgroup { font-weight: bold; color: #555; }
+        .sub-tab-btn.active {
+            background-color: #059669;
+            color: white;
+            border-color: #059669;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #0f766e;
+        }
+
+        .toggle-checkbox:checked+.toggle-label {
+            background-color: #0f766e;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        optgroup {
+            font-weight: bold;
+            color: #555;
+        }
     </style>
 </head>
 
@@ -33,17 +68,26 @@
 
             <div class="mt-6 flex flex-wrap justify-center gap-4 border-t border-gray-100 pt-4 px-4 items-center">
                 <div class="flex space-x-2">
-                    <button id="btn-open-save" class="flex items-center px-4 py-2 bg-teal-50 text-teal-700 rounded-md hover:bg-teal-100 border border-teal-200 transition text-sm font-bold shadow-sm">💾 Save</button>
-                    <button id="btn-open-load" class="flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 border border-blue-200 transition text-sm font-bold shadow-sm">📂 Load</button>
+                    <button id="btn-open-save"
+                        class="flex items-center px-4 py-2 bg-teal-50 text-teal-700 rounded-md hover:bg-teal-100 border border-teal-200 transition text-sm font-bold shadow-sm">💾
+                        Save</button>
+                    <button id="btn-open-load"
+                        class="flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 border border-blue-200 transition text-sm font-bold shadow-sm">📂
+                        Load</button>
                 </div>
                 <div class="hidden md:block w-px h-6 bg-gray-300 mx-2"></div>
                 <div class="flex space-x-4 items-center">
-                    <button id="btn-pin-baseline" class="flex items-center px-4 py-2 bg-yellow-50 text-yellow-700 rounded-md hover:bg-yellow-100 border border-yellow-200 transition text-sm font-bold shadow-sm">📌 Pin Baseline</button>
+                    <button id="btn-pin-baseline"
+                        class="flex items-center px-4 py-2 bg-yellow-50 text-yellow-700 rounded-md hover:bg-yellow-100 border border-yellow-200 transition text-sm font-bold shadow-sm">📌
+                        Pin Baseline</button>
                     <div class="flex items-center bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
                         <span class="text-xs font-bold text-gray-500 mr-2">SI</span>
-                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" name="unit-toggle" id="unit-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                            <label for="unit-toggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                        <div
+                            class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="unit-toggle" id="unit-toggle"
+                                class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" />
+                            <label for="unit-toggle"
+                                class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
                         </div>
                         <span class="text-xs font-bold text-gray-500" id="unit-label">IMP</span>
                     </div>
@@ -53,19 +97,33 @@
 
         <div class="bg-white rounded-lg shadow-md no-print min-h-[600px]">
             <nav class="flex border-b border-gray-300 overflow-x-auto no-scrollbar">
-                <button id="tab-btn-1" class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 active whitespace-nowrap border-b-2 border-transparent"><span class="text-xl block md:inline">①</span> 制冷/CO2热泵</button>
-                <button id="tab-btn-2" class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span class="text-xl block md:inline">②</span> 气体压缩 (Gas)</button>
-                <button id="tab-btn-3" class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span class="text-xl block md:inline">③</span> 空压机 (Air)</button>
-                <button id="tab-btn-4" class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span class="text-xl block md:inline">④</span> MVR (容积)</button>
-                <button id="tab-btn-5" class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span class="text-xl block md:inline">⑤</span> MVR (透平)</button>
+                <button id="tab-btn-1"
+                    class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 active whitespace-nowrap border-b-2 border-transparent"><span
+                        class="text-xl block md:inline">①</span> 制冷/CO2热泵</button>
+                <button id="tab-btn-2"
+                    class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span
+                        class="text-xl block md:inline">②</span> 气体压缩 (Gas)</button>
+                <button id="tab-btn-3"
+                    class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span
+                        class="text-xl block md:inline">③</span> 空压机 (Air)</button>
+                <button id="tab-btn-4"
+                    class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span
+                        class="text-xl block md:inline">④</span> MVR (容积)</button>
+                <button id="tab-btn-5"
+                    class="tab-btn flex-1 py-4 px-6 text-center text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-all duration-200 whitespace-nowrap border-b-2 border-transparent"><span
+                        class="text-xl block md:inline">⑤</span> MVR (透平)</button>
             </nav>
 
             <div class="p-4 md:p-8">
 
                 <div id="tab-content-1" class="tab-content">
                     <div class="flex justify-center space-x-4 mb-8 border-b pb-4">
-                        <button id="sub-tab-std" class="sub-tab-btn active px-6 py-2 rounded-full border border-gray-300 font-bold transition-colors shadow-sm">❄️ 常规制冷/热泵</button>
-                        <button id="sub-tab-co2" class="sub-tab-btn px-6 py-2 rounded-full border border-gray-300 font-bold transition-colors shadow-sm">🔥 CO2 (R744) 循环</button>
+                        <button id="sub-tab-std"
+                            class="sub-tab-btn active px-6 py-2 rounded-full border border-gray-300 font-bold transition-colors shadow-sm">❄️
+                            常规制冷/热泵</button>
+                        <button id="sub-tab-co2"
+                            class="sub-tab-btn px-6 py-2 rounded-full border border-gray-300 font-bold transition-colors shadow-sm">🔥
+                            CO2 (R744) 循环</button>
                     </div>
 
                     <div id="panel-m1-std">
@@ -74,7 +132,8 @@
                                 <h2 class="text-2xl font-semibold text-green-700 border-b pb-2">1. 循环参数 (Cycle)</h2>
                                 <div class="input-group">
                                     <label class="block text-sm font-bold text-gray-700 mb-1">工质 (Refrigerant)</label>
-                                    <select id="fluid_m1" name="fluid_m1" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                                    <select id="fluid_m1" name="fluid_m1"
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
                                         <optgroup label="Standard Ref/AC (-40°C ~ +60°C)">
                                             <option value="R134a" selected>R134a</option>
                                             <option value="R410A">R410A</option>
@@ -110,41 +169,92 @@
                                             <option value="Ethylene">Ethylene</option>
                                         </optgroup>
                                     </select>
-                                    <div id="fluid-info-m1" class="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">---</div>
+                                    <div id="fluid-info-m1" class="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                        ---</div>
                                 </div>
-                                
+
                                 <div class="grid grid-cols-2 gap-4 mt-2">
-                                    <div><label class="text-sm text-gray-600">T Evap (°C)</label><input type="number" name="T_evap_m1" value="5" step="0.1" class="w-full border rounded px-3 py-2"></div>
-                                    <div><label id="lbl_sh_m1" class="text-sm text-gray-600">SH (K)</label><input type="number" name="SH_m1" value="5" step="0.1" class="w-full border rounded px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">T Evap (°C)</label><input type="number"
+                                            name="T_evap_m1" value="5" step="0.1"
+                                            class="w-full border rounded px-3 py-2"></div>
+                                    <div><label id="lbl_sh_m1" class="text-sm text-gray-600">SH (K)</label><input
+                                            type="number" name="SH_m1" value="5" step="0.1"
+                                            class="w-full border rounded px-3 py-2"></div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4 mt-2">
-                                    <div><label class="text-sm text-gray-600">T Cond (°C)</label><input type="number" name="T_cond_m1" value="50" step="0.1" class="w-full border rounded px-3 py-2"></div>
-                                    <div><label id="lbl_sc_m1" class="text-sm text-gray-600">SC (K)</label><input type="number" name="SC_m1" value="5" step="0.1" class="w-full border rounded px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">T Cond (°C)</label><input type="number"
+                                            name="T_cond_m1" value="50" step="0.1"
+                                            class="w-full border rounded px-3 py-2"></div>
+                                    <div><label id="lbl_sc_m1" class="text-sm text-gray-600">SC (K)</label><input
+                                            type="number" name="SC_m1" value="5" step="0.1"
+                                            class="w-full border rounded px-3 py-2"></div>
                                 </div>
-                                
+
                                 <div class="bg-indigo-50 p-3 rounded border border-indigo-100 mt-2">
                                     <div class="flex items-center mb-1">
-                                        <input id="enable_ihx_m1" name="enable_ihx_m1" type="checkbox" class="h-4 w-4 text-indigo-600 rounded cursor-pointer">
-                                        <label for="enable_ihx_m1" class="ml-2 text-sm font-bold text-indigo-900 cursor-pointer">♻️ 启用回热器 (IHX)</label>
+                                        <input id="enable_ihx_m1" name="enable_ihx_m1" type="checkbox"
+                                            class="h-4 w-4 text-indigo-600 rounded cursor-pointer">
+                                        <label for="enable_ihx_m1"
+                                            class="ml-2 text-sm font-bold text-indigo-900 cursor-pointer">♻️ 启用回热器
+                                            (IHX)</label>
                                     </div>
                                     <div id="ihx-inputs-m1" class="hidden mt-2 pl-6">
                                         <label class="text-xs text-gray-600 block mb-1">换热效率 (Effectiveness %)</label>
-                                        <input type="number" name="ihx_eff_m1" value="60" min="0" max="100" class="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-white">
+                                        <input type="number" name="ihx_eff_m1" value="60" min="0" max="100"
+                                            class="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-white">
                                     </div>
                                 </div>
 
-                                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100"><label class="text-sm font-bold text-blue-800 mb-2 block">🤖 AI 效率模型</label><select id="ai_eff_m1" class="w-full border rounded text-sm px-2 py-1 mb-3"><option value="">-- Select --</option><option value="scroll">Scroll</option><option value="piston">Piston</option><option value="screw">Screw</option><option value="centrifugal">Centrifugal</option></select><div class="flex items-center mb-2"><input id="enable_dynamic_eff_m1" name="enable_dynamic_eff_m1" type="checkbox" checked class="mr-2"><label class="text-xs font-bold">Auto PR Correction</label></div><div id="dynamic-eff-inputs-m1"><label class="text-xs text-gray-600">Design PR</label><input id="pr_design_m1" name="pr_design_m1" value="3.0" class="w-full border rounded px-2 py-1"></div></div>
-                                <div class="grid grid-cols-2 gap-4 mt-2"><div><label class="text-sm text-gray-600">Isen Eff (%)</label><input id="eff_isen_m1" name="eff_isen_m1" value="70" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">Vol Eff (%)</label><input id="vol_eff_m1" name="vol_eff_m1" value="95" class="w-full border rounded px-3 py-2"></div></div>
+                                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100"><label
+                                        class="text-sm font-bold text-blue-800 mb-2 block">🤖 AI 效率模型</label><select
+                                        id="ai_eff_m1" class="w-full border rounded text-sm px-2 py-1 mb-3">
+                                        <option value="">-- Select --</option>
+                                        <option value="scroll">Scroll</option>
+                                        <option value="piston">Piston</option>
+                                        <option value="screw">Screw</option>
+                                        <option value="centrifugal">Centrifugal</option>
+                                    </select>
+                                    <div class="flex items-center mb-2"><input id="enable_dynamic_eff_m1"
+                                            name="enable_dynamic_eff_m1" type="checkbox" checked class="mr-2"><label
+                                            class="text-xs font-bold">Auto PR Correction</label></div>
+                                    <div id="dynamic-eff-inputs-m1"><label class="text-xs text-gray-600">Design
+                                            PR</label><input id="pr_design_m1" name="pr_design_m1" value="3.0"
+                                            class="w-full border rounded px-2 py-1"></div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 mt-2">
+                                    <div><label class="text-sm text-gray-600">Isen Eff (%)</label><input
+                                            id="eff_isen_m1" name="eff_isen_m1" value="70"
+                                            class="w-full border rounded px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">Vol Eff (%)</label><input id="vol_eff_m1"
+                                            name="vol_eff_m1" value="95" class="w-full border rounded px-3 py-2"></div>
+                                </div>
                             </div>
                             <div class="space-y-6">
                                 <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">2. 流量配置 (Flow)</h2>
                                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <div class="mb-4 flex space-x-4 text-sm"><label><input type="radio" name="flow_mode_m1" value="rpm" checked> RPM</label><label><input type="radio" name="flow_mode_m1" value="mass"> Mass</label><label><input type="radio" name="flow_mode_m1" value="vol"> Vol (Theo)</label></div>
-                                    <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">Speed (RPM)</label><input name="rpm_m1" value="3000" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">Disp (cm³)</label><input name="vol_disp_m1" value="500" class="w-full border rounded px-3 py-2"></div></div>
-                                    <div id="flow-inputs-mass-m1" class="hidden"><label class="text-sm text-gray-600">Mass Flow (kg/s)</label><input name="mass_flow_m1" value="1.0" class="w-full border rounded px-3 py-2"></div>
-                                    <div id="flow-inputs-vol-m1" class="hidden"><label class="text-sm font-bold text-blue-700">Theo Vol Flow (m³/h)</label><input name="vol_flow_m1" value="100" class="w-full border rounded px-3 py-2"></div>
+                                    <div class="mb-4 flex space-x-4 text-sm"><label><input type="radio"
+                                                name="flow_mode_m1" value="rpm" checked> RPM</label><label><input
+                                                type="radio" name="flow_mode_m1" value="mass"> Mass</label><label><input
+                                                type="radio" name="flow_mode_m1" value="vol"> Vol (Theo)</label></div>
+                                    <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-4">
+                                        <div><label class="text-sm text-gray-600">Speed (RPM)</label><input
+                                                name="rpm_m1" value="3000" class="w-full border rounded px-3 py-2">
+                                        </div>
+                                        <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
+                                                name="vol_disp_m1" value="500" class="w-full border rounded px-3 py-2">
+                                        </div>
+                                    </div>
+                                    <div id="flow-inputs-mass-m1" class="hidden"><label
+                                            class="text-sm text-gray-600">Mass Flow (kg/s)</label><input
+                                            name="mass_flow_m1" value="1.0" class="w-full border rounded px-3 py-2">
+                                    </div>
+                                    <div id="flow-inputs-vol-m1" class="hidden"><label
+                                            class="text-sm font-bold text-blue-700">Theo Vol Flow (m³/h)</label><input
+                                            name="vol_flow_m1" value="100" class="w-full border rounded px-3 py-2">
+                                    </div>
                                 </div>
-                                <button type="submit" id="calc-button-1" class="w-full bg-green-600 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-green-700 text-lg">计算常规热泵</button>
+                                <button type="submit" id="calc-button-1"
+                                    class="w-full bg-green-600 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-green-700 text-lg">计算常规热泵</button>
                             </div>
                         </form>
                     </div>
@@ -153,67 +263,125 @@
                         <form id="calc-form-1-co2" class="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
                             <div class="space-y-6">
                                 <h2 class="text-2xl font-semibold text-orange-700 border-b pb-2">1. CO2 (R744) 参数</h2>
-                                <div><label class="text-sm font-bold mb-1 text-gray-700">工质 (Fixed)</label><select name="fluid_m1_co2" class="w-full bg-gray-100 border rounded px-3 py-2 cursor-not-allowed text-gray-500" disabled><option>R744</option></select></div>
+                                <div><label class="text-sm font-bold mb-1 text-gray-700">工质 (Fixed)</label><select
+                                        name="fluid_m1_co2"
+                                        class="w-full bg-gray-100 border rounded px-3 py-2 cursor-not-allowed text-gray-500"
+                                        disabled>
+                                        <option>R744</option>
+                                    </select></div>
                                 <div class="grid grid-cols-2 gap-4 mt-2">
-                                    <div><label class="text-sm text-gray-600">T Evap (°C)</label><input name="T_evap_m1_co2" value="-5" class="border rounded w-full px-3 py-2"></div>
-                                    <div><label id="lbl_sh_m1_co2" class="text-sm text-gray-600">SH (K)</label><input name="SH_m1_co2" value="5" class="border rounded w-full px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">T Evap (°C)</label><input
+                                            name="T_evap_m1_co2" value="-5" class="border rounded w-full px-3 py-2">
+                                    </div>
+                                    <div><label id="lbl_sh_m1_co2" class="text-sm text-gray-600">SH (K)</label><input
+                                            name="SH_m1_co2" value="5" class="border rounded w-full px-3 py-2"></div>
                                 </div>
-                                <div class="mt-4"><label><input type="radio" name="cycle_type_m1_co2" value="transcritical" checked> Transcritical</label> <label class="ml-3"><input type="radio" name="cycle_type_m1_co2" value="subcritical"> Subcritical</label></div>
-                                
-                                <div id="inputs-transcritical-m1-co2" class="bg-orange-50 p-4 rounded border border-orange-200">
-                                    <div class="flex justify-between mb-2"><label class="text-sm font-bold text-orange-800">Gas Cooler</label><button type="button" id="btn-opt-p-high" class="text-xs bg-orange-200 px-2 py-1 rounded hover:bg-orange-300">⚡ Opt P</button></div>
+                                <div class="mt-4"><label><input type="radio" name="cycle_type_m1_co2"
+                                            value="transcritical" checked> Transcritical</label> <label
+                                        class="ml-3"><input type="radio" name="cycle_type_m1_co2" value="subcritical">
+                                        Subcritical</label></div>
+
+                                <div id="inputs-transcritical-m1-co2"
+                                    class="bg-orange-50 p-4 rounded border border-orange-200">
+                                    <div class="flex justify-between mb-2"><label
+                                            class="text-sm font-bold text-orange-800">Gas Cooler</label><button
+                                            type="button" id="btn-opt-p-high"
+                                            class="text-xs bg-orange-200 px-2 py-1 rounded hover:bg-orange-300">⚡ Opt
+                                            P</button></div>
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div><label class="text-xs text-gray-600">Exit Temp (°C)</label><input id="T_gc_out_m1_co2" name="T_gc_out_m1_co2" value="35" class="border rounded w-full px-2 py-1"></div>
-                                        <div><label class="text-xs text-gray-600">High Side P (bar)</label><input id="p_high_m1_co2" name="p_high_m1_co2" value="90" class="border rounded w-full px-2 py-1 font-bold text-orange-700"></div>
+                                        <div><label class="text-xs text-gray-600">Exit Temp (°C)</label><input
+                                                id="T_gc_out_m1_co2" name="T_gc_out_m1_co2" value="35"
+                                                class="border rounded w-full px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-600">High Side P (bar)</label><input
+                                                id="p_high_m1_co2" name="p_high_m1_co2" value="90"
+                                                class="border rounded w-full px-2 py-1 font-bold text-orange-700"></div>
                                     </div>
                                 </div>
-                                
-                                <div id="inputs-subcritical-m1-co2" class="hidden bg-blue-50 p-4 rounded border border-blue-200">
+
+                                <div id="inputs-subcritical-m1-co2"
+                                    class="hidden bg-blue-50 p-4 rounded border border-blue-200">
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div><label class="text-xs text-gray-600">Cond Temp (°C)</label><input id="T_cond_m1_co2" name="T_cond_m1_co2" value="15" class="border rounded w-full px-2 py-1"></div>
-                                        <div><label id="lbl_sc_m1_co2" class="text-xs text-gray-600">Subcool (K)</label><input name="SC_m1_co2" value="3" class="border rounded w-full px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-600">Cond Temp (°C)</label><input
+                                                id="T_cond_m1_co2" name="T_cond_m1_co2" value="15"
+                                                class="border rounded w-full px-2 py-1"></div>
+                                        <div><label id="lbl_sc_m1_co2" class="text-xs text-gray-600">Subcool
+                                                (K)</label><input name="SC_m1_co2" value="3"
+                                                class="border rounded w-full px-2 py-1"></div>
                                     </div>
                                 </div>
 
                                 <div class="bg-indigo-50 p-3 rounded border border-indigo-100 mt-2">
                                     <div class="flex items-center mb-1">
-                                        <input id="enable_ihx_m1_co2" name="enable_ihx_m1_co2" type="checkbox" class="h-4 w-4 text-indigo-600 rounded cursor-pointer">
-                                        <label for="enable_ihx_m1_co2" class="ml-2 text-sm font-bold text-indigo-900 cursor-pointer">♻️ 启用回热器 (IHX)</label>
+                                        <input id="enable_ihx_m1_co2" name="enable_ihx_m1_co2" type="checkbox"
+                                            class="h-4 w-4 text-indigo-600 rounded cursor-pointer">
+                                        <label for="enable_ihx_m1_co2"
+                                            class="ml-2 text-sm font-bold text-indigo-900 cursor-pointer">♻️ 启用回热器
+                                            (IHX)</label>
                                     </div>
                                     <div id="ihx-inputs-m1_co2" class="hidden mt-2 pl-6">
                                         <label class="text-xs text-gray-600 block mb-1">换热效率 (Effectiveness %)</label>
-                                        <input type="number" name="ihx_eff_m1_co2" value="60" min="0" max="100" class="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-white">
+                                        <input type="number" name="ihx_eff_m1_co2" value="60" min="0" max="100"
+                                            class="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-white">
                                     </div>
                                 </div>
 
                                 <div class="bg-gray-50 p-4 rounded border border-gray-200">
                                     <div class="flex justify-between items-center mb-3">
-                                         <label class="text-sm font-bold text-gray-700">⚙️ Efficiency Model</label>
-                                         <div class="flex space-x-2 text-xs">
-                                             <label class="flex items-center cursor-pointer"><input type="radio" name="eff_model_m1_co2" value="fixed" checked class="mr-1 text-orange-600"> Fixed</label>
-                                             <label class="flex items-center cursor-pointer"><input type="radio" name="eff_model_m1_co2" value="physical" class="mr-1 text-orange-600"> Physical</label>
-                                         </div>
+                                        <label class="text-sm font-bold text-gray-700">⚙️ Efficiency Model</label>
+                                        <div class="flex space-x-2 text-xs">
+                                            <label class="flex items-center cursor-pointer"><input type="radio"
+                                                    name="eff_model_m1_co2" value="fixed" checked
+                                                    class="mr-1 text-orange-600"> Fixed</label>
+                                            <label class="flex items-center cursor-pointer"><input type="radio"
+                                                    name="eff_model_m1_co2" value="physical"
+                                                    class="mr-1 text-orange-600"> Physical</label>
+                                        </div>
                                     </div>
-                                    <select id="ai_eff_m1_co2" class="w-full border rounded px-2 py-1 mb-3 text-sm"><option value="">-- AI Preset --</option><option value="co2_piston">Piston (Fixed)</option><option value="co2_rotary">Rotary (Physical)</option></select>
-                                    
+                                    <select id="ai_eff_m1_co2" class="w-full border rounded px-2 py-1 mb-3 text-sm">
+                                        <option value="">-- AI Preset --</option>
+                                        <option value="co2_piston">Piston (Fixed)</option>
+                                        <option value="co2_rotary">Rotary (Physical)</option>
+                                    </select>
+
                                     <div id="eff-inputs-fixed-m1_co2" class="grid grid-cols-2 gap-4 animate-fade-in">
-                                        <div><label class="text-xs text-gray-600">Isen Eff (%)</label><input id="eff_isen_m1_co2" name="eff_isen_m1_co2" value="70" class="w-full border rounded px-2 py-1"></div>
-                                        <div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m1_co2" name="vol_eff_m1_co2" value="85" class="w-full border rounded px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-600">Isen Eff (%)</label><input
+                                                id="eff_isen_m1_co2" name="eff_isen_m1_co2" value="70"
+                                                class="w-full border rounded px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-600">Vol Eff (%)</label><input
+                                                id="vol_eff_m1_co2" name="vol_eff_m1_co2" value="85"
+                                                class="w-full border rounded px-2 py-1"></div>
                                     </div>
-                                    <div id="eff-inputs-physical-m1_co2" class="hidden grid grid-cols-2 gap-2 animate-fade-in">
-                                        <div><label class="text-xs text-gray-500">Peak Isen</label><input id="eff_isen_peak_m1_co2" name="eff_isen_peak_m1_co2" value="0.70" class="w-full border rounded px-2 py-1"></div>
-                                        <div><label class="text-xs text-gray-500">Clearance</label><input id="clearance_m1_co2" name="clearance_m1_co2" value="0.05" class="w-full border rounded px-2 py-1"></div>
-                                        <div><label class="text-xs text-gray-500">Index n</label><input id="poly_index_m1_co2" name="poly_index_m1_co2" value="1.3" class="w-full border rounded px-2 py-1"></div>
-                                        <div><label class="text-xs text-gray-500">Design PR</label><input id="pr_design_m1_co2" name="pr_design_m1_co2" value="3.5" class="w-full border rounded px-2 py-1"></div>
+                                    <div id="eff-inputs-physical-m1_co2"
+                                        class="hidden grid grid-cols-2 gap-2 animate-fade-in">
+                                        <div><label class="text-xs text-gray-500">Peak Isen</label><input
+                                                id="eff_isen_peak_m1_co2" name="eff_isen_peak_m1_co2" value="0.70"
+                                                class="w-full border rounded px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-500">Clearance</label><input
+                                                id="clearance_m1_co2" name="clearance_m1_co2" value="0.05"
+                                                class="w-full border rounded px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-500">Index n</label><input
+                                                id="poly_index_m1_co2" name="poly_index_m1_co2" value="1.3"
+                                                class="w-full border rounded px-2 py-1"></div>
+                                        <div><label class="text-xs text-gray-500">Design PR</label><input
+                                                id="pr_design_m1_co2" name="pr_design_m1_co2" value="3.5"
+                                                class="w-full border rounded px-2 py-1"></div>
                                     </div>
                                 </div>
                             </div>
                             <div>
                                 <h2 class="text-2xl font-semibold text-orange-700 border-b pb-2">2. 流量配置</h2>
-                                <div class="mb-2"><label><input type="radio" name="flow_mode_m1_co2" value="rpm" checked> RPM</label> <label class="ml-3"><input type="radio" name="flow_mode_m1_co2" value="mass"> Mass</label> <label class="ml-3"><input type="radio" name="flow_mode_m1_co2" value="vol"> Vol (Theo)</label></div>
+                                <div class="mb-2"><label><input type="radio" name="flow_mode_m1_co2" value="rpm"
+                                            checked> RPM</label> <label class="ml-3"><input type="radio"
+                                            name="flow_mode_m1_co2" value="mass"> Mass</label> <label
+                                        class="ml-3"><input type="radio" name="flow_mode_m1_co2" value="vol"> Vol
+                                        (Theo)</label></div>
                                 <div id="flow-inputs-rpm-m1_co2" class="grid grid-cols-2 gap-4">
-                                    <div><label class="text-sm text-gray-600">Speed (RPM)</label><input name="rpm_m1_co2" value="4500" class="border rounded w-full px-3 py-2"></div>
-                                    <div><label class="text-sm text-gray-600">Disp (cm³)</label><input name="vol_disp_m1_co2" value="15" class="border rounded w-full px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">Speed (RPM)</label><input
+                                            name="rpm_m1_co2" value="4500" class="border rounded w-full px-3 py-2">
+                                    </div>
+                                    <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
+                                            name="vol_disp_m1_co2" value="15" class="border rounded w-full px-3 py-2">
+                                    </div>
                                 </div>
                                 <div id="flow-inputs-mass-m1_co2" class="hidden">
                                     <label class="text-sm text-gray-600">Mass Flow (kg/s)</label>
@@ -223,11 +391,20 @@
                                     <label class="text-sm text-gray-600">Vol Flow (Theo) (m³/h)</label>
                                     <input name="vol_flow_m1_co2" value="5" class="w-full border rounded px-3 py-2">
                                 </div>
-                                <button type="submit" id="calc-button-1-co2" class="w-full mt-8 bg-gray-800 text-white font-bold py-4 rounded-lg shadow-lg border-2 border-orange-500 hover:bg-gray-900 transition">🔥 计算 CO2 (R744) 循环</button>
+                                <button type="submit" id="calc-button-1-co2"
+                                    class="w-full mt-8 bg-gray-800 text-white font-bold py-4 rounded-lg shadow-lg border-2 border-orange-500 hover:bg-gray-900 transition">🔥
+                                    计算 CO2 (R744) 循环</button>
                             </div>
                         </form>
                     </div>
-                    <div class="mt-8"><div id="results-1" class="bg-white border p-6 rounded min-h-[150px]">Waiting...</div><div id="chart-m1" class="hidden h-[500px] mt-8"></div><div class="mt-6 flex gap-4 justify-center"><button id="print-button-1" class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button id="export-button-1" class="px-6 py-2 bg-green-600 text-white rounded" disabled>Excel</button></div></div>
+                    <div class="mt-8">
+                        <div id="results-1" class="bg-white border p-6 rounded min-h-[150px]">Waiting...</div>
+                        <div id="chart-m1" class="hidden h-[500px] mt-8"></div>
+                        <div class="mt-6 flex gap-4 justify-center"><button id="print-button-1"
+                                class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button
+                                id="export-button-1" class="px-6 py-2 bg-green-600 text-white rounded"
+                                disabled>Excel</button></div>
+                    </div>
                 </div>
 
                 <div id="tab-content-2" class="tab-content" style="display: none;">
@@ -238,10 +415,17 @@
                                 <label class="block text-sm font-bold mb-1">工质</label>
                                 <select id="fluid_m2" name="fluid_m2" class="w-full border rounded px-3 py-2">
                                     <optgroup label="Air Separation">
-                                        <option value="Air">Air</option><option value="Nitrogen">Nitrogen</option><option value="Oxygen">Oxygen</option><option value="Argon">Argon</option><option value="Helium">Helium</option>
+                                        <option value="Air">Air</option>
+                                        <option value="Nitrogen">Nitrogen</option>
+                                        <option value="Oxygen">Oxygen</option>
+                                        <option value="Argon">Argon</option>
+                                        <option value="Helium">Helium</option>
                                     </optgroup>
                                     <optgroup label="Energy">
-                                        <option value="Hydrogen">Hydrogen</option><option value="Methane">Methane</option><option value="CarbonMonoxide">Carbon Monoxide</option><option value="CarbonDioxide">Carbon Dioxide</option>
+                                        <option value="Hydrogen">Hydrogen</option>
+                                        <option value="Methane">Methane</option>
+                                        <option value="CarbonMonoxide">Carbon Monoxide</option>
+                                        <option value="CarbonDioxide">Carbon Dioxide</option>
                                     </optgroup>
                                     <optgroup label="Specialty">
                                         <option value="Neon">Neon</option>
@@ -252,111 +436,429 @@
                                 </select>
                                 <div id="fluid-info-m2" class="mt-2 text-xs text-gray-500">---</div>
                             </div>
-                            <div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">Inlet P (bar)</label><input name="p_in_m2" value="1.013" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">Inlet T (°C)</label><input name="T_in_m2" value="20" class="w-full border rounded px-3 py-2"></div></div>
-                            <div><label class="text-sm font-bold text-cyan-700">Outlet P (bar)</label><input name="p_out_m2" value="8.0" class="w-full border rounded px-3 py-2 font-bold"></div>
-                            <div class="mt-4 bg-blue-50 p-4 rounded border border-blue-100"><label class="text-sm font-bold text-blue-800 mb-2 block">🤖 AI 机型推荐</label><select id="ai_eff_m2" class="w-full border rounded px-2 py-1 mb-3 text-sm"><option value="">-- Select --</option><option value="piston">Piston</option><option value="screw">Screw</option><option value="turbo">Turbo</option></select><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Isen Eff (%)</label><input id="eff_isen_m2" name="eff_isen_m2" value="75" class="w-full border rounded px-2 py-1"></div><div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m2" name="vol_eff_m2" value="85" class="w-full border rounded px-2 py-1"></div></div></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">Inlet P (bar)</label><input name="p_in_m2"
+                                        value="1.013" class="w-full border rounded px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">Inlet T (°C)</label><input name="T_in_m2"
+                                        value="20" class="w-full border rounded px-3 py-2"></div>
+                            </div>
+                            <div><label class="text-sm font-bold text-cyan-700">Outlet P (bar)</label><input
+                                    name="p_out_m2" value="8.0" class="w-full border rounded px-3 py-2 font-bold"></div>
+                            <div class="mt-4 bg-blue-50 p-4 rounded border border-blue-100"><label
+                                    class="text-sm font-bold text-blue-800 mb-2 block">🤖 AI 机型推荐</label><select
+                                    id="ai_eff_m2" class="w-full border rounded px-2 py-1 mb-3 text-sm">
+                                    <option value="">-- Select --</option>
+                                    <option value="piston">Piston</option>
+                                    <option value="screw">Screw</option>
+                                    <option value="turbo">Turbo</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Isen Eff (%)</label><input
+                                            id="eff_isen_m2" name="eff_isen_m2" value="75"
+                                            class="w-full border rounded px-2 py-1"></div>
+                                    <div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m2"
+                                            name="vol_eff_m2" value="85" class="w-full border rounded px-2 py-1"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="space-y-6">
                             <h2 class="text-2xl font-semibold text-cyan-700 border-b pb-2">2. 流量 & 热管理</h2>
-                            <div class="bg-gray-50 p-4 rounded border border-gray-200"><div class="mb-3"><label><input type="radio" name="flow_mode_m2" value="rpm" checked> RPM</label> <label class="ml-4"><input type="radio" name="flow_mode_m2" value="mass"> Mass</label><label class="ml-4"><input type="radio" name="flow_mode_m2" value="vol"> Vol</label></div><div id="flow-inputs-rpm-m2" class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m2" value="3000" class="border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">Disp (cm³)</label><input name="vol_disp_m2" value="500" class="border rounded px-3 py-2"></div></div><div id="flow-inputs-mass-m2" class="hidden"><label class="text-sm text-gray-600">Mass Flow (kg/h)</label><input name="mass_flow_m2" value="1.0" class="w-full border rounded px-3 py-2"></div><div id="flow-inputs-vol-m2" class="hidden"><label class="text-sm text-gray-600">Vol Flow (m³/h)</label><input name="vol_flow_m2" value="100" class="w-full border rounded px-3 py-2"></div></div>
-                            <div class="bg-cyan-50 p-4 rounded border border-cyan-100"><label class="text-sm font-bold text-cyan-800 mb-2 block">🌡️ 热管理</label><div class="flex space-x-4 text-sm mb-2"><label><input type="radio" name="cooling_mode_m2" value="adiabatic" checked> Adiabatic</label><label><input type="radio" name="cooling_mode_m2" value="target_t"> Target T</label></div><div id="cooling-inputs-m2" class="hidden"><label class="text-xs text-gray-600">Target T_out (°C)</label><input name="target_t_out_m2" value="100" class="w-full border border-cyan-300 rounded px-2 py-1"></div></div>
-                            <button type="submit" id="calc-button-2" class="w-full mt-4 bg-cyan-600 text-white font-bold py-4 rounded-lg shadow transition hover:bg-cyan-700">计算气体压缩</button>
+                            <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                                <div class="mb-3"><label><input type="radio" name="flow_mode_m2" value="rpm" checked>
+                                        RPM</label> <label class="ml-4"><input type="radio" name="flow_mode_m2"
+                                            value="mass"> Mass</label><label class="ml-4"><input type="radio"
+                                            name="flow_mode_m2" value="vol"> Vol</label></div>
+                                <div id="flow-inputs-rpm-m2" class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m2"
+                                            value="3000" class="border rounded px-3 py-2"></div>
+                                    <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
+                                            name="vol_disp_m2" value="500" class="border rounded px-3 py-2"></div>
+                                </div>
+                                <div id="flow-inputs-mass-m2" class="hidden"><label class="text-sm text-gray-600">Mass
+                                        Flow (kg/h)</label><input name="mass_flow_m2" value="1.0"
+                                        class="w-full border rounded px-3 py-2"></div>
+                                <div id="flow-inputs-vol-m2" class="hidden"><label class="text-sm text-gray-600">Vol
+                                        Flow (m³/h)</label><input name="vol_flow_m2" value="100"
+                                        class="w-full border rounded px-3 py-2"></div>
+                            </div>
+                            <div class="bg-cyan-50 p-4 rounded border border-cyan-100"><label
+                                    class="text-sm font-bold text-cyan-800 mb-2 block">🌡️ 热管理</label>
+                                <div class="flex space-x-4 text-sm mb-2"><label><input type="radio"
+                                            name="cooling_mode_m2" value="adiabatic" checked>
+                                        Adiabatic</label><label><input type="radio" name="cooling_mode_m2"
+                                            value="target_t"> Target T</label></div>
+                                <div id="cooling-inputs-m2" class="hidden"><label class="text-xs text-gray-600">Target
+                                        T_out (°C)</label><input name="target_t_out_m2" value="100"
+                                        class="w-full border border-cyan-300 rounded px-2 py-1"></div>
+                            </div>
+                            <button type="submit" id="calc-button-2"
+                                class="w-full mt-4 bg-cyan-600 text-white font-bold py-4 rounded-lg shadow transition hover:bg-cyan-700">计算气体压缩</button>
                         </div>
                     </form>
-                    <div class="mt-8"><div id="results-2" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...</div><div id="chart-m2" class="hidden h-[500px] mt-8"></div><div class="mt-6 flex gap-4 justify-center"><button id="print-button-2" class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button id="export-button-2" class="px-6 py-2 bg-green-600 text-white rounded" disabled>Excel</button></div></div>
+                    <div class="mt-8">
+                        <div id="results-2" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...
+                        </div>
+                        <div id="chart-m2" class="hidden h-[500px] mt-8"></div>
+                        <div class="mt-6 flex gap-4 justify-center"><button id="print-button-2"
+                                class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button
+                                id="export-button-2" class="px-6 py-2 bg-green-600 text-white rounded"
+                                disabled>Excel</button></div>
+                    </div>
                 </div>
 
                 <div id="tab-content-3" class="tab-content" style="display: none;">
                     <form id="calc-form-3" class="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
                         <div class="space-y-6">
                             <h2 class="text-2xl font-semibold text-cyan-700 border-b pb-2">1. 湿空气参数 (Air)</h2>
-                            <div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">P In (bar)</label><input name="p_in_m3" value="1.013" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">T In (°C)</label><input name="T_in_m3" value="20" class="w-full border rounded px-3 py-2"></div></div>
-                            <div class="grid grid-cols-2 gap-4 mt-2"><div><label class="text-sm text-gray-600">RH (%)</label><input name="RH_in_m3" value="60" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm font-bold text-cyan-700">P Out (bar)</label><input name="p_out_m3" value="8.0" class="w-full border rounded px-3 py-2 font-bold"></div></div>
-                            <div class="bg-yellow-50 p-4 rounded border border-yellow-100 shadow-sm"><div class="flex items-center justify-between mb-3"><label class="text-sm font-bold text-yellow-800">Multi-Stage</label><div class="flex items-center"><input type="checkbox" id="enable_intercool_m3" name="enable_intercool_m3" class="mr-2 text-yellow-600"><label for="enable_intercool_m3" class="text-xs text-gray-700 font-semibold">Intercooling</label></div></div><div class="flex gap-4 items-end"><div class="flex-1"><label class="text-xs text-gray-500 block mb-1">Count</label><input type="number" id="stages_m3" name="stages_m3" value="1" min="1" class="w-full border rounded px-2 py-1.5"></div><div class="flex-1"><button type="button" id="btn-open-stage-config" class="w-full py-1.5 bg-white border border-yellow-300 text-yellow-700 text-xs rounded shadow-sm hover:bg-yellow-100 disabled:opacity-50" disabled>⚙️ Adv. Config</button></div></div></div>
-                            <div class="bg-blue-50 p-4 rounded border border-blue-200"><label class="text-sm font-bold text-blue-800 block mb-2">🤖 AI 推荐</label><select id="ai_eff_m3" class="w-full border rounded px-3 py-2 text-sm mb-3"><option value="">-- Select --</option><option value="screw_oil_free">Screw</option><option value="piston_water">Piston</option><option value="turbo">Turbo</option></select><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Isen Eff (%)</label><input id="eff_isen_m3" name="eff_isen_m3" value="75" class="w-full border rounded px-2 py-1"></div><div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m3" name="vol_eff_m3" value="90" class="w-full border rounded px-2 py-1"></div></div></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">P In (bar)</label><input name="p_in_m3"
+                                        value="1.013" class="w-full border rounded px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">T In (°C)</label><input name="T_in_m3"
+                                        value="20" class="w-full border rounded px-3 py-2"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mt-2">
+                                <div><label class="text-sm text-gray-600">RH (%)</label><input name="RH_in_m3"
+                                        value="60" class="w-full border rounded px-3 py-2"></div>
+                                <div><label class="text-sm font-bold text-cyan-700">P Out (bar)</label><input
+                                        name="p_out_m3" value="8.0" class="w-full border rounded px-3 py-2 font-bold">
+                                </div>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded border border-yellow-100 shadow-sm">
+                                <div class="flex items-center justify-between mb-3"><label
+                                        class="text-sm font-bold text-yellow-800">Multi-Stage</label>
+                                    <div class="flex items-center"><input type="checkbox" id="enable_intercool_m3"
+                                            name="enable_intercool_m3" class="mr-2 text-yellow-600"><label
+                                            for="enable_intercool_m3"
+                                            class="text-xs text-gray-700 font-semibold">Intercooling</label></div>
+                                </div>
+                                <div class="flex gap-4 items-end">
+                                    <div class="flex-1"><label
+                                            class="text-xs text-gray-500 block mb-1">Count</label><input type="number"
+                                            id="stages_m3" name="stages_m3" value="1" min="1"
+                                            class="w-full border rounded px-2 py-1.5"></div>
+                                    <div class="flex-1"><button type="button" id="btn-open-stage-config"
+                                            class="w-full py-1.5 bg-white border border-yellow-300 text-yellow-700 text-xs rounded shadow-sm hover:bg-yellow-100 disabled:opacity-50"
+                                            disabled>⚙️ Adv. Config</button></div>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 p-4 rounded border border-blue-200"><label
+                                    class="text-sm font-bold text-blue-800 block mb-2">🤖 AI 推荐</label><select
+                                    id="ai_eff_m3" class="w-full border rounded px-3 py-2 text-sm mb-3">
+                                    <option value="">-- Select --</option>
+                                    <option value="screw_oil_free">Screw</option>
+                                    <option value="piston_water">Piston</option>
+                                    <option value="turbo">Turbo</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Isen Eff (%)</label><input
+                                            id="eff_isen_m3" name="eff_isen_m3" value="75"
+                                            class="w-full border rounded px-2 py-1"></div>
+                                    <div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m3"
+                                            name="vol_eff_m3" value="90" class="w-full border rounded px-2 py-1"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="space-y-6">
                             <h2 class="text-2xl font-semibold text-cyan-700 border-b pb-2">2. 流量与工况</h2>
-                            <div class="bg-gray-100 p-3 rounded-lg flex items-center justify-between border border-gray-200"><span class="text-sm font-bold text-gray-700">Calc Mode:</span><div class="flex items-center"><input type="checkbox" id="batch_mode_m3" name="batch_mode_m3" class="h-5 w-5 text-cyan-600 rounded"><label for="batch_mode_m3" class="ml-2 text-sm font-bold text-cyan-700 cursor-pointer">Batch Run</label></div></div>
-                            <div class="mb-2">
-                                <label><input type="radio" name="flow_mode_m3" value="rpm" checked> RPM</label> 
-                                <label class="ml-3"><input type="radio" name="flow_mode_m3" value="mass"> Mass</label>
-                                <label class="ml-3"><input type="radio" name="flow_mode_m3" value="vol"> Vol (Theo)</label>
+                            <div
+                                class="bg-gray-100 p-3 rounded-lg flex items-center justify-between border border-gray-200">
+                                <span class="text-sm font-bold text-gray-700">Calc Mode:</span>
+                                <div class="flex items-center"><input type="checkbox" id="batch_mode_m3"
+                                        name="batch_mode_m3" class="h-5 w-5 text-cyan-600 rounded"><label
+                                        for="batch_mode_m3"
+                                        class="ml-2 text-sm font-bold text-cyan-700 cursor-pointer">Batch Run</label>
+                                </div>
                             </div>
-                            <div id="flow-inputs-rpm-m3" class="grid grid-cols-2 gap-4 animate-fade-in"><div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m3" value="1500" class="w-full border rounded px-3 py-2"></div><div><label class="text-sm text-gray-600">Disp (cm³)</label><input id="vol_disp_m3_single" name="vol_disp_m3" value="1000" class="w-full border rounded px-3 py-2"></div></div>
-                            <div id="flow-inputs-batch-m3" class="hidden bg-cyan-50 p-4 rounded border border-cyan-200 animate-fade-in"><div class="grid grid-cols-3 gap-2 mb-2"><div><label class="text-[10px] text-gray-600">Start</label><input name="rpm_start_m3" value="1000" class="border rounded px-2 py-1 w-full"></div><div><label class="text-[10px] text-gray-600">End</label><input name="rpm_end_m3" value="3000" class="border rounded px-2 py-1 w-full"></div><div><label class="text-[10px] text-gray-600">Step</label><input name="rpm_step_m3" value="200" class="border rounded px-2 py-1 w-full"></div></div><div><label class="text-xs text-gray-600">Disp (cm³)</label><input name="vol_disp_m3_batch" value="1000" class="border rounded w-full px-2 py-1"></div></div>
-                            <div id="flow-inputs-mass-m3" class="hidden"><label class="text-sm text-gray-600">Mass Flow (kg/s)</label><input name="mass_flow_m3" value="0.5" class="w-full border rounded px-3 py-2"></div>
-                            <div id="flow-inputs-vol-m3" class="hidden"><label class="text-sm font-bold text-blue-700">Theo Vol Flow (m³/h)</label><input name="vol_flow_m3" value="600" class="w-full border rounded px-3 py-2"></div>
-                            
-                            <div class="mt-4 border-t pt-2"><label class="block text-sm font-bold mb-2 text-cyan-800">Cooling</label><div class="flex flex-col space-y-2"><label><input type="radio" name="cooling_type_m3" value="adiabatic" checked> Adiabatic</label><label><input type="radio" name="cooling_type_m3" value="jacket"> Jacket</label><label><input type="radio" name="cooling_type_m3" value="injection"> Injection</label></div><div id="jacket-inputs-m3" class="hidden mt-2 ml-6"><label class="text-xs text-gray-600">Heat Loss %</label><input name="jacket_heat_percent_m3" value="15" class="w-full border rounded px-2 py-1"></div><div id="injection-inputs-m3" class="hidden mt-2 ml-6 grid grid-cols-2 gap-2"><div><label class="text-xs text-gray-600">T Out</label><input name="target_t_out_m3" value="100" class="border rounded w-full px-2 py-1"></div><div><label class="text-xs text-gray-600">H2O T</label><input name="T_inject_water_m3" value="25" class="border rounded w-full px-2 py-1"></div></div></div>
-                            <div class="mt-2 border-t pt-2"><input type="checkbox" id="enable_cooler_calc_m3" name="enable_cooler_calc_m3"> <label class="ml-1 text-sm">Aftercooler</label></div><div id="cooler-inputs-m3" class="hidden mt-1 ml-6"><label class="text-xs text-gray-600">Target T</label><input name="target_temp_m3" value="40" class="w-full border rounded px-2 py-1"></div>
-                            <button type="submit" id="calc-button-3" class="w-full mt-6 bg-cyan-600 text-white font-bold py-4 rounded shadow">计算空压机</button>
+                            <div class="mb-2">
+                                <label><input type="radio" name="flow_mode_m3" value="rpm" checked> RPM</label>
+                                <label class="ml-3"><input type="radio" name="flow_mode_m3" value="mass"> Mass</label>
+                                <label class="ml-3"><input type="radio" name="flow_mode_m3" value="vol"> Vol
+                                    (Theo)</label>
+                            </div>
+                            <div id="flow-inputs-rpm-m3" class="grid grid-cols-2 gap-4 animate-fade-in">
+                                <div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m3" value="1500"
+                                        class="w-full border rounded px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
+                                        id="vol_disp_m3_single" name="vol_disp_m3" value="1000"
+                                        class="w-full border rounded px-3 py-2"></div>
+                            </div>
+                            <div id="flow-inputs-batch-m3"
+                                class="hidden bg-cyan-50 p-4 rounded border border-cyan-200 animate-fade-in">
+                                <div class="grid grid-cols-3 gap-2 mb-2">
+                                    <div><label class="text-[10px] text-gray-600">Start</label><input
+                                            name="rpm_start_m3" value="1000" class="border rounded px-2 py-1 w-full">
+                                    </div>
+                                    <div><label class="text-[10px] text-gray-600">End</label><input name="rpm_end_m3"
+                                            value="3000" class="border rounded px-2 py-1 w-full"></div>
+                                    <div><label class="text-[10px] text-gray-600">Step</label><input name="rpm_step_m3"
+                                            value="200" class="border rounded px-2 py-1 w-full"></div>
+                                </div>
+                                <div><label class="text-xs text-gray-600">Disp (cm³)</label><input
+                                        name="vol_disp_m3_batch" value="1000" class="border rounded w-full px-2 py-1">
+                                </div>
+                            </div>
+                            <div id="flow-inputs-mass-m3" class="hidden"><label class="text-sm text-gray-600">Mass Flow
+                                    (kg/s)</label><input name="mass_flow_m3" value="0.5"
+                                    class="w-full border rounded px-3 py-2"></div>
+                            <div id="flow-inputs-vol-m3" class="hidden"><label
+                                    class="text-sm font-bold text-blue-700">Theo Vol Flow (m³/h)</label><input
+                                    name="vol_flow_m3" value="600" class="w-full border rounded px-3 py-2"></div>
+
+                            <div class="mt-4 border-t pt-2"><label
+                                    class="block text-sm font-bold mb-2 text-cyan-800">Cooling</label>
+                                <div class="flex flex-col space-y-2"><label><input type="radio" name="cooling_type_m3"
+                                            value="adiabatic" checked> Adiabatic</label><label><input type="radio"
+                                            name="cooling_type_m3" value="jacket"> Jacket</label><label><input
+                                            type="radio" name="cooling_type_m3" value="injection"> Injection</label>
+                                </div>
+                                <div id="jacket-inputs-m3" class="hidden mt-2 ml-6"><label
+                                        class="text-xs text-gray-600">Heat Loss %</label><input
+                                        name="jacket_heat_percent_m3" value="15"
+                                        class="w-full border rounded px-2 py-1"></div>
+                                <div id="injection-inputs-m3" class="hidden mt-2 ml-6 grid grid-cols-2 gap-2">
+                                    <div><label class="text-xs text-gray-600">T Out</label><input name="target_t_out_m3"
+                                            value="100" class="border rounded w-full px-2 py-1"></div>
+                                    <div><label class="text-xs text-gray-600">H2O T</label><input
+                                            name="T_inject_water_m3" value="25" class="border rounded w-full px-2 py-1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 border-t pt-2"><input type="checkbox" id="enable_cooler_calc_m3"
+                                    name="enable_cooler_calc_m3"> <label class="ml-1 text-sm">Aftercooler</label></div>
+                            <div id="cooler-inputs-m3" class="hidden mt-1 ml-6"><label
+                                    class="text-xs text-gray-600">Target T</label><input name="target_temp_m3"
+                                    value="40" class="w-full border rounded px-2 py-1"></div>
+                            <button type="submit" id="calc-button-3"
+                                class="w-full mt-6 bg-cyan-600 text-white font-bold py-4 rounded shadow">计算空压机</button>
                         </div>
                     </form>
-                    <div class="mt-8"><div id="results-3" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...</div><div id="chart-m3" class="hidden h-[500px] mt-4"></div><div class="mt-4 flex gap-4 justify-center"><button id="print-button-3" class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button id="export-button-3" class="px-6 py-2 bg-green-600 text-white rounded" disabled>Excel</button></div></div>
+                    <div class="mt-8">
+                        <div id="results-3" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...
+                        </div>
+                        <div id="chart-m3" class="hidden h-[500px] mt-4"></div>
+                        <div class="mt-4 flex gap-4 justify-center"><button id="print-button-3"
+                                class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button
+                                id="export-button-3" class="px-6 py-2 bg-green-600 text-white rounded"
+                                disabled>Excel</button></div>
+                    </div>
                 </div>
 
                 <div id="tab-content-4" class="tab-content" style="display: none;">
                     <form id="calc-form-4" class="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
                         <div>
                             <h2 class="text-2xl font-semibold text-purple-700 border-b pb-2">1. MVR Parameters</h2>
-                            <div class="input-group"><label class="block text-sm font-bold mb-1">工质</label><select id="fluid_m4" name="fluid_m4" class="w-full border rounded px-3 py-2 mb-4"><option value="Water" selected>Water (Steam)</option></select></div>
-                            <div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">P Suc (bar)</label><input name="p_in_m4" value="1.013" class="border rounded w-full px-3 py-2"></div><div><label class="text-sm text-gray-600">SH (K)</label><input name="SH_in_m4" value="0" class="border rounded w-full px-3 py-2"></div></div>
-                            <div class="mt-2"><label class="text-sm font-bold text-purple-800">Sat. Temp Rise ΔT (K)</label><input name="delta_T_m4" value="12" class="border rounded w-full px-3 py-2 text-lg font-bold"></div>
-                            <div class="mt-6 bg-purple-50 p-4 rounded border border-purple-100"><label class="text-xs font-bold text-purple-800 mb-2 block">🤖 AI Preset</label><select id="ai_eff_m4" class="w-full border rounded px-2 py-1 text-sm mb-3"><option value="">-- Select --</option><option value="roots">Roots Blower</option><option value="screw_mvr">Screw Compressor</option></select><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Isen Eff (%)</label><input id="eff_isen_m4" name="eff_isen_m4" value="65" class="border rounded w-full px-2 py-1"></div><div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m4" name="vol_eff_m4" value="80" class="border rounded w-full px-2 py-1"></div></div></div>
+                            <div class="input-group"><label class="block text-sm font-bold mb-1">工质</label><select
+                                    id="fluid_m4" name="fluid_m4" class="w-full border rounded px-3 py-2 mb-4">
+                                    <option value="Water" selected>Water (Steam)</option>
+                                </select></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">P Suc (bar)</label><input name="p_in_m4"
+                                        value="1.013" class="border rounded w-full px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">SH (K)</label><input name="SH_in_m4" value="0"
+                                        class="border rounded w-full px-3 py-2"></div>
+                            </div>
+                            <div class="mt-2"><label class="text-sm font-bold text-purple-800">Sat. Temp Rise ΔT
+                                    (K)</label><input name="delta_T_m4" value="12"
+                                    class="border rounded w-full px-3 py-2 text-lg font-bold"></div>
+                            <div class="mt-6 bg-purple-50 p-4 rounded border border-purple-100"><label
+                                    class="text-xs font-bold text-purple-800 mb-2 block">🤖 AI Preset</label><select
+                                    id="ai_eff_m4" class="w-full border rounded px-2 py-1 text-sm mb-3">
+                                    <option value="">-- Select --</option>
+                                    <option value="roots">Roots Blower</option>
+                                    <option value="screw_mvr">Screw Compressor</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Isen Eff (%)</label><input
+                                            id="eff_isen_m4" name="eff_isen_m4" value="65"
+                                            class="border rounded w-full px-2 py-1"></div>
+                                    <div><label class="text-xs text-gray-600">Vol Eff (%)</label><input id="vol_eff_m4"
+                                            name="vol_eff_m4" value="80" class="border rounded w-full px-2 py-1"></div>
+                                </div>
+                            </div>
                         </div>
                         <div>
-                            <h2 class="text-2xl font-semibold text-purple-700 border-b pb-2">2. Sizing & Desuperheat</h2>
-                            <div class="mb-2"><label><input type="radio" name="flow_mode_m4" value="rpm" checked> RPM</label> <label class="ml-3"><input type="radio" name="flow_mode_m4" value="mass"> Mass</label> <label class="ml-3"><input type="radio" name="flow_mode_m4" value="vol"> Vol</label></div>
-                            <div id="flow-inputs-rpm-m4" class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m4" value="2980" class="border rounded w-full px-3 py-2"></div><div><label class="text-sm text-gray-600">Disp (cm³)</label><input name="vol_disp_m4" value="10000" class="border rounded w-full px-3 py-2"></div></div>
-                            <div id="flow-inputs-mass-m4" class="hidden"><label class="text-sm text-gray-600">Mass Flow (kg/h)</label><input name="mass_flow_m4" value="1000" class="border rounded w-full px-3 py-2"></div>
-                            <div id="flow-inputs-vol-m4" class="hidden"><label class="text-sm text-gray-600">Vol Flow (m³/h)</label><input name="vol_flow_m4" value="2000" class="border rounded w-full px-3 py-2"></div>
-                            <div class="mt-6 bg-purple-50 p-4 rounded border border-purple-100"><div class="flex items-center mb-3"><input id="enable_desuperheat_m4" name="enable_desuperheat_m4" type="checkbox" checked class="h-4 w-4 text-purple-600"><label for="enable_desuperheat_m4" class="ml-2 text-sm font-bold text-purple-900">Enable Desuperheating</label></div><div id="desuperheat-inputs-m4" class="grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Water T (°C)</label><input name="T_water_in_m4" value="30" class="border rounded w-full px-2 py-1"></div><div><label class="text-xs text-gray-600">Target SH (K)</label><input name="target_superheat_m4" value="0" class="border rounded w-full px-2 py-1"></div></div></div>
-                            <button type="submit" id="calc-button-4" class="w-full mt-6 bg-purple-600 text-white font-bold py-4 rounded shadow">计算 MVR (容积)</button>
+                            <h2 class="text-2xl font-semibold text-purple-700 border-b pb-2">2. Sizing & Desuperheat
+                            </h2>
+                            <div class="mb-2"><label><input type="radio" name="flow_mode_m4" value="rpm" checked>
+                                    RPM</label> <label class="ml-3"><input type="radio" name="flow_mode_m4"
+                                        value="mass"> Mass</label> <label class="ml-3"><input type="radio"
+                                        name="flow_mode_m4" value="vol"> Vol</label></div>
+                            <div id="flow-inputs-rpm-m4" class="grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m4" value="2980"
+                                        class="border rounded w-full px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">Disp (cm³)</label><input name="vol_disp_m4"
+                                        value="10000" class="border rounded w-full px-3 py-2"></div>
+                            </div>
+                            <div id="flow-inputs-mass-m4" class="hidden"><label class="text-sm text-gray-600">Mass Flow
+                                    (kg/h)</label><input name="mass_flow_m4" value="1000"
+                                    class="border rounded w-full px-3 py-2"></div>
+                            <div id="flow-inputs-vol-m4" class="hidden"><label class="text-sm text-gray-600">Vol Flow
+                                    (m³/h)</label><input name="vol_flow_m4" value="2000"
+                                    class="border rounded w-full px-3 py-2"></div>
+                            <div class="mt-6 bg-purple-50 p-4 rounded border border-purple-100">
+                                <div class="flex items-center mb-3"><input id="enable_desuperheat_m4"
+                                        name="enable_desuperheat_m4" type="checkbox" checked
+                                        class="h-4 w-4 text-purple-600"><label for="enable_desuperheat_m4"
+                                        class="ml-2 text-sm font-bold text-purple-900">Enable Desuperheating</label>
+                                </div>
+                                <div id="desuperheat-inputs-m4" class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Water T (°C)</label><input
+                                            name="T_water_in_m4" value="30" class="border rounded w-full px-2 py-1">
+                                    </div>
+                                    <div><label class="text-xs text-gray-600">Target SH (K)</label><input
+                                            name="target_superheat_m4" value="0"
+                                            class="border rounded w-full px-2 py-1"></div>
+                                </div>
+                            </div>
+                            <button type="submit" id="calc-button-4"
+                                class="w-full mt-6 bg-purple-600 text-white font-bold py-4 rounded shadow">计算 MVR
+                                (容积)</button>
                         </div>
                     </form>
-                    <div class="mt-8"><div id="results-4" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...</div><div id="chart-m4" class="hidden h-[500px] mt-4"></div><div class="mt-4 flex gap-4 justify-center"><button id="print-button-4" class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button id="export-button-4" class="px-6 py-2 bg-green-600 text-white rounded" disabled>Excel</button></div></div>
+                    <div class="mt-8">
+                        <div id="results-4" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...
+                        </div>
+                        <div id="chart-m4" class="hidden h-[500px] mt-4"></div>
+                        <div class="mt-4 flex gap-4 justify-center"><button id="print-button-4"
+                                class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button
+                                id="export-button-4" class="px-6 py-2 bg-green-600 text-white rounded"
+                                disabled>Excel</button></div>
+                    </div>
                 </div>
 
                 <div id="tab-content-5" class="tab-content" style="display: none;">
                     <form id="calc-form-5" class="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-8">
                         <div>
                             <h2 class="text-2xl font-semibold text-teal-700 border-b pb-2">1. Turbo Parameters</h2>
-                            <div class="input-group"><label class="block text-sm font-bold mb-1">工质</label><select id="fluid_m5" name="fluid_m5" class="w-full border rounded px-3 py-2 mb-4"><option value="Water">Water (Steam)</option></select></div>
-                            <div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">P Suc (bar)</label><input name="p_in_m5" value="1.013" class="border rounded w-full px-3 py-2"></div><div><label class="text-sm text-gray-600">SH (K)</label><input name="SH_in_m5" value="0" class="border rounded w-full px-3 py-2"></div></div>
-                            <div class="mt-2"><label class="text-sm font-bold text-teal-800">Temp Rise ΔT (K)</label><input name="delta_T_m5" value="8" class="border rounded w-full px-3 py-2 text-lg font-bold"></div>
-                            <div class="mt-6 bg-teal-50 p-4 rounded border border-teal-100"><label class="text-xs font-bold text-teal-800 mb-2 block">🤖 AI Preset</label><select id="ai_eff_m5" class="w-full border rounded px-2 py-1 mb-3 text-sm"><option value="">-- Select --</option><option value="fan">Fan</option><option value="centrifugal">Centrifugal</option><option value="multi_stage">Multi-Stage</option></select><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Poly Eff (%)</label><input id="eff_poly_m5" name="eff_poly_m5" value="80" class="border rounded w-full px-2 py-1"></div><div><label class="text-xs font-bold text-teal-700">Stages</label><input name="stages_m5" value="1" min="1" class="border rounded w-full px-2 py-1 font-bold"></div></div></div>
+                            <div class="input-group"><label class="block text-sm font-bold mb-1">工质</label><select
+                                    id="fluid_m5" name="fluid_m5" class="w-full border rounded px-3 py-2 mb-4">
+                                    <option value="Water">Water (Steam)</option>
+                                </select></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">P Suc (bar)</label><input name="p_in_m5"
+                                        value="1.013" class="border rounded w-full px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">SH (K)</label><input name="SH_in_m5" value="0"
+                                        class="border rounded w-full px-3 py-2"></div>
+                            </div>
+                            <div class="mt-2"><label class="text-sm font-bold text-teal-800">Temp Rise ΔT
+                                    (K)</label><input name="delta_T_m5" value="8"
+                                    class="border rounded w-full px-3 py-2 text-lg font-bold"></div>
+                            <div class="mt-6 bg-teal-50 p-4 rounded border border-teal-100"><label
+                                    class="text-xs font-bold text-teal-800 mb-2 block">🤖 AI Preset</label><select
+                                    id="ai_eff_m5" class="w-full border rounded px-2 py-1 mb-3 text-sm">
+                                    <option value="">-- Select --</option>
+                                    <option value="fan">Fan</option>
+                                    <option value="centrifugal">Centrifugal</option>
+                                    <option value="multi_stage">Multi-Stage</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Poly Eff (%)</label><input
+                                            id="eff_poly_m5" name="eff_poly_m5" value="80"
+                                            class="border rounded w-full px-2 py-1"></div>
+                                    <div><label class="text-xs font-bold text-teal-700">Stages</label><input
+                                            name="stages_m5" value="1" min="1"
+                                            class="border rounded w-full px-2 py-1 font-bold"></div>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <h2 class="text-2xl font-semibold text-teal-700 border-b pb-2">2. Flow & Desuperheat</h2>
-                            <div class="mb-2"><label><input type="radio" name="flow_mode_m5" value="mass" checked> Mass</label> <label class="ml-3"><input type="radio" name="flow_mode_m5" value="vol"> Vol</label> <label class="ml-3"><input type="radio" name="flow_mode_m5" value="rpm"> RPM</label></div>
-                            <div id="flow-inputs-rpm-m5" class="hidden grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m5" value="10000" class="border rounded w-full px-3 py-2"></div><div><label class="text-sm text-gray-600">Disp</label><input name="vol_disp_m5" value="100" class="border rounded w-full px-3 py-2"></div></div>
-                            <div id="flow-inputs-mass-m5"><label class="text-sm text-gray-600">Mass Flow (kg/h)</label><input name="mass_flow_m5" value="5000" class="border rounded w-full px-3 py-2"></div>
-                            <div id="flow-inputs-vol-m5" class="hidden"><label class="text-sm text-gray-600">Vol Flow (m³/h)</label><input name="vol_flow_m5" value="8000" class="border rounded w-full px-3 py-2"></div>
-                            <div class="mt-6 bg-teal-50 p-3 rounded"><div class="flex items-center mb-2"><input id="enable_desuperheat_m5" name="enable_desuperheat_m5" type="checkbox"><label class="ml-2 text-sm font-bold text-teal-900">Desuperheat</label></div><div id="desuperheat-inputs-m5" class="hidden grid grid-cols-2 gap-4"><div><label class="text-xs text-gray-600">Water T (°C)</label><input name="T_water_in_m5" value="30" class="border rounded w-full px-2 py-1"></div><div><label class="text-xs text-gray-600">Target SH</label><input name="target_superheat_m5" value="0" class="border rounded w-full px-2 py-1"></div></div></div>
-                            <button type="submit" id="calc-button-5" class="w-full mt-6 bg-teal-600 text-white font-bold py-4 rounded shadow">计算透平 MVR</button>
+                            <div class="mb-2"><label><input type="radio" name="flow_mode_m5" value="mass" checked>
+                                    Mass</label> <label class="ml-3"><input type="radio" name="flow_mode_m5"
+                                        value="vol"> Vol</label> <label class="ml-3"><input type="radio"
+                                        name="flow_mode_m5" value="rpm"> RPM</label></div>
+                            <div id="flow-inputs-rpm-m5" class="hidden grid grid-cols-2 gap-4">
+                                <div><label class="text-sm text-gray-600">RPM</label><input name="rpm_m5" value="10000"
+                                        class="border rounded w-full px-3 py-2"></div>
+                                <div><label class="text-sm text-gray-600">Disp</label><input name="vol_disp_m5"
+                                        value="100" class="border rounded w-full px-3 py-2"></div>
+                            </div>
+                            <div id="flow-inputs-mass-m5"><label class="text-sm text-gray-600">Mass Flow
+                                    (kg/h)</label><input name="mass_flow_m5" value="5000"
+                                    class="border rounded w-full px-3 py-2"></div>
+                            <div id="flow-inputs-vol-m5" class="hidden"><label class="text-sm text-gray-600">Vol Flow
+                                    (m³/h)</label><input name="vol_flow_m5" value="8000"
+                                    class="border rounded w-full px-3 py-2"></div>
+                            <div class="mt-6 bg-teal-50 p-3 rounded">
+                                <div class="flex items-center mb-2"><input id="enable_desuperheat_m5"
+                                        name="enable_desuperheat_m5" type="checkbox"><label
+                                        class="ml-2 text-sm font-bold text-teal-900">Desuperheat</label></div>
+                                <div id="desuperheat-inputs-m5" class="hidden grid grid-cols-2 gap-4">
+                                    <div><label class="text-xs text-gray-600">Water T (°C)</label><input
+                                            name="T_water_in_m5" value="30" class="border rounded w-full px-2 py-1">
+                                    </div>
+                                    <div><label class="text-xs text-gray-600">Target SH</label><input
+                                            name="target_superheat_m5" value="0"
+                                            class="border rounded w-full px-2 py-1"></div>
+                                </div>
+                            </div>
+                            <button type="submit" id="calc-button-5"
+                                class="w-full mt-6 bg-teal-600 text-white font-bold py-4 rounded shadow">计算透平
+                                MVR</button>
                         </div>
                     </form>
-                    <div class="mt-8"><div id="results-5" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...</div><div id="chart-m5" class="hidden h-[500px] mt-4"></div><div class="mt-4 flex gap-4 justify-center"><button id="print-button-5" class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button id="export-button-5" class="px-6 py-2 bg-green-600 text-white rounded" disabled>Excel</button></div></div>
+                    <div class="mt-8">
+                        <div id="results-5" class="bg-white border p-6 rounded text-center text-gray-400">Waiting...
+                        </div>
+                        <div id="chart-m5" class="hidden h-[500px] mt-4"></div>
+                        <div class="mt-4 flex gap-4 justify-center"><button id="print-button-5"
+                                class="px-6 py-2 bg-gray-700 text-white rounded" disabled>Print</button><button
+                                id="export-button-5" class="px-6 py-2 bg-green-600 text-white rounded"
+                                disabled>Excel</button></div>
+                    </div>
                 </div>
 
             </div>
         </div>
     </div>
 
-    <div id="save-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 animate-fade-in"><h3 class="text-lg font-bold mb-4">Save Case</h3><input id="save-case-name" class="w-full border rounded px-3 py-2 mb-4"><div class="flex justify-end space-x-3"><button id="btn-cancel-save" class="px-4 py-2 bg-gray-100 rounded">Cancel</button><button id="btn-confirm-save" class="px-4 py-2 bg-teal-600 text-white rounded font-bold">Save</button></div></div></div>
-    <div id="load-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50"><div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh] animate-fade-in"><div class="p-4 border-b flex justify-between"><h3 class="text-lg font-bold">Load Case</h3><button id="btn-close-load" class="text-2xl">&times;</button></div><div class="p-4 overflow-y-auto bg-gray-50 flex-1"><div id="case-list-container" class="space-y-2"></div></div></div></div>
-    <div id="stage-config-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50"><div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh] animate-fade-in"><div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center"><div><h3 class="text-lg font-bold text-gray-800">Multi-Stage Config</h3><p class="text-xs text-gray-500">Customize Pressure Drops</p></div><button id="btn-cancel-stages" class="text-2xl text-gray-400 hover:text-gray-600">&times;</button></div><div class="p-4 overflow-y-auto flex-1 bg-white"><div id="stage-config-container"></div></div><div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3"><button id="btn-confirm-stages" class="px-6 py-2 bg-teal-600 text-white rounded shadow font-bold">Apply</button></div></div></div>
+    <div id="save-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 animate-fade-in">
+            <h3 class="text-lg font-bold mb-4">Save Case</h3><input id="save-case-name"
+                class="w-full border rounded px-3 py-2 mb-4">
+            <div class="flex justify-end space-x-3"><button id="btn-cancel-save"
+                    class="px-4 py-2 bg-gray-100 rounded">Cancel</button><button id="btn-confirm-save"
+                    class="px-4 py-2 bg-teal-600 text-white rounded font-bold">Save</button></div>
+        </div>
+    </div>
+    <div id="load-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh] animate-fade-in">
+            <div class="p-4 border-b flex justify-between">
+                <h3 class="text-lg font-bold">Load Case</h3><button id="btn-close-load"
+                    class="text-2xl">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto bg-gray-50 flex-1">
+                <div id="case-list-container" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+    <div id="stage-config-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh] animate-fade-in">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Multi-Stage Config</h3>
+                    <p class="text-xs text-gray-500">Customize Pressure Drops</p>
+                </div><button id="btn-cancel-stages" class="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 bg-white">
+                <div id="stage-config-container"></div>
+            </div>
+            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3"><button
+                    id="btn-confirm-stages"
+                    class="px-6 py-2 bg-teal-600 text-white rounded shadow font-bold">Apply</button></div>
+        </div>
+    </div>
 
     <script type="module" src="/src/js/main.js"></script>
-    <script>document.addEventListener('DOMContentLoaded', ()=>{
-        const t=(c,d)=>{if(c&&d){const f=()=>{d.style.display=c.checked?'block':'none';d.classList.toggle('hidden',!c.checked)};c.addEventListener('change',f);f()}};
-        t(document.getElementById('enable_desuperheat_m4'),document.getElementById('desuperheat-inputs-m4'));
-        t(document.getElementById('enable_desuperheat_m5'),document.getElementById('desuperheat-inputs-m5'));
-        t(document.getElementById('enable_dynamic_eff_m1'),document.getElementById('dynamic-eff-inputs-m1'));
-        t(document.getElementById('enable_cooler_calc_m3'),document.getElementById('cooler-inputs-m3'));
-        t(document.getElementById('enable_ihx_m1'), document.getElementById('ihx-inputs-m1'));
-        t(document.getElementById('enable_ihx_m1_co2'), document.getElementById('ihx-inputs-m1_co2'));
-    });</script>
+    <script>document.addEventListener('DOMContentLoaded', () => {
+            const t = (c, d) => { if (c && d) { const f = () => { d.style.display = c.checked ? 'block' : 'none'; d.classList.toggle('hidden', !c.checked) }; c.addEventListener('change', f); f() } };
+            t(document.getElementById('enable_desuperheat_m4'), document.getElementById('desuperheat-inputs-m4'));
+            t(document.getElementById('enable_desuperheat_m5'), document.getElementById('desuperheat-inputs-m5'));
+            t(document.getElementById('enable_dynamic_eff_m1'), document.getElementById('dynamic-eff-inputs-m1'));
+            t(document.getElementById('enable_cooler_calc_m3'), document.getElementById('cooler-inputs-m3'));
+            t(document.getElementById('enable_ihx_m1'), document.getElementById('ihx-inputs-m1'));
+            t(document.getElementById('enable_ihx_m1_co2'), document.getElementById('ihx-inputs-m1_co2'));
+        });</script>
 </body>
+
 </html>
