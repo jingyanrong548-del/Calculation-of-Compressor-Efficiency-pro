@@ -1,11 +1,25 @@
 // =====================================================================
 // ui.js: UI 界面交互逻辑
-// 版本: v8.49 (Feature: Dynamic Labels for IHX Context)
+// 版本: v8.53 (Feature: Brand Models Quick Select)
 // =====================================================================
 
 import { CaseStorage } from './storage.js';
 import { UnitState } from './utils.js';
 import { stageConfigMgr } from './stage_config.js';
+
+// --- 1. Compressor Model Database (v8.53) ---
+const COMPRESSOR_DB = [
+    // Danfoss Fixed
+    { id: 'SY240', brand: 'Danfoss', disp: 347.8, rpm: 2900, type: 'fixed' },
+    { id: 'SY300', brand: 'Danfoss', disp: 437.5, rpm: 2900, type: 'fixed' },
+    { id: 'SY380', brand: 'Danfoss', disp: 531.2, rpm: 2900, type: 'fixed' },
+    // Danfoss Variable
+    { id: 'VCH115', brand: 'Danfoss', disp: 115.0, rpm: 4500, type: 'variable', range: '1800-8400' },
+    // Copeland Fixed
+    { id: 'ZW150KBE-TFP-522', brand: 'Copeland', disp: 203.0, rpm: 2900, type: 'fixed' },
+    // Copeland Variable
+    { id: 'ZWV112BC-4X9-550', brand: 'Copeland', disp: 110.0, rpm: 4500, type: 'variable', range: '1800-6000' }
+];
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("UI: Initializing Interface Logic...");
@@ -16,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------
-    // 1. 主选项卡 (Tab) 切换逻辑
+    // 2. 主选项卡 (Tab) 切换逻辑
     // -----------------------------------------------------------------
     const tabIds = [1, 2, 3, 4, 5];
     const tabs = tabIds.map(id => ({
@@ -40,16 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -----------------------------------------------------------------
-    // 2. 全局控制 (Unit Switch & Baseline)
+    // 3. 全局控制 (Unit Switch & Baseline)
     // -----------------------------------------------------------------
     function setupGlobalControls() {
         const unitToggle = document.getElementById('unit-toggle');
         const unitLabel = document.getElementById('unit-label');
-        
+
         if (unitToggle) {
             unitToggle.addEventListener('change', () => {
                 const newUnit = UnitState.toggle();
-                if(unitLabel) unitLabel.textContent = newUnit;
+                if (unitLabel) unitLabel.textContent = newUnit;
                 document.dispatchEvent(new Event('unit-change'));
             });
         }
@@ -71,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupGlobalControls();
 
     // -----------------------------------------------------------------
-    // 3. 工况管理 (Case Management)
+    // 4. 工况管理 (Case Management)
     // -----------------------------------------------------------------
     const saveModal = document.getElementById('save-modal');
     const loadModal = document.getElementById('load-modal');
@@ -131,15 +145,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.refreshAllToggles) window.refreshAllToggles();
     };
 
-    if(btnOpenSave) {
+    if (btnOpenSave) {
         btnOpenSave.addEventListener('click', () => {
-            if(saveNameInput) saveNameInput.value = `Case ${new Date().toLocaleTimeString()}`;
+            if (saveNameInput) saveNameInput.value = `Case ${new Date().toLocaleTimeString()}`;
             toggleModal(saveModal, true);
-            if(saveNameInput) saveNameInput.focus();
+            if (saveNameInput) saveNameInput.focus();
         });
     }
-    if(btnCancelSave) btnCancelSave.addEventListener('click', () => toggleModal(saveModal, false));
-    if(btnConfirmSave) {
+    if (btnCancelSave) btnCancelSave.addEventListener('click', () => toggleModal(saveModal, false));
+    if (btnConfirmSave) {
         btnConfirmSave.addEventListener('click', () => {
             const name = saveNameInput.value.trim();
             if (!name) { alert("请输入工况名称"); return; }
@@ -169,36 +183,84 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn-delete px-2 py-1 text-red-400 hover:text-red-600 text-xs">&times;</button>
                 </div>`;
             item.querySelector('.btn-restore').addEventListener('click', () => {
-                if(confirm(`确认加载工况 "${c.name}"?`)) { restoreFormData(c.data); toggleModal(loadModal, false); }
+                if (confirm(`确认加载工况 "${c.name}"?`)) { restoreFormData(c.data); toggleModal(loadModal, false); }
             });
             item.querySelector('.btn-delete').addEventListener('click', () => {
-                if(confirm(`删除工况 "${c.name}"?`)) { CaseStorage.deleteCase(c.id); renderCaseList(); }
+                if (confirm(`删除工况 "${c.name}"?`)) { CaseStorage.deleteCase(c.id); renderCaseList(); }
             });
             caseListContainer.appendChild(item);
         });
     };
 
-    if(btnOpenLoad) { btnOpenLoad.addEventListener('click', () => { renderCaseList(); toggleModal(loadModal, true); }); }
-    if(btnCloseLoad) btnCloseLoad.addEventListener('click', () => toggleModal(loadModal, false));
+    if (btnOpenLoad) { btnOpenLoad.addEventListener('click', () => { renderCaseList(); toggleModal(loadModal, true); }); }
+    if (btnCloseLoad) btnCloseLoad.addEventListener('click', () => toggleModal(loadModal, false));
     window.addEventListener('click', (e) => {
         if (e.target === saveModal) toggleModal(saveModal, false);
         if (e.target === loadModal) toggleModal(loadModal, false);
     });
 
     // -----------------------------------------------------------------
-    // 4. Mode 1 Logic
+    // 5. Mode 1 Logic (Includes Brand Selector)
     // -----------------------------------------------------------------
     const btnStd = document.getElementById('sub-tab-std');
     const btnCo2 = document.getElementById('sub-tab-co2');
     const panelStd = document.getElementById('panel-m1-std');
     const panelCo2 = document.getElementById('panel-m1-co2');
 
+    // [NEW] Compressor Selector Logic
+    function setupCompressorSelector() {
+        const selector = document.getElementById('compressor_model_selector_m1');
+        if (!selector) return;
+
+        selector.addEventListener('change', () => {
+            const modelId = selector.value;
+            const modelData = COMPRESSOR_DB.find(m => m.id === modelId);
+
+            if (modelData) {
+                // 1. Force RPM Mode
+                const rpmRadio = document.querySelector('input[name="flow_mode_m1"][value="rpm"]');
+                if (rpmRadio) {
+                    rpmRadio.checked = true;
+                    rpmRadio.dispatchEvent(new Event('change'));
+                }
+
+                // 2. Set Displacement
+                const dispInput = document.querySelector('input[name="vol_disp_m1"]');
+                if (dispInput) {
+                    dispInput.value = modelData.disp;
+                    // Visual feedback
+                    dispInput.classList.add('bg-green-50', 'text-green-800', 'font-bold');
+                    setTimeout(() => dispInput.classList.remove('bg-green-50', 'text-green-800', 'font-bold'), 1000);
+                }
+
+                // 3. Set RPM & Tooltip
+                const rpmInput = document.querySelector('input[name="rpm_m1"]');
+                if (rpmInput) {
+                    rpmInput.value = modelData.rpm;
+                    if (modelData.type === 'variable' && modelData.range) {
+                        rpmInput.title = `Variable Speed Range: ${modelData.range} RPM`;
+                    } else {
+                        rpmInput.title = "Fixed Speed";
+                    }
+                }
+
+                // 4. Auto-Set Efficiency Model to 'Scroll'
+                const effSelect = document.getElementById('ai_eff_m1');
+                if (effSelect) {
+                    effSelect.value = 'scroll';
+                    effSelect.dispatchEvent(new Event('change')); // Trigger preset values
+                }
+            }
+        });
+    }
+    setupCompressorSelector();
+
     if (btnStd && btnCo2 && panelStd && panelCo2) {
         const switchMode1Tab = (isCo2) => {
             if (isCo2) {
                 btnStd.classList.remove('active', 'bg-green-600', 'text-white', 'border-green-600');
                 btnCo2.classList.add('active', 'bg-gray-800', 'text-white', 'border-gray-800');
-                panelStd.classList.add('hidden'); 
+                panelStd.classList.add('hidden');
                 panelCo2.classList.remove('hidden');
             } else {
                 btnCo2.classList.remove('active', 'bg-gray-800', 'text-white', 'border-gray-800');
@@ -230,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         radios.forEach(r => r.addEventListener('change', update));
-        update(); 
+        update();
     }
     setupCo2CycleToggle();
 
@@ -255,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCo2EffModelToggle();
 
     // -----------------------------------------------------------------
-    // [NEW] 4.1 Dynamic Labels for IHX Context
+    // 6. Dynamic Labels for IHX Context
     // -----------------------------------------------------------------
     function setupDynamicLabels() {
         // Standard Heat Pump
@@ -263,9 +325,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const lblShStd = document.getElementById('lbl_sh_m1');
         const lblScStd = document.getElementById('lbl_sc_m1');
 
-        if(ihxStd && lblShStd && lblScStd) {
+        if (ihxStd && lblShStd && lblScStd) {
             const updateStd = () => {
-                if(ihxStd.checked) {
+                if (ihxStd.checked) {
                     lblShStd.textContent = "Evap SH (K)";
                     lblScStd.textContent = "Cond SC (K)";
                 } else {
@@ -282,9 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const lblShCo2 = document.getElementById('lbl_sh_m1_co2');
         const lblScCo2 = document.getElementById('lbl_sc_m1_co2');
 
-        if(ihxCo2 && lblShCo2 && lblScCo2) {
+        if (ihxCo2 && lblShCo2 && lblScCo2) {
             const updateCo2 = () => {
-                if(ihxCo2.checked) {
+                if (ihxCo2.checked) {
                     lblShCo2.textContent = "Evap SH (K)";
                     lblScCo2.textContent = "Cond SC (K)";
                 } else {
@@ -299,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDynamicLabels();
 
     // -----------------------------------------------------------------
-    // 5. Multi-Stage Advanced Logic (Mode 3)
+    // 7. Multi-Stage Advanced Logic (Mode 3)
     // -----------------------------------------------------------------
     function setupStageConfigM3() {
         const inputStagesM3 = document.getElementById('stages_m3');
@@ -307,11 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (inputStagesM3 && btnStageConfig) {
             const resetConfigVisuals = () => {
-                if(btnStageConfig) {
+                if (btnStageConfig) {
                     btnStageConfig.classList.remove('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
                     btnStageConfig.classList.add('bg-white', 'text-yellow-700', 'border-yellow-300');
                     btnStageConfig.textContent = "⚙️ Adv. Config";
-                    if(stageConfigMgr) stageConfigMgr.reset();
+                    if (stageConfigMgr) stageConfigMgr.reset();
                 }
             };
 
@@ -323,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     btnStageConfig.disabled = true;
                     btnStageConfig.classList.add('opacity-50', 'cursor-not-allowed');
-                    resetConfigVisuals(); 
+                    resetConfigVisuals();
                 }
             };
 
@@ -334,33 +396,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pIn = parseFloat(document.querySelector('input[name="p_in_m3"]').value) || 1.013;
                 const pOut = parseFloat(document.querySelector('input[name="p_out_m3"]').value) || 8.0;
                 const stages = parseInt(inputStagesM3.value) || 1;
-                if(stageConfigMgr) stageConfigMgr.open(stages, pIn, pOut);
+                if (stageConfigMgr) stageConfigMgr.open(stages, pIn, pOut);
             });
         }
 
         document.addEventListener('advanced-config-updated', () => {
-            if(btnStageConfig) {
+            if (btnStageConfig) {
                 btnStageConfig.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
                 btnStageConfig.classList.remove('bg-white', 'text-yellow-700', 'border-yellow-300');
                 btnStageConfig.textContent = "⚙️ Configured";
             }
         });
-        
+
         const m3Triggers = document.querySelectorAll('input[name="p_in_m3"], input[name="p_out_m3"]');
         m3Triggers.forEach(el => el.addEventListener('input', () => {
-            if(inputStagesM3) inputStagesM3.dispatchEvent(new Event('input'));
+            if (inputStagesM3) inputStagesM3.dispatchEvent(new Event('input'));
         }));
     }
     setupStageConfigM3();
 
 
     // -----------------------------------------------------------------
-    // 6. Flow Inputs Toggle
+    // 8. Flow Inputs Toggle
     // -----------------------------------------------------------------
     function setupFlowToggle(modeSuffix) {
         const radioName = `flow_mode_${modeSuffix}`;
         const radios = document.querySelectorAll(`input[name="${radioName}"]`);
-        
+
         const divRpm = document.getElementById(`flow-inputs-rpm-${modeSuffix}`);
         const divMass = document.getElementById(`flow-inputs-mass-${modeSuffix}`);
         const divVol = document.getElementById(`flow-inputs-vol-${modeSuffix}`);
@@ -369,14 +431,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toggleEl = (el, show, displayType = 'block') => {
             if (!el) return;
-            if (show) { 
-                el.classList.remove('hidden'); 
-                el.style.display = displayType; 
-                el.querySelectorAll('input').forEach(i => i.disabled = false); 
-            } else { 
-                el.classList.add('hidden'); 
-                el.style.display = 'none'; 
-                el.querySelectorAll('input').forEach(i => i.disabled = true); 
+            if (show) {
+                el.classList.remove('hidden');
+                el.style.display = displayType;
+                el.querySelectorAll('input').forEach(i => i.disabled = false);
+            } else {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+                el.querySelectorAll('input').forEach(i => i.disabled = true);
             }
         };
 
@@ -390,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const batchChk = document.getElementById('batch_mode_m3');
                 const divBatch = document.getElementById('flow-inputs-batch-m3');
                 const isBatch = batchChk && batchChk.checked;
-                
+
                 if (isBatch) {
                     showBatch = true;
                     toggleEl(divBatch, true, 'block');
@@ -412,27 +474,30 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         radios.forEach(r => r.addEventListener('change', updateVisibility));
-        
+
         if (modeSuffix === 'm3') {
             const batchChk = document.getElementById('batch_mode_m3');
-            if(batchChk) batchChk.addEventListener('change', updateVisibility);
+            if (batchChk) batchChk.addEventListener('change', updateVisibility);
         }
-        
-        updateVisibility(); 
+
+        updateVisibility();
     }
     ['m1', 'm1_co2', 'm2', 'm3', 'm4', 'm5'].forEach(setupFlowToggle);
 
     // -----------------------------------------------------------------
-    // 7. AI Presets
+    // 9. AI Presets
     // -----------------------------------------------------------------
     function setupAiPresets() {
-        const setVal = (id, val) => { const el = document.getElementById(id); if(el){el.value=val; el.dispatchEvent(new Event('input', {bubbles:true}));}};
-        const setRadio = (name, val) => { document.querySelectorAll(`input[name="${name}"]`).forEach(r => { if(r.value === val) r.click(); }); };
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+        const setRadio = (name, val) => { document.querySelectorAll(`input[name="${name}"]`).forEach(r => { if (r.value === val) r.click(); }); };
 
         const aiM1 = document.getElementById('ai_eff_m1');
         if (aiM1) aiM1.addEventListener('change', () => {
             const v = aiM1.value;
-            if (v === 'scroll') { setVal('eff_isen_m1', 70); setVal('vol_eff_m1', 95); setVal('pr_design_m1', 3.0); }
+
+            // 👇 修改这一行 (Scroll: Isen 60%, Vol 90%)
+            if (v === 'scroll') { setVal('eff_isen_m1', 60); setVal('vol_eff_m1', 90); setVal('pr_design_m1', 3.0); }
+
             else if (v === 'piston') { setVal('eff_isen_m1', 75); setVal('vol_eff_m1', 88); setVal('pr_design_m1', 3.5); }
             else if (v === 'screw') { setVal('eff_isen_m1', 78); setVal('vol_eff_m1', 92); setVal('pr_design_m1', 4.0); }
             else if (v === 'centrifugal') { setVal('eff_isen_m1', 82); setVal('vol_eff_m1', 98); setVal('pr_design_m1', 2.5); }
@@ -458,12 +523,12 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (v === 'turbo') { setVal('eff_isen_m3', 82); setVal('vol_eff_m3', 98); setRadio('cooling_type_m3', 'adiabatic'); }
         });
         const aiM4 = document.getElementById('ai_eff_m4');
-        if(aiM4) aiM4.addEventListener('change', () => {
+        if (aiM4) aiM4.addEventListener('change', () => {
             if (aiM4.value === 'roots') { setVal('eff_isen_m4', 60); setVal('vol_eff_m4', 75); }
             else if (aiM4.value === 'screw_mvr') { setVal('eff_isen_m4', 75); setVal('vol_eff_m4', 85); }
         });
         const aiM5 = document.getElementById('ai_eff_m5');
-        if(aiM5) aiM5.addEventListener('change', () => {
+        if (aiM5) aiM5.addEventListener('change', () => {
             if (aiM5.value === 'fan') setVal('eff_poly_m5', 75);
             else if (aiM5.value === 'centrifugal') setVal('eff_poly_m5', 80);
             else if (aiM5.value === 'multi_stage') setVal('eff_poly_m5', 84);
@@ -472,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAiPresets();
 
     // -----------------------------------------------------------------
-    // 8. Helper Toggles
+    // 10. Helper Toggles
     // -----------------------------------------------------------------
     function setupRadioToggle(name, targetValue, targetDivId) {
         const radios = document.querySelectorAll(`input[name="${name}"]`);
@@ -483,9 +548,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!checked) return;
             const shouldShow = (checked.value === targetValue);
             const toggleEl = (el, s) => {
-                 if(!el) return;
-                 if(s) { el.classList.remove('hidden'); el.style.display = 'block'; el.querySelectorAll('input').forEach(i=>i.disabled=false); }
-                 else { el.classList.add('hidden'); el.style.display = 'none'; el.querySelectorAll('input').forEach(i=>i.disabled=true); }
+                if (!el) return;
+                if (s) { el.classList.remove('hidden'); el.style.display = 'block'; el.querySelectorAll('input').forEach(i => i.disabled = false); }
+                else { el.classList.add('hidden'); el.style.display = 'none'; el.querySelectorAll('input').forEach(i => i.disabled = true); }
             };
             toggleEl(targetDiv, shouldShow);
         };
@@ -499,10 +564,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!chk || !div) return;
         const update = () => {
             const shouldShow = chk.checked;
-             const toggleEl = (el, s) => {
-                 if(!el) return;
-                 if(s) { el.classList.remove('hidden'); el.style.display = 'block'; el.querySelectorAll('input').forEach(i=>i.disabled=false); }
-                 else { el.classList.add('hidden'); el.style.display = 'none'; el.querySelectorAll('input').forEach(i=>i.disabled=true); }
+            const toggleEl = (el, s) => {
+                if (!el) return;
+                if (s) { el.classList.remove('hidden'); el.style.display = 'block'; el.querySelectorAll('input').forEach(i => i.disabled = false); }
+                else { el.classList.add('hidden'); el.style.display = 'none'; el.querySelectorAll('input').forEach(i => i.disabled = true); }
             };
             toggleEl(div, shouldShow);
         };
@@ -514,34 +579,31 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCheckboxToggle('enable_cooler_calc_m2', 'cooler-inputs-m2');
 
     const m3Radios = document.querySelectorAll('input[name="cooling_type_m3"]');
-    if(m3Radios.length) {
+    if (m3Radios.length) {
         const updateM3 = () => {
             const checked = document.querySelector('input[name="cooling_type_m3"]:checked');
-            if(!checked) return;
+            if (!checked) return;
             const val = checked.value;
             const jacketDiv = document.getElementById('jacket-inputs-m3');
             const injDiv = document.getElementById('injection-inputs-m3');
-            
+
             const toggle = (el, s) => {
-                if(!el) return;
+                if (!el) return;
                 el.style.display = s ? 'block' : 'none';
-                if(s) { el.classList.remove('hidden'); el.querySelectorAll('input').forEach(i=>i.disabled=false); }
-                else { el.classList.add('hidden'); el.querySelectorAll('input').forEach(i=>i.disabled=true); }
+                if (s) { el.classList.remove('hidden'); el.querySelectorAll('input').forEach(i => i.disabled = false); }
+                else { el.classList.add('hidden'); el.querySelectorAll('input').forEach(i => i.disabled = true); }
             };
             toggle(jacketDiv, val === 'jacket');
             toggle(injDiv, val === 'injection');
         };
         m3Radios.forEach(r => r.addEventListener('change', updateM3));
-        updateM3(); 
+        updateM3();
     }
-    
+
     setupCheckboxToggle('enable_cooler_calc_m3', 'cooler-inputs-m3');
     setupCheckboxToggle('enable_desuperheat_m4', 'desuperheat-inputs-m4');
     setupCheckboxToggle('enable_desuperheat_m5', 'desuperheat-inputs-m5');
     setupCheckboxToggle('enable_dynamic_eff_m1', 'dynamic-eff-inputs-m1');
-    // Note: IHX Toggles are handled in main.js via simple script injection or can be moved here. 
-    // Since we added setupDynamicLabels above, we can rely on that for labels, 
-    // but we still need the visibility toggle. Let's add it here to be safe and consistent.
     setupCheckboxToggle('enable_ihx_m1', 'ihx-inputs-m1');
     setupCheckboxToggle('enable_ihx_m1_co2', 'ihx-inputs-m1_co2');
 

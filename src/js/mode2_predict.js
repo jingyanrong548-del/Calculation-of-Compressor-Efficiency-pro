@@ -472,7 +472,7 @@ async function calculateMode1_CO2(CP) {
             const q_evap = (state1a.h - valveInlet.h) * m_flow / 1000.0;
             const q_cond = (h_out - h_point3a) * m_flow / 1000.0;
             const flash_gas = CP.PropsSI('Q', 'P', p_in, 'H', valveInlet.h, fluid);
-            const vcc = (state1a.h - valveInlet.h) * state1a.d;
+            const vcc = (state1a.h - valveInlet.h) * state1a.d; // 原始计算 (J/m³)
 
             const t_sat_out_k = cycleType === 'subcritical' ? CP.PropsSI('T', 'P', p_out, 'Q', 1, fluid) : 0;
             const sh_out = cycleType === 'subcritical' ? (t_out_k - t_sat_out_k) : 0;
@@ -495,7 +495,9 @@ async function calculateMode1_CO2(CP) {
                 m_flow, v_flow: v_flow_in, power,
                 q_evap, q_cond,
                 cop_c: q_evap / power, cop_h: q_cond / power,
-                heat_rejection_ratio: q_cond / q_evap, vcc, flash_gas,
+                heat_rejection_ratio: q_cond / q_evap,
+                vcc: vcc / 1000.0, // <--- 【修复】: 除以 1000 转换为 kJ/m³
+                flash_gas,
                 eff_isen, eff_vol: eff_vol, eff_note: `AI-CO2 (${cycleType})`,
                 ihx: ihxResult,
                 opt_curve_data: optimizationResults ? optimizationResults.data : null,
@@ -629,7 +631,7 @@ async function calculateMode1(CP) {
             const t_sat_out_k = CP.PropsSI('T', 'P', p_out, 'Q', 1, fluid);
             const sh_out = t_out_k - t_sat_out_k;
 
-            const vcc = (state1a.h - valveInlet.h) * state1a.d;
+            const vcc = (state1a.h - valveInlet.h) * state1a.d; // 原始计算 (J/m³)
             const flash_gas = CP.PropsSI('Q', 'P', p_in, 'H', valveInlet.h, fluid);
 
             const z_out = CP.PropsSI('Z', 'P', p_out, 'H', h_out, fluid);
@@ -637,7 +639,7 @@ async function calculateMode1(CP) {
 
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in / 1e5, t_in: state1a.t - 273.15, p_out: p_out / 1e5, t_out: t_out_k - 273.15,
+                p_in: p_in/1e5, t_in: state1a.t-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
                 sh_out,
                 t_cond,
                 static_sc: sc,
@@ -645,12 +647,14 @@ async function calculateMode1(CP) {
                 t_sat_evap: t_evap,
                 static_sh: sh,
                 total_sh: compInlet.t - (t_evap + 273.15),
-                m_flow, v_flow: v_flow_in, power, q_evap, q_cond,
-                cop_c: q_evap / power, cop_h: q_cond / power,
-                heat_rejection_ratio: q_cond / q_evap, vcc, flash_gas,
+                m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
+                cop_c: q_evap/power, cop_h: q_cond/power,
+                heat_rejection_ratio: q_cond/q_evap, 
+                vcc: vcc / 1000.0, // <--- 【修复】: 除以 1000 转换为 kJ/m³
+                flash_gas,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
                 z_in: state1a.z, gamma_in: state1a.k, d_in: state1a.d, sound_speed_in: state1a.a,
-                z_out, gamma_out, pr: p_out / p_in,
+                z_out, gamma_out, pr: p_out/p_in,
                 ihx: ihxResult
             };
 

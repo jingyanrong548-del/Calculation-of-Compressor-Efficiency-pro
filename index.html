@@ -1,10 +1,14 @@
+{
+type: uploaded file
+fileName: index.html
+fullContent:
 <!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无油压缩机性能计算器 v8.49 (Restored)</title>
+    <title>无油压缩机性能计算器 v8.53 (Brands)</title>
 
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f766e">
@@ -64,7 +68,7 @@
 
         <header class="text-center py-6 mb-4 bg-white rounded-lg shadow-md no-print">
             <h1 class="text-3xl md:text-4xl font-bold text-teal-800">无油压缩机性能计算器</h1>
-            <p class="text-sm md:text-lg text-gray-600 mt-2">v8.49 (IHX & Advanced Analysis)</p>
+            <p class="text-sm md:text-lg text-gray-600 mt-2">v8.53 (Brands & Models)</p>
 
             <div class="mt-6 flex flex-wrap justify-center gap-4 border-t border-gray-100 pt-4 px-4 items-center">
                 <div class="flex space-x-2">
@@ -231,6 +235,26 @@
                             </div>
                             <div class="space-y-6">
                                 <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">2. 流量配置 (Flow)</h2>
+                                
+                                <div class="input-group mb-4">
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">🏷️ 快速选型 (Quick Select)</label>
+                                    <select id="compressor_model_selector_m1" class="block w-full px-3 py-2 border border-green-200 bg-green-50 rounded-md shadow-sm text-sm font-medium">
+                                        <option value="custom" selected>-- 自定义 (Custom) --</option>
+                                        <optgroup label="Danfoss (丹佛斯) - 定频">
+                                            <option value="SY240">SY240 (347.8 cm³ / 2900 rpm)</option>
+                                            <option value="SY300">SY300 (437.5 cm³ / 2900 rpm)</option>
+                                            <option value="SY380">SY380 (531.2 cm³ / 2900 rpm)</option>
+                                        </optgroup>
+                                        <optgroup label="Danfoss (丹佛斯) - 变频">
+                                            <option value="VCH115">VCH115 (115.0 cm³ / Var)</option>
+                                        </optgroup>
+                                        <optgroup label="Copeland (谷轮)">
+                                            <option value="ZW150KBE-TFP-522">ZW150KBE (203.0 cm³ / Fixed)</option>
+                                            <option value="ZWV112BC-4X9-550">ZWV112BC (110.0 cm³ / Var)</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+
                                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                     <div class="mb-4 flex space-x-4 text-sm"><label><input type="radio"
                                                 name="flow_mode_m1" value="rpm" checked> RPM</label><label><input
@@ -238,10 +262,10 @@
                                                 type="radio" name="flow_mode_m1" value="vol"> Vol (Theo)</label></div>
                                     <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-4">
                                         <div><label class="text-sm text-gray-600">Speed (RPM)</label><input
-                                                name="rpm_m1" value="3000" class="w-full border rounded px-3 py-2">
+                                                name="rpm_m1" id="rpm_m1" value="3000" class="w-full border rounded px-3 py-2">
                                         </div>
                                         <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
-                                                name="vol_disp_m1" value="500" class="w-full border rounded px-3 py-2">
+                                                name="vol_disp_m1" id="vol_disp_m1" value="500" class="w-full border rounded px-3 py-2">
                                         </div>
                                     </div>
                                     <div id="flow-inputs-mass-m1" class="hidden"><label
@@ -862,3 +886,4 @@
 </body>
 
 </html>
+}
