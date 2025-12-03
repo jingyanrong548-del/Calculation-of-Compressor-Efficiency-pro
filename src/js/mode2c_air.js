@@ -1,9 +1,9 @@
 // =====================================================================
 // mode2c_air.js: 模式三 (空压机) 核心逻辑
-// 版本: v8.45 (Stable: Std Flow, Dew Point, UI Suffix Fix)
+// 版本: v8.56 (PV Diagram & Enhanced Charts)
 // =====================================================================
 
-import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
+import { exportToExcel, drawPerformanceMap, drawPVDiagram, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
 import { stageConfigMgr } from './stage_config.js';
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3, chartDivM3;
@@ -30,7 +30,6 @@ document.addEventListener('pin-baseline', () => {
 
 // --- Helper: Generate Datasheet ---
 function generateAirDatasheet(d, base = null) {
-    // [FIX] rowCmp with 'suffix' support to prevent UI overlap
     const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
         if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
@@ -127,7 +126,7 @@ function generateAirDatasheet(d, base = null) {
             </div>
         </div>
 
-<div class="mt-8 pt-4 border-t border-gray-100 text-center">
+        <div class="mt-8 pt-4 border-t border-gray-100 text-center">
             <div class="flex flex-col items-center justify-center space-y-1">
                 <p class="text-xs font-bold text-gray-600">
                     <span class="opacity-75">Created by:</span> 荆炎荣 (Jing Yanrong)
@@ -136,10 +135,10 @@ function generateAirDatasheet(d, base = null) {
                     免责声明：本计算结果基于理论模型，仅供方案参考，不作为最终设备选型依据。<br>
                     Disclaimer: Simulation results are for reference only. Please verify with official manufacturer data.
                 </p>
-                <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.52</p>
+                <p class="text-[10px] text-gray-300 mt-1 font-mono">Calculation of Compressor Efficiency Pro v8.56</p>
             </div>
         </div>
-    </div>`; // 结束 return 字符串
+    </div>`;
 }
 
 function generateBatchTable(batchData) {
@@ -192,13 +191,11 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     let current_s = CP.HAPropsSI('S', 'T', t_in, 'P', p_in, 'R', rh_in);
     let current_w = w_in;
 
-    // Flow Rate Calculation (Using m_da = mass of dry air)
+    // Flow Rate Calculation
     const v_flow_th = (rpm / 60.0) * (vol_disp / 1e6);
     const v_flow_in = v_flow_th * eff_vol;
     const m_da = v_flow_in / v_da_in;
 
-    // [New] Standard Flow Calculation (Nm3/h @ 0°C, 1atm)
-    // Density of Dry Air at STP (0°C, 101.325kPa) is approx 1.292 kg/m³
     const rho_std = 1.292;
     const v_flow_std = m_da / rho_std;
 
@@ -261,11 +258,7 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
             if (useAdv) {
                 const conf = advConfig[i];
                 p_next_in = (conf.p_out - conf.dp_intercool) * 1e5;
-                if (conf.t_intercool_out !== null && !isNaN(conf.t_intercool_out)) {
-                    t_next_in = conf.t_intercool_out + 273.15;
-                } else {
-                    t_next_in = final_t;
-                }
+                t_next_in = (conf.t_intercool_out !== null && !isNaN(conf.t_intercool_out)) ? (conf.t_intercool_out + 273.15) : final_t;
                 const h_next_in = CP.HAPropsSI('H', 'T', t_next_in, 'P', p_next_in, 'W', current_w);
                 q_intercool_total += (current_h - h_next_in) * m_da / 1000.0;
                 current_p = p_next_in;
@@ -302,7 +295,6 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
     const power_shaft = (total_work * m_da) / 1000.0;
     const spec_power = power_shaft / (v_flow_in * 60);
 
-    // [New] Dew Point Calculation
     let dew_point = -999;
     try {
         dew_point = CP.HAPropsSI('T_dp', 'P', current_p, 'W', current_w, 'T', final_t) - 273.15;
@@ -310,16 +302,28 @@ function calculateSinglePoint(CP, inputs, advConfig = null) {
         console.warn("Dew point calc failed", e);
     }
 
+    // [New Feature] Polytropic Index Estimation for PV Diagram
+    let n_poly = 1.3;
+    try {
+        if(stages === 1 && final_t > t_in && p_out > p_in) {
+            const K = Math.log(final_t / t_in) / Math.log(p_out / p_in);
+            n_poly = 1 / (1 - K);
+            if(n_poly < 1 || n_poly > 2) n_poly = 1.3; // Fallback
+        }
+    } catch(e) {}
+
     return {
         date: new Date().toLocaleDateString(),
         p_in: p_in / 1e5, t_in: t_in - 273.15, rh_in_display: rh_in * 100, humidity_ratio: w_in,
         p_out: p_out / 1e5, t_out: final_t - 273.15, dew_point,
-        rpm, m_da, v_flow: v_flow_in, v_flow_std, // Export standard flow
+        rpm, m_da, v_flow: v_flow_in, v_flow_std, 
         power: power_shaft, spec_power,
         eff_is, eff_vol, stages, intercool: enable_intercool, cooling_desc,
         cooling_info: { m_inj: m_inj * m_da },
         q_jacket, q_aftercool, m_condensate, q_intercool: q_intercool_total,
-        is_advanced: useAdv
+        is_advanced: useAdv,
+        // PV Data
+        pv_data: { v_in: v_da_in, n_poly: n_poly }
     };
 }
 
@@ -362,13 +366,11 @@ async function calculateMode3(CP) {
                     rpm = parseFloat(fd.get('rpm_m3'));
                     vol_disp = parseFloat(fd.get('vol_disp_m3'));
                 } else if (mode === 'vol') {
-                    // Theoretical Volume Flow Mode
                     const v_flow_th_target = parseFloat(fd.get('vol_flow_m3')) / 3600.0;
-                    const v_disp_ref = 1000; // cm3
+                    const v_disp_ref = 1000; 
                     rpm = (v_flow_th_target / (v_disp_ref / 1e6)) * 60;
                     vol_disp = v_disp_ref;
                 } else {
-                    // Mass Mode fallback (simplified for now)
                     rpm = 1500;
                     vol_disp = 1000;
                 }
@@ -377,7 +379,18 @@ async function calculateMode3(CP) {
                 lastBatchData = null;
 
                 resultsDivM3.innerHTML = generateAirDatasheet(lastMode3Data, baselineMode3);
-                if (chartDivM3) chartDivM3.classList.add('hidden');
+                
+                // [NEW] Draw PV Diagram for Single Mode
+                if (chartDivM3) {
+                    chartDivM3.classList.remove('hidden');
+                    drawPVDiagram({
+                        p_in: commonParams.p_in / 1e5,
+                        p_out: commonParams.p_out / 1e5,
+                        v_in: lastMode3Data.pv_data.v_in,
+                        n_poly: lastMode3Data.pv_data.n_poly
+                    }, 'chart-m3');
+                }
+
             } else {
                 // --- Batch Run ---
                 const rpmStart = parseFloat(fd.get('rpm_start_m3'));
@@ -396,23 +409,23 @@ async function calculateMode3(CP) {
 
                 resultsDivM3.innerHTML = generateBatchTable(batchResults);
 
+                // [UPDATE] Draw Enhanced Performance Map for Batch Mode
                 if (chartDivM3) {
                     chartDivM3.classList.remove('hidden');
                     drawPerformanceMap('chart-m3', batchResults);
                 }
             }
 
-            // 【确认此处】: 必须包含以下三行解锁逻辑
+            // Unlock Controls
             calcButtonM3.disabled = false;
             calcButtonM3.textContent = "计算空压机";
-            if (printButtonM3) printButtonM3.disabled = false;  // <--- 修复点
-            if (exportButtonM3) exportButtonM3.disabled = false; // <--- 修复点
+            if (printButtonM3) printButtonM3.disabled = false;  
+            if (exportButtonM3) exportButtonM3.disabled = false; 
 
         } catch (err) {
             console.error(err);
             resultsDivM3.textContent = "Error: " + err.message;
             calcButtonM3.disabled = false;
-            // 出错时不解锁导出按钮，防止导出空数据
         }
     }, 10);
 }
@@ -429,20 +442,18 @@ export function initMode3(CP) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });
     }
 
-    // 2. ✅ [修改] initMode3 函数中的打印逻辑 (约第 340 行)
     if (printButtonM3) {
         printButtonM3.onclick = () => {
             if (lastMode3Data || lastBatchData) {
                 let content;
                 if (lastBatchData) {
                     content = generateBatchTable(lastBatchData);
-                    // 批量模式图表 ID 为 chart-m3
-                    generatePrintPage(content, 'chart-m3');
+                    // Pass 'chart-m3' to capture the performance map
+                    generatePrintPage(content, 'chart-m3'); 
                 } else {
                     content = generateAirDatasheet(lastMode3Data, baselineMode3);
-                    // 单点模式无图表或图表不重要，这里也可以传 'chart-m3' 如果有绘制的话
-                    // 如果单点模式不需要打印图表，第二个参数传 null
-                    generatePrintPage(content, null);
+                    // Pass 'chart-m3' to capture the PV diagram
+                    generatePrintPage(content, 'chart-m3'); 
                 }
             } else alert("Please Calculate First");
         };

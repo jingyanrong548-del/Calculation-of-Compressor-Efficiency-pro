@@ -750,6 +750,8 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     }
 }
 
+// [替换/新增] src/js/utils.js 中的绘图逻辑
+
 export function drawPerformanceMap(domId, batchData) {
     const dom = document.getElementById(domId);
     if (!dom) return;
@@ -759,34 +761,62 @@ export function drawPerformanceMap(domId, batchData) {
     if (chart) chart.clear();
     else chart = echarts.init(dom);
 
+    // 数据准备
     const xData = batchData.map(d => (d.v_flow * 3600).toFixed(1));
     const yPower = batchData.map(d => d.power.toFixed(2));
     const ySpecPower = batchData.map(d => d.spec_power.toFixed(2));
+    const yTout = batchData.map(d => (d.t_out).toFixed(1));
+
+    // 寻找最佳比功率点 (Min Spec Power)
+    let minSpec = Infinity;
+    let minIndex = -1;
+    batchData.forEach((d, i) => {
+        if (d.spec_power < minSpec) {
+            minSpec = d.spec_power;
+            minIndex = i;
+        }
+    });
 
     const option = {
         title: {
-            text: 'Performance Curve (Variable RPM)',
-            subtext: 'Volume Flow vs Power & Specific Power',
+            text: 'Air Compressor Performance Map',
+            subtext: 'Interactive: Power, Specific Power & Temp vs Flow',
             left: 'center'
         },
         tooltip: {
             trigger: 'axis',
-            axisPointer: { type: 'cross' }
+            axisPointer: { type: 'cross' },
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            formatter: function (params) {
+                const idx = params[0].dataIndex;
+                const d = batchData[idx];
+                let html = `<div style="font-weight:bold; margin-bottom:5px;">RPM: ${d.rpm}</div>`;
+                html += `<span style="color:#059669">●</span> Flow: ${(d.v_flow * 3600).toFixed(1)} m³/h<br/>`;
+                html += `<span style="color:#059669">●</span> Power: ${d.power.toFixed(2)} kW<br/>`;
+                html += `<span style="color:#d97706">●</span> Spec. Power: ${d.spec_power.toFixed(2)} kW/(m³/min)<br/>`;
+                html += `<span style="color:#2563eb">●</span> T_out: ${d.t_out.toFixed(1)} °C<br/>`;
+                if (d.dew_point > -100) html += `<span style="color:#9333ea">●</span> Dew Point: ${d.dew_point.toFixed(1)} °C`;
+                return html;
+            }
         },
         legend: {
-            data: ['Shaft Power (kW)', 'Specific Power (kW/m³/min)'],
-            bottom: 0
+            data: ['Shaft Power (kW)', 'Spec. Power (kW/m³/min)', 'Discharge T (°C)'],
+            bottom: 30
         },
         grid: {
-            left: '3%', right: '4%', bottom: '10%', containLabel: true
+            left: '3%', right: '4%', bottom: '15%', containLabel: true
         },
+        dataZoom: [
+            { type: 'slider', show: true, xAxisIndex: 0, bottom: 0, height: 20 },
+            { type: 'inside', xAxisIndex: 0 }
+        ],
         xAxis: {
             type: 'category',
             boundaryGap: false,
             data: xData,
             name: 'Flow (m³/h)',
             nameLocation: 'middle',
-            nameGap: 25
+            nameGap: 30
         },
         yAxis: [
             {
@@ -794,14 +824,14 @@ export function drawPerformanceMap(domId, batchData) {
                 name: 'Power (kW)',
                 position: 'left',
                 axisLine: { show: true, lineStyle: { color: '#059669' } },
-                axisLabel: { formatter: '{value} kW' }
+                splitLine: { show: true, lineStyle: { type: 'dashed' } }
             },
             {
                 type: 'value',
                 name: 'Spec. Power',
                 position: 'right',
+                alignTicks: true,
                 axisLine: { show: true, lineStyle: { color: '#d97706' } },
-                axisLabel: { formatter: '{value}' },
                 splitLine: { show: false }
             }
         ],
@@ -814,26 +844,149 @@ export function drawPerformanceMap(domId, batchData) {
                 yAxisIndex: 0,
                 itemStyle: { color: '#059669' },
                 lineStyle: { width: 3 },
-                areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(5,150,105,0.3)' }, { offset: 1, color: 'rgba(5,150,105,0.05)' }]) }
+                areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(5,150,105,0.3)' }, { offset: 1, color: 'rgba(5,150,105,0.01)' }]) }
             },
             {
-                name: 'Specific Power (kW/m³/min)',
+                name: 'Spec. Power (kW/m³/min)',
                 type: 'line',
                 data: ySpecPower,
                 smooth: true,
                 yAxisIndex: 1,
                 itemStyle: { color: '#d97706' },
-                lineStyle: { width: 3, type: 'dashed' }
+                lineStyle: { width: 3, type: 'dashed' },
+                markPoint: {
+                    data: [
+                        { name: 'Best Efficiency', value: minSpec.toFixed(2), xAxis: minIndex, yAxis: minSpec, itemStyle: { color: '#d97706' } }
+                    ],
+                    label: { formatter: 'Best\n{c}' }
+                }
+            },
+            {
+                name: 'Discharge T (°C)',
+                type: 'line',
+                data: yTout,
+                smooth: true,
+                yAxisIndex: 0, // Share left axis or hide
+                showSymbol: false,
+                lineStyle: { width: 1, color: '#2563eb', opacity: 0.5 },
+                itemStyle: { opacity: 0 } // Hidden mostly, just for tooltip
             }
         ]
     };
 
     chart.setOption(option);
+    window.addEventListener('resize', () => chart.resize());
+}
 
-    let tableDiv = dom.nextElementSibling;
-    if (tableDiv && tableDiv.classList.contains('state-table-container')) {
-        tableDiv.style.display = 'none';
+export function drawPVDiagram(pvData, domId) {
+    const dom = document.getElementById(domId);
+    if (!dom) return;
+
+    dom.classList.remove('hidden');
+    let chart = echarts.getInstanceByDom(dom);
+    if (chart) chart.clear();
+    else chart = echarts.init(dom);
+
+    // pvData: { p_in, p_out, v_in, v_out, n_poly, stages }
+    // Generate Curve Data (P * v^n = C)
+    const points = [];
+    const steps = 50;
+
+    // 1. Suction Line (Point 4 -> 1): Constant P_in
+    // 假设 V_clearance = 0.05 * V_swept (简化绘制)
+    const v_swept = pvData.v_in;
+    const v_clearance = v_swept * 0.05;
+    const v_1 = v_swept + v_clearance;
+
+    // 2. Compression Curve (Point 1 -> 2)
+    const p1 = pvData.p_in;
+    const v1 = v_1;
+    const n = pvData.n_poly || 1.3;
+    const C = p1 * Math.pow(v1, n); // Constant
+    const p2 = pvData.p_out;
+    const v2 = Math.pow(C / p2, 1 / n);
+
+    // Generate compression path
+    const compLine = [];
+    for (let i = 0; i <= steps; i++) {
+        const p_curr = p1 + (p2 - p1) * (i / steps);
+        const v_curr = Math.pow(C / p_curr, 1 / n);
+        compLine.push([v_curr, p_curr]);
     }
+    // Reverse to go 1 -> 2 (Low P to High P)
+    // Actually standard PV loops go clockwise. 
+    // Suction: (v_clearance, p1) -> (v1, p1)
+    // Comp: (v1, p1) -> (v2, p2)
+    // Disch: (v2, p2) -> (v_clearance_high_p, p2) ... simplified
 
+    const seriesData = [];
+    // Suction
+    seriesData.push([0, p1]); // Start
+    seriesData.push([v1, p1]); // End of suction
+    // Compression
+    // Need to generate points from v1 to v2 based on P
+    // Using simple approach: P = C / V^n
+    const stepV = (v1 - v2) / steps;
+    for (let i = 0; i <= steps; i++) {
+        const v = v1 - i * stepV;
+        const p = C / Math.pow(v, n);
+        seriesData.push([v, p]);
+    }
+    // Discharge (Idealized)
+    seriesData.push([0, p2]);
+    // Close loop
+    seriesData.push([0, p1]);
+
+    const option = {
+        title: {
+            text: 'Indicator P-V Diagram',
+            subtext: `n = ${n.toFixed(2)} (Polytropic)`,
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            formatter: (params) => {
+                const p = params[0].value;
+                return `V: ${p[0].toFixed(4)} m³/kg<br/>P: ${p[1].toFixed(2)} bar`;
+            }
+        },
+        grid: {
+            top: 70,
+            right: 40,
+            bottom: 60, // <--- 关键修改：增加底部空间给 X 轴标题
+            left: 60,
+            containLabel: true // <--- 关键修改：自动计算标签空间，彻底防止被切
+        },
+        xAxis: {
+            name: 'Specific Volume (m³/kg)',
+            nameLocation: 'middle',
+            nameGap: 25,
+            type: 'value',
+            min: 0
+        },
+        yAxis: {
+            name: 'Pressure (bar)',
+            type: 'value',
+            min: 0
+        },
+        series: [
+            {
+                name: 'PV Cycle',
+                type: 'line',
+                smooth: true,
+                data: seriesData,
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(6, 182, 212, 0.4)' }, // Cyan for Air
+                        { offset: 1, color: 'rgba(6, 182, 212, 0.1)' }
+                    ])
+                },
+                lineStyle: { color: '#0891b2', width: 2 },
+                itemStyle: { opacity: 0 } // Hide dots
+            }
+        ]
+    };
+
+    chart.setOption(option);
     window.addEventListener('resize', () => chart.resize());
 }
