@@ -31,7 +31,7 @@ const CONVERSIONS = {
         digits: 1
     },
     delta_temp: { // Temperature Difference
-        si: 'K', imp: '°R', 
+        si: 'K', imp: '°R',
         toImp: (v) => v * 1.8,
         digits: 1
     },
@@ -42,7 +42,7 @@ const CONVERSIONS = {
     },
     std_flow: { // Standard Flow (Nm3/h vs SCFM)
         si: 'Nm³/h', imp: 'SCFM',
-        toImp: (v) => v * 0.588578, 
+        toImp: (v) => v * 0.588578,
         digits: 1
     },
     flow_mass: {
@@ -57,12 +57,12 @@ const CONVERSIONS = {
     },
     spec_power: {
         si: 'kW/(m³/min)', imp: 'kW/100cfm',
-        toImp: (v) => v * 1.699, 
+        toImp: (v) => v * 1.699,
         digits: 2
     },
     sec: { // Specific Energy Consumption (MVR)
-        si: 'kWh/ton', imp: 'BTU/lb', 
-        toImp: (v) => v * 1.9, 
+        si: 'kWh/ton', imp: 'BTU/lb',
+        toImp: (v) => v * 1.9,
         digits: 2
     },
     vcc: { // Volumetric Cooling Capacity
@@ -98,13 +98,13 @@ const CONVERSIONS = {
 export function formatValue(valueSI, type, overrideDigits = null) {
     if (valueSI === null || valueSI === undefined || valueSI === '' || isNaN(valueSI)) return '-';
     if (!isFinite(valueSI)) return 'Inf';
-    
+
     const def = CONVERSIONS[type];
-    if (!def) return Number(valueSI).toFixed(2); 
+    if (!def) return Number(valueSI).toFixed(2);
 
     let val = valueSI;
     let unit = def.si;
-    
+
     if (!UnitState.isMetric()) {
         val = def.toImp(valueSI);
         unit = def.imp;
@@ -131,7 +131,7 @@ export function getDiffHtml(current, baseline, inverse = false) {
     if (!baseline || baseline === 0) return '';
     const diffPct = ((current - baseline) / baseline) * 100;
     const absDiff = Math.abs(diffPct);
-    if (absDiff < 0.01) return ''; 
+    if (absDiff < 0.01) return '';
     let color = 'text-gray-500';
     const isGood = inverse ? (diffPct < 0) : (diffPct > 0);
     color = isGood ? 'text-green-600' : 'text-red-600';
@@ -194,7 +194,7 @@ export class AutoSaveManager {
             const raw = localStorage.getItem(this.STORAGE_KEY);
             if (!raw) return;
             const data = JSON.parse(raw);
-            
+
             const inputs = document.querySelectorAll('input, select');
             inputs.forEach(el => {
                 if (el.type === 'radio') {
@@ -226,13 +226,13 @@ export class AutoSaveManager {
             if (btn) btn.click();
         } else {
             const btn = document.getElementById('tab-btn-1');
-            if(btn) btn.click();
+            if (btn) btn.click();
         }
     }
 
     static debounce(func, wait) {
         let timeout;
-        return function(...args) {
+        return function (...args) {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(this, args), wait);
         };
@@ -346,7 +346,7 @@ export async function exportToExcel(data, filename) {
     try {
         const rows = [];
         rows.push(["Parameter (参数)", "Value (数值)", "Unit (单位)"]);
-        
+
         const add = (k, v, type) => {
             if (v !== undefined && v !== null) {
                 const val = type ? getConvertedValue(v, type) : v;
@@ -359,15 +359,15 @@ export async function exportToExcel(data, filename) {
         rows.push(["--- INFO ---", "", ""]);
         add("Date", data.date);
         add("Fluid", data.fluid);
-        add("Unit System", UnitState.current); 
-        if(data.is_advanced) add("Config Mode", "Advanced Multi-Stage");
+        add("Unit System", UnitState.current);
+        if (data.is_advanced) add("Config Mode", "Advanced Multi-Stage");
 
         rows.push(["--- CONDITIONS ---", "", ""]);
         add("Suction Pressure", data.p_in, 'pressure');
         add("Suction Temp", data.t_in, 'temp');
-        if(data.z_in) add("Compressibility Z (In)", data.z_in);
-        if(data.gamma_in) add("Isentropic Exp k (In)", data.gamma_in);
-        
+        if (data.z_in) add("Compressibility Z (In)", data.z_in);
+        if (data.gamma_in) add("Isentropic Exp k (In)", data.gamma_in);
+
         if (data.p_out) add("Discharge Pressure", data.p_out, 'pressure');
         if (data.t_out) add("Discharge Temp", data.t_out, 'temp');
         if (data.t_cond) add("Condensing Temp", data.t_cond, 'temp');
@@ -376,7 +376,7 @@ export async function exportToExcel(data, filename) {
         if (data.rpm) add("Speed", data.rpm, '');
         add("Mass Flow", data.m_flow * 3600, 'flow_mass');
         add("Vol Flow (Actual)", (data.v_flow || data.v_flow_in) * 3600, 'flow_vol');
-        if(data.v_flow_std) add("Vol Flow (Standard)", data.v_flow_std * 3600, 'std_flow');
+        if (data.v_flow_std) add("Vol Flow (Standard)", data.v_flow_std * 3600, 'std_flow');
 
         if (data.ihx && data.ihx.enabled) {
             rows.push(["--- IHX (Internal Heat Exchanger) ---", "", ""]);
@@ -389,30 +389,30 @@ export async function exportToExcel(data, filename) {
 
         rows.push(["--- PERFORMANCE ---", "", ""]);
         add("Shaft Power", data.power, 'power');
-        if(data.spec_power) add("Specific Power", data.spec_power, 'spec_power');
-        if(data.sec) add("SEC", data.sec, 'sec');
+        if (data.spec_power) add("Specific Power", data.spec_power, 'spec_power');
+        if (data.sec) add("SEC", data.sec, 'sec');
 
-        if(data.q_evap) add("Cooling Capacity", data.q_evap, 'power'); 
-        if(data.q_cond) add("Heating Capacity", data.q_cond, 'power');
-        
-        if(data.cop_c) add("COP (Cooling)", data.cop_c);
-        if(data.cop_h) add("COP (Heating)", data.cop_h);
-        if(data.vcc) add("VCC", data.vcc, 'vcc');
-        
-        if(data.heat_rejection_ratio) add("Heat Rejection Ratio", data.heat_rejection_ratio);
-        if(data.dew_point) add("Dew Point", data.dew_point, 'temp');
+        if (data.q_evap) add("Cooling Capacity", data.q_evap, 'power');
+        if (data.q_cond) add("Heating Capacity", data.q_cond, 'power');
+
+        if (data.cop_c) add("COP (Cooling)", data.cop_c);
+        if (data.cop_h) add("COP (Heating)", data.cop_h);
+        if (data.vcc) add("VCC", data.vcc, 'vcc');
+
+        if (data.heat_rejection_ratio) add("Heat Rejection Ratio", data.heat_rejection_ratio);
+        if (data.dew_point) add("Dew Point", data.dew_point, 'temp');
 
         // 添加空行分隔
         rows.push(["", "", ""]);
         rows.push(["", "", ""]);
-        
+
         // 添加作者和免责声明
         rows.push(["Created by", "荆炎荣 (Jing Yanrong)", ""]);
         rows.push(["Disclaimer", "本计算结果仅供参考，不作为最终设计依据。", ""]);
         rows.push(["", "Simulation results are for reference only.", ""]);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }]; 
+        ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 15 }];
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Datasheet");
@@ -436,7 +436,7 @@ export function renderStateTable(domId, points) {
     let tableDiv = chartDiv.nextElementSibling;
     if (!tableDiv || !tableDiv.classList.contains('state-table-container')) {
         tableDiv = document.createElement('div');
-        tableDiv.className = 'state-table-container mt-6 mb-8'; 
+        tableDiv.className = 'state-table-container mt-6 mb-8';
         chartDiv.parentNode.insertBefore(tableDiv, chartDiv.nextSibling);
     }
 
@@ -476,6 +476,8 @@ export function renderStateTable(domId, points) {
     `;
 }
 
+// [请定位到 src/js/utils.js 的底部，替换整个 drawPhDiagram 函数]
+
 export function drawPhDiagram(CP, fluid, cycleData, domId) {
     const dom = document.getElementById(domId);
     if (!dom) return;
@@ -483,7 +485,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     dom.classList.remove('hidden');
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
-        existingChart.clear(); 
+        existingChart.clear();
     }
 
     let chart = existingChart || echarts.init(dom);
@@ -492,10 +494,10 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
     try {
         const T_crit = CP.PropsSI('Tcrit', '', 0, '', 0, fluid);
         const P_crit = CP.PropsSI('Pcrit', '', 0, '', 0, fluid);
-        const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid); 
-        
-        const T_start = T_min + 5; 
-        const T_end = T_crit - 0.5; 
+        const T_min = CP.PropsSI('Tmin', '', 0, '', 0, fluid);
+
+        const T_start = T_min + 5;
+        const T_end = T_crit - 0.5;
         const steps = 100;
         const stepSize = (T_end - T_start) / steps;
 
@@ -518,10 +520,10 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
 
         try {
             H_crit = CP.PropsSI('H', 'T', T_crit, 'P', P_crit, fluid) / 1000.0;
-        } catch(e) {
-            if(lineLiquid.length > 0) {
-                const lastL = lineLiquid[lineLiquid.length-1];
-                const lastV = lineVapor[lineVapor.length-1];
+        } catch (e) {
+            if (lineLiquid.length > 0) {
+                const lastL = lineLiquid[lineLiquid.length - 1];
+                const lastV = lineVapor[lineVapor.length - 1];
                 H_crit = (lastL[0] + lastV[0]) / 2;
             }
         }
@@ -531,7 +533,7 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
         if (cycleData && cycleData.points) {
             cycleData.points.forEach(pt => {
                 cycleSeriesData.push({
-                    name: pt.name,
+                    name: pt.name, // 这里存储了 "1", "2", "3" 等
                     value: [pt.h / 1000.0, pt.p / 1e5],
                     labelInfo: {
                         t: (pt.t - 273.15).toFixed(2),
@@ -539,16 +541,17 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     }
                 });
             });
+            // 闭合循环
             if (cycleSeriesData.length > 0) {
                 cycleSeriesData.push(cycleSeriesData[0]);
             }
         }
 
         const option = {
-            title: { 
-                text: `P-h Diagram: ${fluid}`, 
-                subtext: `Critical Point: ${(T_crit-273.15).toFixed(1)}°C / ${(P_crit/1e5).toFixed(1)} bar`,
-                left: 'center', 
+            title: {
+                text: `P-h Diagram: ${fluid}`,
+                subtext: `Critical Point: ${(T_crit - 273.15).toFixed(1)}°C / ${(P_crit / 1e5).toFixed(1)} bar`,
+                left: 'center',
                 top: 5,
                 textStyle: { fontSize: 14, color: '#333' }
             },
@@ -558,47 +561,47 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     if (params.seriesName === 'Cycle') {
                         const info = params.data.labelInfo;
                         let s = `<b>Pt ${params.name}</b><br/>`;
-                        if(info && info.desc) s += `<span style="font-size:10px; color:#ccc">${info.desc}</span><br/>`;
+                        if (info && info.desc) s += `<span style="font-size:10px; color:#ccc">${info.desc}</span><br/>`;
                         s += `P: ${params.value[1].toFixed(2)} bar<br/>`;
                         s += `H: ${params.value[0].toFixed(1)} kJ/kg<br/>`;
                         if (info) s += `T: ${info.t} °C`;
                         return s;
                     } else if (params.seriesName === 'Critical Point') {
-                         return `<b>Critical Point</b><br/>P: ${params.value[1].toFixed(2)} bar`;
+                        return `<b>Critical Point</b><br/>P: ${params.value[1].toFixed(2)} bar`;
                     }
                     return params.seriesName;
                 }
             },
             grid: { top: 70, right: 50, bottom: 50, left: 60 },
-            xAxis: { 
-                name: 'Enthalpy (kJ/kg)', 
+            xAxis: {
+                name: 'Enthalpy (kJ/kg)',
                 nameLocation: 'middle',
                 nameGap: 30,
-                type: 'value', 
-                scale: true, 
+                type: 'value',
+                scale: true,
                 splitLine: { show: false }
             },
-            yAxis: { 
-                name: 'Pressure (bar)', 
-                type: 'log', 
-                logBase: 10, 
+            yAxis: {
+                name: 'Pressure (bar)',
+                type: 'log',
+                logBase: 10,
                 scale: true,
                 axisLabel: { formatter: (value) => Number(value).toString() }
             },
             series: [
-                { 
-                    name: 'Sat. Liquid', 
-                    type: 'line', 
-                    showSymbol: false, 
-                    data: lineLiquid, 
+                {
+                    name: 'Sat. Liquid',
+                    type: 'line',
+                    showSymbol: false,
+                    data: lineLiquid,
                     lineStyle: { color: '#0000ff', width: 1.5 },
-                    silent: true 
+                    silent: true
                 },
-                { 
-                    name: 'Sat. Vapor', 
-                    type: 'line', 
-                    showSymbol: false, 
-                    data: lineVapor, 
+                {
+                    name: 'Sat. Vapor',
+                    type: 'line',
+                    showSymbol: false,
+                    data: lineVapor,
                     lineStyle: { color: '#ff0000', width: 1.5 },
                     silent: true
                 },
@@ -615,29 +618,30 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     type: 'line',
                     data: cycleSeriesData,
                     symbol: 'circle',
-                    symbolSize: 10,
+                    symbolSize: 12, // 稍微加大点的大小，让数字更清晰
                     smooth: false,
-                    label: { 
-                        show: true, 
-                        formatter: '{@name}', 
-                        position: 'top', 
-                        fontWeight: 'bold', 
-                        fontSize: 12,
-                        color: '#000',
-                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                        padding: [2, 4],
-                        borderRadius: 3,
-                        distance: 5
+                    label: {
+                        show: true,
+                        // ✅ [关键修改]: 改为 '{b}'，代表数据项名称 (name)
+                        formatter: '{b}',
+                        position: 'top',
+                        fontWeight: 'bold',
+                        fontSize: 14, // 加大字体
+                        color: '#fff', // 改为白色文字
+                        backgroundColor: '#059669', // 增加绿色背景块
+                        padding: [3, 5],
+                        borderRadius: 4,
+                        distance: 8
                     },
                     lineStyle: { color: '#059669', width: 2.5, type: 'solid' },
-                    itemStyle: { color: '#059669', borderColor: '#fff', borderWidth: 1 }
+                    itemStyle: { color: '#059669', borderColor: '#fff', borderWidth: 2 }
                 }
             ]
         };
 
         chart.hideLoading();
         chart.setOption(option);
-        
+
         let tableDiv = dom.nextElementSibling;
         if (tableDiv && tableDiv.classList.contains('state-table-container')) {
             tableDiv.style.display = 'block';
@@ -663,7 +667,7 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     dom.classList.remove('hidden');
     const existingChart = echarts.getInstanceByDom(dom);
     if (existingChart) {
-        existingChart.clear(); 
+        existingChart.clear();
     }
 
     let chart = existingChart || echarts.init(dom);
@@ -672,14 +676,14 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
     try {
         const maxCOP = Math.max(...optimizationData.map(d => d.cop));
         let optP = 0;
-        optimizationData.forEach(d => { if(d.cop === maxCOP) optP = d.p; });
+        optimizationData.forEach(d => { if (d.cop === maxCOP) optP = d.p; });
 
         const option = {
             title: {
                 text: 'CO₂ Transcritical Optimization',
                 subtext: `Optimal P: ${optP.toFixed(1)} bar (COP: ${maxCOP.toFixed(3)})`,
                 left: 'center',
-                textStyle: { color: '#c2410c', fontWeight: 'bold' } 
+                textStyle: { color: '#c2410c', fontWeight: 'bold' }
             },
             tooltip: {
                 trigger: 'axis',
@@ -719,10 +723,10 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
                     markLine: {
                         symbol: 'none',
                         data: [
-                            { 
-                                xAxis: currentP, 
+                            {
+                                xAxis: currentP,
                                 label: { formatter: 'Current P', position: 'end' },
-                                lineStyle: { color: '#333', type: 'dashed' } 
+                                lineStyle: { color: '#333', type: 'dashed' }
                             }
                         ]
                     }
@@ -732,7 +736,7 @@ export function drawOptimizationCurve(domId, optimizationData, currentP) {
 
         chart.hideLoading();
         chart.setOption(option);
-        
+
         let tableDiv = dom.nextElementSibling;
         if (tableDiv && tableDiv.classList.contains('state-table-container')) {
             tableDiv.style.display = 'none';
@@ -810,7 +814,7 @@ export function drawPerformanceMap(domId, batchData) {
                 yAxisIndex: 0,
                 itemStyle: { color: '#059669' },
                 lineStyle: { width: 3 },
-                areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0, color:'rgba(5,150,105,0.3)'}, {offset:1, color:'rgba(5,150,105,0.05)'}]) }
+                areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(5,150,105,0.3)' }, { offset: 1, color: 'rgba(5,150,105,0.05)' }]) }
             },
             {
                 name: 'Specific Power (kW/m³/min)',
@@ -825,7 +829,7 @@ export function drawPerformanceMap(domId, batchData) {
     };
 
     chart.setOption(option);
-    
+
     let tableDiv = dom.nextElementSibling;
     if (tableDiv && tableDiv.classList.contains('state-table-container')) {
         tableDiv.style.display = 'none';

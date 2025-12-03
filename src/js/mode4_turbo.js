@@ -283,10 +283,10 @@ async function calculateMode5(CP) {
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
 
             const points = [
-                { name: 'In', desc: 'Suc', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
-                { name: 'Dry', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: current_s }
+                { name: '1', desc: 'Suction', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
+                { name: '2', desc: 'Disch(Dry)', p: p_out, t: t_out_dry, h: h_out_dry, s: current_s }
             ];
-            if (m_water > 0) points.push({ name: 'Fin', desc: 'Cooled', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
+            if (m_water > 0) points.push({ name: '3', desc: 'Final', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
 
             lastMode5Data = {
                 date: new Date().toLocaleDateString(),

@@ -280,10 +280,10 @@ async function calculateMode4(CP) {
             if (chartDivM4) {
                 chartDivM4.classList.remove('hidden');
                 const points = [
-                    { name: '1', desc: 'Suc', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
-                    { name: '2', desc: 'Dry', p: p_out, t: t_out_dry, h: h_out_dry, s: stateIn.s } // Isentropic path
+                    { name: '1', desc: 'Suction', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
+                    { name: '2', desc: 'Disch(Dry)', p: p_out, t: t_out_dry, h: h_out_dry, s: stateIn.s } // Isentropic path approximation
                 ];
-                if (m_water > 0) points.push({ name: '3', desc: 'Fin', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
+                if (m_water > 0) points.push({ name: '3', desc: 'Final', p: p_out, t: t_out_final, h: h_out_final, s: s_out_final });
                 drawPhDiagram(CP, fluid, { points }, 'chart-m4');
             }
 

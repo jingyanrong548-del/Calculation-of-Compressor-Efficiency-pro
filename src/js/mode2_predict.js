@@ -527,23 +527,22 @@ async function calculateMode1_CO2(CP) {
             if (chartDivM1) { chartDivM1.classList.remove('hidden'); drawPh(); }
 
             function drawPh() {
-                const h_4 = h_point3a;
                 let points = [];
                 if (ihxResult && ihxResult.enabled) {
                     points = [
-                        { name: '1a', desc: 'EvapOut', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                        { name: '1b', desc: 'CmpIn', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
-                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
-                        { name: '3a', desc: 'GCOut', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
-                        { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
-                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
+                        { name: '1a', desc: 'Evap Out', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
+                        { name: '1b', desc: 'Comp In', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
+                        { name: '2', desc: 'Discharge', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                        { name: '3a', desc: 'GC Out', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                        { name: '3b', desc: 'Valve In', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
+                        { name: '4', desc: 'Evap In', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
                     ];
                 } else {
                     points = [
-                        { name: '1', desc: 'Suc', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                        { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
-                        { name: '3', desc: 'Out', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
-                        { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
+                        { name: '1', desc: 'Suction', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
+                        { name: '2', desc: 'Discharge', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                        { name: '3', desc: 'GC Out', p: p_out, t: t_out_point3a_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                        { name: '4', desc: 'Evap In', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
                     ];
                 }
                 drawPhDiagram(CP, fluid, { points }, 'chart-m1');
@@ -663,19 +662,19 @@ async function calculateMode1(CP) {
             let points = [];
             if (ihxResult && ihxResult.enabled) {
                 points = [
-                    { name: '1a', desc: 'EvapOut', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                    { name: '1b', desc: 'CmpIn', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
-                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
-                    { name: '3a', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
-                    { name: '3b', desc: 'VlvIn', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
-                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
+                    { name: '1a', desc: 'Evap Out', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
+                    { name: '1b', desc: 'Comp In', p: p_in, t: compInlet.t, h: compInlet.h, s: compInlet.s },
+                    { name: '2', desc: 'Discharge', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                    { name: '3a', desc: 'Cond Out', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                    { name: '3b', desc: 'Valve In', p: p_out, t: valveInlet.t, h: valveInlet.h, s: CP.PropsSI('S', 'P', p_out, 'H', valveInlet.h, fluid) },
+                    { name: '4', desc: 'Evap In', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', valveInlet.h, fluid), h: valveInlet.h, s: CP.PropsSI('S', 'P', p_in, 'H', valveInlet.h, fluid) }
                 ];
             } else {
                 points = [
-                    { name: '1', desc: 'Suc', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
-                    { name: '2', desc: 'Dis', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
-                    { name: '3', desc: 'Liq', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
-                    { name: '4', desc: 'Exp', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
+                    { name: '1', desc: 'Suction', p: p_in, t: state1a.t, h: state1a.h, s: state1a.s },
+                    { name: '2', desc: 'Discharge', p: p_out, t: t_out_k, h: h_out, s: CP.PropsSI('S', 'P', p_out, 'H', h_out, fluid) },
+                    { name: '3', desc: 'Cond Out', p: p_out, t: t_liq_k, h: h_point3a, s: CP.PropsSI('S', 'P', p_out, 'H', h_point3a, fluid) },
+                    { name: '4', desc: 'Evap In', p: p_in, t: CP.PropsSI('T', 'P', p_in, 'H', h_point3a, fluid), h: h_point3a, s: CP.PropsSI('S', 'P', p_in, 'H', h_point3a, fluid) }
                 ];
             }
             if (chartDivM1) { chartDivM1.classList.remove('hidden'); drawPhDiagram(CP, fluid, { points }, 'chart-m1'); }
@@ -758,8 +757,8 @@ async function calculateMode2(CP) {
                 chartDivM2.classList.remove('hidden');
                 drawPhDiagram(CP, fluid, {
                     points: [
-                        { name: '1', desc: 'Suc', p: p_in, t: t_in, h: h_in, s: s_in },
-                        { name: '2', desc: 'Dis', p: p_out, t: t_out_final, h: CP.PropsSI('H', 'P', p_out, 'T', t_out_final, fluid), s: CP.PropsSI('S', 'P', p_out, 'T', t_out_final, fluid) }
+                        { name: '1', desc: 'Inlet', p: p_in, t: t_in, h: h_in, s: s_in },
+                        { name: '2', desc: 'Outlet', p: p_out, t: t_out_final, h: CP.PropsSI('H', 'P', p_out, 'T', t_out_final, fluid), s: CP.PropsSI('S', 'P', p_out, 'T', t_out_final, fluid) }
                     ]
                 }, 'chart-m2');
             }
