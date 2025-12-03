@@ -67,7 +67,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.dispatchEvent(new Event('unit-change'));
             });
         }
-
+        // ✅ [插入] 绑定退出按钮逻辑
+        const btnExit = document.getElementById('btn-exit');
+        if (btnExit) {
+            btnExit.addEventListener('click', () => {
+                if (confirm("Close the application?")) {
+                    window.close(); // 尝试关闭窗口
+                    // 如果是 PWA 或被脚本拦截无法关闭，提示用户
+                    setTimeout(() => alert("Web 浏览器限制自动关闭。\n请手动关闭标签页或应用窗口。"), 200);
+                }
+            });
+        }
         const pinBtn = document.getElementById('btn-pin-baseline');
         if (pinBtn) {
             pinBtn.addEventListener('click', () => {

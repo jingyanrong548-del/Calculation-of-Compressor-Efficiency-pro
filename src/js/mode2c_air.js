@@ -3,7 +3,7 @@
 // 版本: v8.45 (Stable: Std Flow, Dew Point, UI Suffix Fix)
 // =====================================================================
 
-import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml } from './utils.js';
+import { exportToExcel, drawPerformanceMap, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
 import { stageConfigMgr } from './stage_config.js';
 
 let calcButtonM3, resultsDivM3, calcFormM3, printButtonM3, exportButtonM3, chartDivM3;
@@ -429,13 +429,21 @@ export function initMode3(CP) {
         calcFormM3.addEventListener('submit', (e) => { e.preventDefault(); calculateMode3(CP); });
     }
 
+    // 2. ✅ [修改] initMode3 函数中的打印逻辑 (约第 340 行)
     if (printButtonM3) {
         printButtonM3.onclick = () => {
             if (lastMode3Data || lastBatchData) {
-                const win = window.open('', '_blank');
-                const content = lastBatchData ? generateBatchTable(lastBatchData) : generateAirDatasheet(lastMode3Data, baselineMode3);
-                win.document.write(`<html><head><title>Air Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${content}</body></html>`);
-                setTimeout(() => win.print(), 200);
+                let content;
+                if (lastBatchData) {
+                    content = generateBatchTable(lastBatchData);
+                    // 批量模式图表 ID 为 chart-m3
+                    generatePrintPage(content, 'chart-m3');
+                } else {
+                    content = generateAirDatasheet(lastMode3Data, baselineMode3);
+                    // 单点模式无图表或图表不重要，这里也可以传 'chart-m3' 如果有绘制的话
+                    // 如果单点模式不需要打印图表，第二个参数传 null
+                    generatePrintPage(content, null);
+                }
             } else alert("Please Calculate First");
         };
     }

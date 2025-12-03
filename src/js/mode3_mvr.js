@@ -4,7 +4,7 @@
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml } from './utils.js';
+import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
 
 let calcButtonM4, resultsDivM4, calcFormM4, printButtonM4, exportButtonM4, chartDivM4, fluidSelectM4;
 let lastMode4Data = null;
@@ -57,7 +57,7 @@ function generateMVRDatasheet(d, base = null) {
     const rowCmp = (label, valSI, baseSI, type, inverse = false, suffix = '') => {
         let formatted = formatValue(valSI, type);
         if (suffix) formatted += `<span class="text-xs text-gray-400 ml-0.5">${suffix}</span>`;
-        
+
         const diff = base ? getDiffHtml(valSI, baseSI, inverse) : '';
         return `
         <div class="flex justify-between items-start py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -165,21 +165,21 @@ function generateMVRDatasheet(d, base = null) {
 function getFlowRate(formData, density_in) {
     const mode = formData.get('flow_mode_m4');
     let m_flow = 0, v_flow_in = 0, rpm = 0;
-    
+
     const vol_eff = parseFloat(formData.get('vol_eff_m4') || '80') / 100.0;
 
     if (mode === 'rpm') {
         rpm = parseFloat(formData.get('rpm_m4'));
-        const disp = parseFloat(formData.get('vol_disp_m4')) / 1e6; 
+        const disp = parseFloat(formData.get('vol_disp_m4')) / 1e6;
         const v_flow_th = (rpm / 60.0) * disp;
-        v_flow_in = v_flow_th * vol_eff; 
+        v_flow_in = v_flow_th * vol_eff;
         m_flow = v_flow_in * density_in;
     } else if (mode === 'mass') {
         m_flow = parseFloat(formData.get('mass_flow_m4')) / 3600.0; // kg/h -> kg/s
         v_flow_in = m_flow / density_in;
     } else if (mode === 'vol') {
         const v_flow_th = parseFloat(formData.get('vol_flow_m4')) / 3600.0;
-        v_flow_in = v_flow_th * vol_eff; 
+        v_flow_in = v_flow_th * vol_eff;
         m_flow = v_flow_in * density_in;
     }
     return { m_flow, v_flow_in, rpm };
@@ -195,34 +195,34 @@ async function calculateMode4(CP) {
         try {
             const formData = new FormData(calcFormM4);
             const fluid = formData.get('fluid_m4');
-            
+
             const p_in = parseFloat(formData.get('p_in_m4')) * 1e5;
             const sh_in = parseFloat(formData.get('SH_in_m4')) || 0;
             const t_sat_in = CP.PropsSI('T', 'P', p_in, 'Q', 1, fluid);
-            
+
             // [FIX] Use Guardkeeper for Suction State
             const stateIn = getFluidState(CP, fluid, p_in, t_sat_in, sh_in);
 
             const dt = parseFloat(formData.get('delta_T_m4'));
             const p_out = CP.PropsSI('P', 'T', t_sat_in + dt, 'Q', 1, fluid);
-            
+
             const { m_flow, v_flow_in, rpm } = getFlowRate(formData, stateIn.d);
 
-            const eff_is = parseFloat(formData.get('eff_isen_m4'))/100;
-            
+            const eff_is = parseFloat(formData.get('eff_isen_m4')) / 100;
+
             // Calculate Discharge (Isentropic -> Real)
             const h_out_is = CP.PropsSI('H', 'P', p_out, 'S', stateIn.s, fluid);
             const w_real = (h_out_is - stateIn.h) / eff_is;
             const h_out_dry = stateIn.h + w_real;
             const t_out_dry = CP.PropsSI('T', 'P', p_out, 'H', h_out_dry, fluid);
-            
+
             const power = w_real * m_flow / 1000.0; // kW
 
             // Injection Logic
             const is_desuperheat = document.getElementById('enable_desuperheat_m4').checked;
             const t_water = parseFloat(formData.get('T_water_in_m4')) || 30;
             const target_sh = parseFloat(formData.get('target_superheat_m4')) || 0;
-            
+
             let m_water = 0;
             let h_out_final = h_out_dry;
             let t_out_final = t_out_dry;
@@ -250,7 +250,7 @@ async function calculateMode4(CP) {
                 }
             }
             const s_out_final = CP.PropsSI('S', 'P', p_out, 'H', h_out_final, fluid);
-            
+
             // [NEW] Latent Heat & SEC Calculation
             const h_gas = CP.PropsSI('H', 'P', p_in, 'Q', 1, fluid);
             const h_liq = CP.PropsSI('H', 'P', p_in, 'Q', 0, fluid);
@@ -263,21 +263,21 @@ async function calculateMode4(CP) {
 
             lastMode4Data = {
                 date: new Date().toLocaleDateString(),
-                fluid, p_in: p_in/1e5, 
+                fluid, p_in: p_in / 1e5,
                 t_sat_in: t_sat_in - 273.15, sh_in,
-                dt, rpm, eff_is, eff_vol: parseFloat(formData.get('vol_eff_m4'))/100,
-                p_out: p_out/1e5, t_sat_out: t_sat_out - 273.15, 
+                dt, rpm, eff_is, eff_vol: parseFloat(formData.get('vol_eff_m4')) / 100,
+                p_out: p_out / 1e5, t_sat_out: t_sat_out - 273.15,
                 t_out_dry: t_out_dry - 273.15,
                 t_out_final: t_out_final - 273.15,
-                power, m_flow, v_flow_in, 
+                power, m_flow, v_flow_in,
                 is_desuperheat, m_water, t_water,
-                sec, 
+                sec,
                 latent_heat: latent / 1000.0 // <--- 修复: 除以 1000 转换为 kJ/kg
             };
 
             resultsDivM4.innerHTML = generateMVRDatasheet(lastMode4Data, baselineMode4);
-            
-            if(chartDivM4) {
+
+            if (chartDivM4) {
                 chartDivM4.classList.remove('hidden');
                 const points = [
                     { name: '1', desc: 'Suc', p: p_in, t: stateIn.t, h: stateIn.h, s: stateIn.s },
@@ -292,8 +292,8 @@ async function calculateMode4(CP) {
         } finally {
             calcButtonM4.textContent = "计算 MVR";
             calcButtonM4.disabled = false;
-            if(printButtonM4) printButtonM4.disabled = false;
-            if(exportButtonM4) exportButtonM4.disabled = false;
+            if (printButtonM4) printButtonM4.disabled = false;
+            if (exportButtonM4) exportButtonM4.disabled = false;
         }
     }, 50);
 }
@@ -306,26 +306,25 @@ export function initMode4(CP) {
     exportButtonM4 = document.getElementById('export-button-4');
     chartDivM4 = document.getElementById('chart-m4');
     fluidSelectM4 = document.getElementById('fluid_m4');
-    
+
     if (calcFormM4) {
         const aiSelect = document.getElementById('ai_eff_m4');
-        if(aiSelect) {
+        if (aiSelect) {
             aiSelect.addEventListener('change', () => {
                 if (aiSelect.value === 'roots') { document.getElementById('eff_isen_m4').value = 60; document.getElementById('vol_eff_m4').value = 75; }
                 else if (aiSelect.value === 'screw_mvr') { document.getElementById('eff_isen_m4').value = 75; document.getElementById('vol_eff_m4').value = 85; }
             });
         }
         calcFormM4.addEventListener('submit', (e) => { e.preventDefault(); calculateMode4(CP); });
-        if(fluidSelectM4) {
+        if (fluidSelectM4) {
             fluidSelectM4.addEventListener('change', () => updateFluidInfo(fluidSelectM4, document.getElementById('fluid-info-m4'), CP));
         }
     }
     if (printButtonM4) {
         printButtonM4.onclick = () => {
             if (lastMode4Data) {
-                const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>MVR Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateMVRDatasheet(lastMode4Data, baselineMode4)}</body></html>`);
-                setTimeout(() => win.print(), 200);
+                const content = generateMVRDatasheet(lastMode4Data, baselineMode4);
+                generatePrintPage(content, 'chart-m4'); // 传入图表 ID
             } else alert("Please Calculate First");
         };
     }

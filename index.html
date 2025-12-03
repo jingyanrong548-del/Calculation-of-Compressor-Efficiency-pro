@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>无油压缩机性能计算器 v8.53 (Brands)</title>
 
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f766e">
-    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+    <link rel="apple-touch-icon" href="pwa-192x192.png">
 
-    <link rel="stylesheet" href="/src/css/style.css">
+    <link rel="stylesheet" href="src/css/style.css">
     <style>
         .sub-tab-btn.active {
             background-color: #059669;
@@ -74,6 +74,11 @@
                     <button id="btn-open-load"
                         class="flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 border border-blue-200 transition text-sm font-bold shadow-sm">📂
                         Load</button>
+                    
+                    <button id="btn-exit"
+                        class="flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 border border-red-200 transition text-sm font-bold shadow-sm ml-2">
+                        🚪 Exit
+                    </button>
                 </div>
                 <div class="hidden md:block w-px h-6 bg-gray-300 mx-2"></div>
                 <div class="flex space-x-4 items-center">
@@ -231,10 +236,12 @@
                             </div>
                             <div class="space-y-6">
                                 <h2 class="text-2xl font-semibold text-green-700 mb-4 border-b pb-2">2. 流量配置 (Flow)</h2>
-                                
+
                                 <div class="input-group mb-4">
-                                    <label class="block text-sm font-bold text-gray-700 mb-1">🏷️ 快速选型 (Quick Select)</label>
-                                    <select id="compressor_model_selector_m1" class="block w-full px-3 py-2 border border-green-200 bg-green-50 rounded-md shadow-sm text-sm font-medium">
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">🏷️ 快速选型 (Quick
+                                        Select)</label>
+                                    <select id="compressor_model_selector_m1"
+                                        class="block w-full px-3 py-2 border border-green-200 bg-green-50 rounded-md shadow-sm text-sm font-medium">
                                         <option value="custom" selected>-- 自定义 (Custom) --</option>
                                         <optgroup label="Danfoss (丹佛斯) - 定频">
                                             <option value="SY240">SY240 (347.8 cm³ / 2900 rpm)</option>
@@ -258,10 +265,12 @@
                                                 type="radio" name="flow_mode_m1" value="vol"> Vol (Theo)</label></div>
                                     <div id="flow-inputs-rpm-m1" class="grid grid-cols-2 gap-4">
                                         <div><label class="text-sm text-gray-600">Speed (RPM)</label><input
-                                                name="rpm_m1" id="rpm_m1" value="3000" class="w-full border rounded px-3 py-2">
+                                                name="rpm_m1" id="rpm_m1" value="3000"
+                                                class="w-full border rounded px-3 py-2">
                                         </div>
                                         <div><label class="text-sm text-gray-600">Disp (cm³)</label><input
-                                                name="vol_disp_m1" id="vol_disp_m1" value="500" class="w-full border rounded px-3 py-2">
+                                                name="vol_disp_m1" id="vol_disp_m1" value="500"
+                                                class="w-full border rounded px-3 py-2">
                                         </div>
                                     </div>
                                     <div id="flow-inputs-mass-m1" class="hidden"><label
@@ -869,7 +878,7 @@
         </div>
     </div>
 
-    <script type="module" src="/src/js/main.js"></script>
+    <script type="module" src="src/js/main.js"></script>
     <script>document.addEventListener('DOMContentLoaded', () => {
             const t = (c, d) => { if (c && d) { const f = () => { d.style.display = c.checked ? 'block' : 'none'; d.classList.toggle('hidden', !c.checked) }; c.addEventListener('change', f); f() } };
             t(document.getElementById('enable_desuperheat_m4'), document.getElementById('desuperheat-inputs-m4'));
@@ -882,4 +891,3 @@
 </body>
 
 </html>
-}

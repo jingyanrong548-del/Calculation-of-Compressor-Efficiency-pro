@@ -4,7 +4,7 @@
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, drawOptimizationCurve, exportToExcel, formatValue, getDiffHtml } from './utils.js';
+import { drawPhDiagram, drawOptimizationCurve, exportToExcel, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
 
 let CP_INSTANCE = null;
 
@@ -639,7 +639,7 @@ async function calculateMode1(CP) {
 
             lastMode1Data = {
                 date: new Date().toLocaleDateString(), fluid,
-                p_in: p_in/1e5, t_in: state1a.t-273.15, p_out: p_out/1e5, t_out: t_out_k-273.15,
+                p_in: p_in / 1e5, t_in: state1a.t - 273.15, p_out: p_out / 1e5, t_out: t_out_k - 273.15,
                 sh_out,
                 t_cond,
                 static_sc: sc,
@@ -647,14 +647,14 @@ async function calculateMode1(CP) {
                 t_sat_evap: t_evap,
                 static_sh: sh,
                 total_sh: compInlet.t - (t_evap + 273.15),
-                m_flow, v_flow: v_flow_in, power, q_evap, q_cond, 
-                cop_c: q_evap/power, cop_h: q_cond/power,
-                heat_rejection_ratio: q_cond/q_evap, 
+                m_flow, v_flow: v_flow_in, power, q_evap, q_cond,
+                cop_c: q_evap / power, cop_h: q_cond / power,
+                heat_rejection_ratio: q_cond / q_evap,
                 vcc: vcc / 1000.0, // <--- 【修复】: 除以 1000 转换为 kJ/m³
                 flash_gas,
                 eff_isen, eff_vol: vol_eff, eff_note: "Standard",
                 z_in: state1a.z, gamma_in: state1a.k, d_in: state1a.d, sound_speed_in: state1a.a,
-                z_out, gamma_out, pr: p_out/p_in,
+                z_out, gamma_out, pr: p_out / p_in,
                 ihx: ihxResult
             };
 
@@ -798,18 +798,19 @@ export function initMode1_2(CP) {
 
     if (printButtonM1) printButtonM1.onclick = () => {
         if (lastMode1Data) {
-            const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode1Data, lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT", baselineMode1)}</body></html>`);
-            setTimeout(() => win.print(), 200);
+            // 使用新的打印生成器，传入 HTML 内容和图表 ID ('chart-m1')
+            const title = lastMode1Data.fluid.includes('R744') ? "CO2 REPORT" : "HEAT PUMP REPORT";
+            const content = generateDatasheetHTML(lastMode1Data, title, baselineMode1);
+            generatePrintPage(content, 'chart-m1');
         } else alert("Please Calculate First");
     };
     if (exportButtonM1) exportButtonM1.onclick = () => { if (lastMode1Data) exportToExcel(lastMode1Data, "Mode1_Result"); };
 
     if (printButtonM2) printButtonM2.onclick = () => {
         if (lastMode2Data) {
-            const win = window.open('', '_blank');
-            win.document.write(`<html><head><title>Gas Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateDatasheetHTML(lastMode2Data, "GAS REPORT", baselineMode2)}</body></html>`);
-            setTimeout(() => win.print(), 200);
+            // 使用新的打印生成器，传入 HTML 内容和图表 ID ('chart-m2')
+            const content = generateDatasheetHTML(lastMode2Data, "GAS REPORT", baselineMode2);
+            generatePrintPage(content, 'chart-m2');
         } else alert("Please Calculate First");
     };
     if (exportButtonM2) exportButtonM2.onclick = () => { if (lastMode2Data) exportToExcel(lastMode2Data, "Mode2_Gas_Result"); };

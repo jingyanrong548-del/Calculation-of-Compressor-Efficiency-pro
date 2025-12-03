@@ -1,10 +1,9 @@
 // =====================================================================
-// utils.js: 通用工具库 (图表 & 导出 & 状态表 & 数据持久化 & 单位转换)
-// 版本: v8.52 (Optimization: Dynamic Import for XLSX)
+// utils.js: 通用工具库 (图表 & 导出 & 打印生成器 & 单位转换)
+// 版本: v8.54 (Features: Mobile Print Close Button, Chart Snapshot, Labels)
 // =====================================================================
 
 import * as echarts from 'echarts';
-// [Optimization] XLSX removed from static import to reduce initial bundle size
 
 // =====================================================================
 // 1. Unit Conversion Infrastructure
@@ -242,7 +241,90 @@ export class AutoSaveManager {
 
 
 // =====================================================================
-// 3. Excel Export (Optimization: Dynamic Import)
+// 3. Print Generator (FIX: Mobile Close & Chart Image)
+// =====================================================================
+
+export function generatePrintPage(contentHTML, chartDomId) {
+    // 1. Capture Chart as Image (if exists)
+    let chartImgHtml = '';
+    if (chartDomId) {
+        const chartDom = document.getElementById(chartDomId);
+        if (chartDom) {
+            const chartInstance = echarts.getInstanceByDom(chartDom);
+            if (chartInstance) {
+                // High res capture
+                const imgUrl = chartInstance.getDataURL({
+                    type: 'png',
+                    pixelRatio: 2,
+                    backgroundColor: '#fff'
+                });
+                chartImgHtml = `
+                    <div class="mt-8 page-break-inside-avoid border-t-2 border-dashed border-gray-200 pt-6">
+                        <h3 class="text-lg font-bold text-gray-700 mb-4">System Diagram (P-h / Curve)</h3>
+                        <img src="${imgUrl}" style="width: 100%; max-width: 800px; height: auto; border: 1px solid #eee; border-radius: 8px;">
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // 2. Build Mobile-Friendly Close Header
+    const closeHeader = `
+        <div class="no-print fixed top-0 left-0 w-full bg-gray-900 text-white p-4 shadow-lg z-50 flex justify-between items-center">
+            <div class="font-bold text-lg">📄 Print Preview</div>
+            <button onclick="window.close()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-md">
+                ✕ Close
+            </button>
+        </div>
+        <div class="no-print h-20"></div> `;
+
+    // 3. Open Window & Write
+    const win = window.open('', '_blank');
+    if (!win) {
+        alert("Pop-up blocked! Please allow pop-ups for this site.");
+        return;
+    }
+
+    win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Calculation Report</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+                @media print {
+                    .no-print { display: none !important; }
+                    body { padding: 0; background: white; -webkit-print-color-adjust: exact; }
+                    .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
+                }
+                body { background-color: #f3f4f6; padding-bottom: 50px; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            </style>
+        </head>
+        <body>
+            ${closeHeader}
+            <div class="max-w-4xl mx-auto bg-white p-4 md:p-8 shadow-xl print:shadow-none print:p-0">
+                ${contentHTML}
+                ${chartImgHtml}
+            </div>
+            <script>
+                // Auto print after short delay to allow images/fonts to load
+                window.onload = function() {
+                    setTimeout(() => {
+                        window.focus();
+                        window.print();
+                    }, 800);
+                }
+            </script>
+        </body>
+        </html>
+    `);
+    win.document.close();
+}
+
+
+// =====================================================================
+// 4. Excel Export
 // =====================================================================
 
 export async function exportToExcel(data, filename) {
@@ -253,7 +335,6 @@ export async function exportToExcel(data, filename) {
 
     let XLSX;
     try {
-        // [Optimization] Load XLSX only when needed
         const module = await import('xlsx');
         XLSX = module.default || module;
     } catch (err) {
@@ -345,7 +426,7 @@ export async function exportToExcel(data, filename) {
 
 
 // =====================================================================
-// 4. Chart Rendering
+// 5. Chart Rendering (FIX: Labels Visible)
 // =====================================================================
 
 export function renderStateTable(domId, points) {
@@ -539,10 +620,13 @@ export function drawPhDiagram(CP, fluid, cycleData, domId) {
                     label: { 
                         show: true, 
                         formatter: '{@name}', 
-                        position: 'right', 
+                        position: 'top', 
                         fontWeight: 'bold', 
                         fontSize: 12,
                         color: '#000',
+                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        padding: [2, 4],
+                        borderRadius: 3,
                         distance: 5
                     },
                     lineStyle: { color: '#059669', width: 2.5, type: 'solid' },

@@ -4,7 +4,7 @@
 // =====================================================================
 
 import { updateFluidInfo } from './coolprop_loader.js';
-import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml } from './utils.js';
+import { drawPhDiagram, exportToExcel, formatValue, getDiffHtml, generatePrintPage } from './utils.js';
 
 let calcButtonM5, resultsDivM5, calcFormM5, printButtonM5, exportButtonM5, chartDivM5, fluidSelectM5;
 let lastMode5Data = null;
@@ -351,9 +351,8 @@ export function initMode5(CP) {
     if (printButtonM5) {
         printButtonM5.onclick = () => {
             if (lastMode5Data) {
-                const win = window.open('', '_blank');
-                win.document.write(`<html><head><title>MVR Turbo Report</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-4 bg-gray-100">${generateTurboDatasheet(lastMode5Data, baselineMode5)}</body></html>`);
-                setTimeout(() => win.print(), 200);
+                const content = generateTurboDatasheet(lastMode5Data, baselineMode5);
+                generatePrintPage(content, 'chart-m5'); // 传入图表 ID
             } else alert("Please Calculate First");
         };
     }
